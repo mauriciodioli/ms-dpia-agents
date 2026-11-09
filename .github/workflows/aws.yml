@@ -103,6 +103,7 @@ jobs:
             docker run -d --name "$CONTAINER" --label com.dpia.service=ms-dpia-agents \
               --network red_app -p 127.0.0.1:8302:8302 --restart unless-stopped \
               -e HOST=0.0.0.0 -e PORT=8302 -e FLASK_ENV=production \
+              -e AGENTS_TRUSTED_PROXY_IPS=172.18.0.1 \
               "$@" "$IMAGE"
             # Silence diagnostics: configuration exceptions may contain credentials.
             if ! docker exec "$CONTAINER" python -c 'import config; assert config.PORT==8302; assert config.GOOGLE_CLIENT_ID.strip()' >/dev/null 2>&1; then

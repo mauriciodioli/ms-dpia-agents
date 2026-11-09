@@ -96,3 +96,7 @@ REDIS_HOST = os.environ.get('REDIS_HOST', '').strip()
 REDIS_PORT = int(os.environ.get('REDIS_PORT', '6379'))
 REDIS_DB = int(os.environ.get('REDIS_DB', '0'))
 REDIS_PASSWORD = os.environ.get('REDIS_PASSWORD', '')
+
+# Exact WSGI peer IPs only. Enable after verifying the Nginx header contract;
+# no default trust in loopback, Docker networks, or client-supplied headers.
+AGENTS_TRUSTED_PROXY_IPS = os.getenv('AGENTS_TRUSTED_PROXY_IPS', '').strip()

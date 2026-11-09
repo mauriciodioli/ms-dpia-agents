@@ -13,6 +13,9 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(config)
 
+    from utils.proxy import configure_proxy
+    configure_proxy(app)
+
     from services.scraping_quota import MySQLScrapingQuota
     app.extensions["scraping_quota"] = MySQLScrapingQuota()
 
