@@ -1,0 +1,2378 @@
+{
+  "categories": [
+    {
+      "id": 18,
+      "nombre": "💾 Informática",
+      "idioma": "es"
+    },
+    {
+      "id": 19,
+      "nombre": " ☎️ Teléfonos",
+      "idioma": "es"
+    },
+    {
+      "id": 20,
+      "nombre": "🤖 Dispositivos",
+      "idioma": "es"
+    },
+    {
+      "id": 22,
+      "nombre": "Gestoría",
+      "idioma": "es"
+    },
+    {
+      "id": 23,
+      "nombre": "Delivery",
+      "idioma": "es"
+    },
+    {
+      "id": 26,
+      "nombre": "Médicos",
+      "idioma": "es"
+    },
+    {
+      "id": 27,
+      "nombre": "Laborales",
+      "idioma": "es"
+    },
+    {
+      "id": 28,
+      "nombre": "works",
+      "idioma": "in"
+    },
+    {
+      "id": 29,
+      "nombre": "Kinesiología",
+      "idioma": "es"
+    },
+    {
+      "id": 30,
+      "nombre": "Bioquímica",
+      "idioma": "es"
+    },
+    {
+      "id": 31,
+      "nombre": "Farmacia",
+      "idioma": "es"
+    },
+    {
+      "id": 32,
+      "nombre": "🏨 Hoteles",
+      "idioma": "es"
+    },
+    {
+      "id": 33,
+      "nombre": "🚌Transportes",
+      "idioma": "es"
+    },
+    {
+      "id": 34,
+      "nombre": "Comedores",
+      "idioma": "es"
+    },
+    {
+      "id": 35,
+      "nombre": "Alimentos",
+      "idioma": "es"
+    },
+    {
+      "id": 36,
+      "nombre": "Artesanias",
+      "idioma": "es"
+    },
+    {
+      "id": 37,
+      "nombre": "Bazar",
+      "idioma": "es"
+    },
+    {
+      "id": 38,
+      "nombre": "Comestibles",
+      "idioma": "es"
+    },
+    {
+      "id": 39,
+      "nombre": "Bebidas",
+      "idioma": "es"
+    },
+    {
+      "id": 40,
+      "nombre": "Plantas",
+      "idioma": "es"
+    },
+    {
+      "id": 41,
+      "nombre": "Trabajo Remoto",
+      "idioma": "es"
+    },
+    {
+      "id": 42,
+      "nombre": "Odontología",
+      "idioma": "es"
+    },
+    {
+      "id": 81,
+      "nombre": "Belleza",
+      "idioma": "es"
+    },
+    {
+      "id": 88,
+      "nombre": "Bebidas alcohólicas",
+      "idioma": "es"
+    },
+    {
+      "id": 89,
+      "nombre": "Repostería",
+      "idioma": "es"
+    },
+    {
+      "id": 96,
+      "nombre": "Salud / outdoor",
+      "idioma": "in"
+    },
+    {
+      "id": 97,
+      "nombre": "Decoracion",
+      "idioma": "in"
+    },
+    {
+      "id": 99,
+      "nombre": "alcoholic beverages",
+      "idioma": "in"
+    },
+    {
+      "id": 103,
+      "nombre": "Scarpe da ginnastica",
+      "idioma": "it"
+    },
+    {
+      "id": 104,
+      "nombre": "Dulces",
+      "idioma": "it"
+    },
+    {
+      "id": 105,
+      "nombre": "Panadería tradicional",
+      "idioma": "it"
+    },
+    {
+      "id": 106,
+      "nombre": "Accesorios",
+      "idioma": "it"
+    },
+    {
+      "id": 107,
+      "nombre": "Tecnología",
+      "idioma": "it"
+    },
+    {
+      "id": 108,
+      "nombre": "Gimnasio",
+      "idioma": "it"
+    },
+    {
+      "id": 109,
+      "nombre": "Entretenimiento",
+      "idioma": "it"
+    },
+    {
+      "id": 112,
+      "nombre": "Telefonia",
+      "idioma": "it"
+    },
+    {
+      "id": 113,
+      "nombre": "Informática",
+      "idioma": "it"
+    },
+    {
+      "id": 114,
+      "nombre": "Home smart",
+      "idioma": "it"
+    },
+    {
+      "id": 115,
+      "nombre": "Salud",
+      "idioma": "it"
+    },
+    {
+      "id": 116,
+      "nombre": "Auriculares",
+      "idioma": "it"
+    },
+    {
+      "id": 117,
+      "nombre": "Accessorio/donna",
+      "idioma": "it"
+    },
+    {
+      "id": 118,
+      "nombre": "Accessori beauty/content",
+      "idioma": "it"
+    },
+    {
+      "id": 119,
+      "nombre": "Accessori wellness",
+      "idioma": "it"
+    },
+    {
+      "id": 120,
+      "nombre": "Accessori uomo/donna",
+      "idioma": "it"
+    },
+    {
+      "id": 121,
+      "nombre": "Scarpe/donna",
+      "idioma": "it"
+    },
+    {
+      "id": 122,
+      "nombre": "Uomo/camicia",
+      "idioma": "it"
+    },
+    {
+      "id": 123,
+      "nombre": "Accessorio unisex",
+      "idioma": "it"
+    },
+    {
+      "id": 124,
+      "nombre": "Uomo/pantaloni",
+      "idioma": "it"
+    },
+    {
+      "id": 125,
+      "nombre": "Accessorio/cappello",
+      "idioma": "it"
+    },
+    {
+      "id": 126,
+      "nombre": "Accessorio utile",
+      "idioma": "it"
+    },
+    {
+      "id": 127,
+      "nombre": "Top donna",
+      "idioma": "it"
+    },
+    {
+      "id": 128,
+      "nombre": "Scarpe uomo",
+      "idioma": "it"
+    },
+    {
+      "id": 129,
+      "nombre": "Accessori/tendenza streetstyle",
+      "idioma": "it"
+    },
+    {
+      "id": 130,
+      "nombre": "Accessorio party donna",
+      "idioma": "it"
+    },
+    {
+      "id": 131,
+      "nombre": "Decorazione parete",
+      "idioma": "it"
+    },
+    {
+      "id": 132,
+      "nombre": "Stampa decorativa",
+      "idioma": "it"
+    },
+    {
+      "id": 133,
+      "nombre": "Artigianato/ceramica",
+      "idioma": "it"
+    },
+    {
+      "id": 134,
+      "nombre": "Stampa da parete",
+      "idioma": "it"
+    },
+    {
+      "id": 135,
+      "nombre": "Papelería artística",
+      "idioma": "it"
+    },
+    {
+      "id": 136,
+      "nombre": "Herramientas de pintura",
+      "idioma": "it"
+    },
+    {
+      "id": 137,
+      "nombre": "Accesorios de taller",
+      "idioma": "it"
+    },
+    {
+      "id": 138,
+      "nombre": "Dibujo técnico y artístico",
+      "idioma": "it"
+    },
+    {
+      "id": 139,
+      "nombre": "Almacenamiento",
+      "idioma": "it"
+    },
+    {
+      "id": 140,
+      "nombre": "Grabado y estampación",
+      "idioma": "it"
+    },
+    {
+      "id": 141,
+      "nombre": "Ayuda visual",
+      "idioma": "it"
+    },
+    {
+      "id": 142,
+      "nombre": "Marcadores artísticos",
+      "idioma": "it"
+    },
+    {
+      "id": 143,
+      "nombre": "Accesorios pintura",
+      "idioma": "it"
+    },
+    {
+      "id": 144,
+      "nombre": "Guía creativa",
+      "idioma": "it"
+    },
+    {
+      "id": 145,
+      "nombre": "Manual digital",
+      "idioma": "it"
+    },
+    {
+      "id": 146,
+      "nombre": "Colección digital",
+      "idioma": "it"
+    },
+    {
+      "id": 147,
+      "nombre": "Ebook artístico",
+      "idioma": "it"
+    },
+    {
+      "id": 148,
+      "nombre": "Ropa unisex",
+      "idioma": "in"
+    },
+    {
+      "id": 149,
+      "nombre": "Zapatos",
+      "idioma": "in"
+    },
+    {
+      "id": 150,
+      "nombre": "Ropa de hombre",
+      "idioma": "in"
+    },
+    {
+      "id": 151,
+      "nombre": "Ropa de mujer",
+      "idioma": "in"
+    },
+    {
+      "id": 152,
+      "nombre": "Cargador inteligente",
+      "idioma": "pl"
+    },
+    {
+      "id": 153,
+      "nombre": "App de productividad",
+      "idioma": "pl"
+    },
+    {
+      "id": 154,
+      "nombre": "Accesorio de organización",
+      "idioma": "pl"
+    },
+    {
+      "id": 155,
+      "nombre": "Wearables",
+      "idioma": "pl"
+    },
+    {
+      "id": 156,
+      "nombre": "Audio",
+      "idioma": "pl"
+    },
+    {
+      "id": 157,
+      "nombre": "Accessories",
+      "idioma": "pl"
+    },
+    {
+      "id": 158,
+      "nombre": "Smart-home",
+      "idioma": "pl"
+    },
+    {
+      "id": 159,
+      "nombre": "Components",
+      "idioma": "pl"
+    },
+    {
+      "id": 160,
+      "nombre": "Digital-templates",
+      "idioma": "pl"
+    },
+    {
+      "id": 161,
+      "nombre": "Apps",
+      "idioma": "pl"
+    },
+    {
+      "id": 266,
+      "nombre": "Alkohole",
+      "idioma": "pl"
+    },
+    {
+      "id": 270,
+      "nombre": "Dekoracja",
+      "idioma": "pl"
+    },
+    {
+      "id": 271,
+      "nombre": "Zdrowie / na świeżym powietrzu",
+      "idioma": "pl"
+    },
+    {
+      "id": 272,
+      "nombre": "Higiena osobista",
+      "idioma": "pl"
+    },
+    {
+      "id": 273,
+      "nombre": "Dom / ekologia",
+      "idioma": "pl"
+    },
+    {
+      "id": 274,
+      "nombre": "Meble",
+      "idioma": "pl"
+    },
+    {
+      "id": 275,
+      "nombre": "Technologia / dom",
+      "idioma": "pl"
+    },
+    {
+      "id": 276,
+      "nombre": "Biuro / dom",
+      "idioma": "pl"
+    },
+    {
+      "id": 277,
+      "nombre": "Dekoracja zewnętrzna",
+      "idioma": "pl"
+    },
+    {
+      "id": 278,
+      "nombre": "Buty",
+      "idioma": "pl"
+    },
+    {
+      "id": 279,
+      "nombre": "Akcesoria",
+      "idioma": "pl"
+    },
+    {
+      "id": 280,
+      "nombre": "Odzież unisex",
+      "idioma": "pl"
+    },
+    {
+      "id": 281,
+      "nombre": "Odzież męska",
+      "idioma": "pl"
+    },
+    {
+      "id": 282,
+      "nombre": "Odzież damska",
+      "idioma": "pl"
+    },
+    {
+      "id": 283,
+      "nombre": "Zdrowie i dobre samopoczucie",
+      "idioma": "pl"
+    },
+    {
+      "id": 284,
+      "nombre": "Technologia",
+      "idioma": "pl"
+    },
+    {
+      "id": 285,
+      "nombre": "Planner_salud_mental",
+      "idioma": "pl"
+    },
+    {
+      "id": 286,
+      "nombre": "Medytacja_przewodnik",
+      "idioma": "pl"
+    },
+    {
+      "id": 287,
+      "nombre": "Habit_tracker_salud",
+      "idioma": "pl"
+    },
+    {
+      "id": 288,
+      "nombre": "Planer_posilkow",
+      "idioma": "pl"
+    },
+    {
+      "id": 289,
+      "nombre": "Keto_przewodnik",
+      "idioma": "pl"
+    },
+    {
+      "id": 290,
+      "nombre": "Aplikacja_dieta",
+      "idioma": "pl"
+    },
+    {
+      "id": 291,
+      "nombre": "Ebook creativo",
+      "idioma": "it"
+    },
+    {
+      "id": 292,
+      "nombre": "Nautica/sup",
+      "idioma": "it"
+    },
+    {
+      "id": 293,
+      "nombre": "Nautica/sicurezza",
+      "idioma": "it"
+    },
+    {
+      "id": 294,
+      "nombre": "Nautica/accessori",
+      "idioma": "it"
+    },
+    {
+      "id": 295,
+      "nombre": "Nautica/manutenzione",
+      "idioma": "it"
+    },
+    {
+      "id": 296,
+      "nombre": "Nautica/ancoraggio",
+      "idioma": "it"
+    },
+    {
+      "id": 297,
+      "nombre": "Nautica/calzature",
+      "idioma": "it"
+    },
+    {
+      "id": 304,
+      "nombre": "Nautica/snorkeling",
+      "idioma": "it"
+    },
+    {
+      "id": 305,
+      "nombre": "Nautica/cover",
+      "idioma": "it"
+    },
+    {
+      "id": 306,
+      "nombre": "Nautica/elettronica",
+      "idioma": "it"
+    },
+    {
+      "id": 307,
+      "nombre": "Nautica/energia",
+      "idioma": "it"
+    },
+    {
+      "id": 308,
+      "nombre": "Nautica/propulsione",
+      "idioma": "it"
+    },
+    {
+      "id": 309,
+      "nombre": "Psicologi",
+      "idioma": "it"
+    },
+    {
+      "id": 310,
+      "nombre": "Pasticceria",
+      "idioma": "it"
+    },
+    {
+      "id": 311,
+      "nombre": "155",
+      "idioma": ""
+    },
+    {
+      "id": 312,
+      "nombre": "Planner_zdrowia",
+      "idioma": "pl"
+    },
+    {
+      "id": 351,
+      "nombre": "Null",
+      "idioma": "it"
+    },
+    {
+      "id": 361,
+      "nombre": "Lekarze",
+      "idioma": "pl"
+    },
+    {
+      "id": 362,
+      "nombre": "Sfera osobista",
+      "idioma": "pl"
+    },
+    {
+      "id": 369,
+      "nombre": "Calcio",
+      "idioma": "it"
+    },
+    {
+      "id": 390,
+      "nombre": "Offerta di Lavoro",
+      "idioma": "It"
+    },
+    {
+      "id": 397,
+      "nombre": "Psicologia",
+      "idioma": "It"
+    },
+    {
+      "id": 408,
+      "nombre": "Bar",
+      "idioma": "It"
+    },
+    {
+      "id": 409,
+      "nombre": "Ristorante",
+      "idioma": "it"
+    },
+    {
+      "id": 411,
+      "nombre": "Productos",
+      "idioma": "es"
+    },
+    {
+      "id": 429,
+      "nombre": "👤Individual",
+      "idioma": "es"
+    },
+    {
+      "id": 437,
+      "nombre": "💈 Barberia Peluqueria ",
+      "idioma": "es"
+    },
+    {
+      "id": 438,
+      "nombre": "🐔 Pollerías",
+      "idioma": "es"
+    },
+    {
+      "id": 473,
+      "nombre": "🧱 Construcción en Seco",
+      "idioma": "es"
+    },
+    {
+      "id": 517,
+      "nombre": "🔧 Reparación",
+      "idioma": "es"
+    },
+    {
+      "id": 518,
+      "nombre": "📞 Empresas",
+      "idioma": "es"
+    },
+    {
+      "id": 519,
+      "nombre": "🧑‍💼 Profesional de oficina",
+      "idioma": "es"
+    },
+    {
+      "id": 522,
+      "nombre": "❄️ Refrigeracion",
+      "idioma": "es"
+    },
+    {
+      "id": 523,
+      "nombre": "🏊 Piscinas",
+      "idioma": "es"
+    },
+    {
+      "id": 524,
+      "nombre": "🔩 Mantenimientos",
+      "idioma": "es"
+    },
+    {
+      "id": 549,
+      "nombre": "Natura",
+      "idioma": "es"
+    },
+    {
+      "id": 622,
+      "nombre": "🔨 Carpintería",
+      "idioma": "es"
+    },
+    {
+      "id": 623,
+      "nombre": "👨‍⚕️ Consultorio",
+      "idioma": "es"
+    },
+    {
+      "id": 624,
+      "nombre": "🥩 Carnicería",
+      "idioma": "es"
+    },
+    {
+      "id": 625,
+      "nombre": "🔨Carpintería",
+      "idioma": "es"
+    },
+    {
+      "id": 626,
+      "nombre": "👨‍⚕️Consultorios",
+      "idioma": "es"
+    },
+    {
+      "id": 627,
+      "nombre": "🔨Carpinterías",
+      "idioma": "es"
+    },
+    {
+      "id": 629,
+      "nombre": "Mecanicos",
+      "idioma": "es"
+    },
+    {
+      "id": 630,
+      "nombre": "Psicológicos",
+      "idioma": "es"
+    },
+    {
+      "id": 651,
+      "nombre": "⚖️ Legales",
+      "idioma": "es"
+    },
+    {
+      "id": 652,
+      "nombre": "🩺 Obra social ",
+      "idioma": "es"
+    },
+    {
+      "id": 678,
+      "nombre": "Odontólogos",
+      "idioma": "es"
+    },
+    {
+      "id": 711,
+      "nombre": "🔮Tarot",
+      "idioma": "es"
+    },
+    {
+      "id": 712,
+      "nombre": "🕯️ Clases",
+      "idioma": "es"
+    },
+    {
+      "id": 713,
+      "nombre": "⚡Reiki",
+      "idioma": "es"
+    },
+    {
+      "id": 714,
+      "nombre": "☯️ Feng Shui",
+      "idioma": "es"
+    },
+    {
+      "id": 728,
+      "nombre": "📑 Licitaciones",
+      "idioma": "es"
+    },
+    {
+      "id": 729,
+      "nombre": "📢 Noticias",
+      "idioma": "es"
+    },
+    {
+      "id": 730,
+      "nombre": "🏭 Proveedores",
+      "idioma": "es"
+    },
+    {
+      "id": 737,
+      "nombre": "🏫 Institutos y Escuelas",
+      "idioma": "es"
+    },
+    {
+      "id": 739,
+      "nombre": "✂️Parrucchieri",
+      "idioma": "it"
+    },
+    {
+      "id": 741,
+      "nombre": "🧰 Carpenteria",
+      "idioma": "it"
+    },
+    {
+      "id": 743,
+      "nombre": "🛠️⚡ Servizio elettrico",
+      "idioma": "it"
+    },
+    {
+      "id": 751,
+      "nombre": "🐾Veterinarias",
+      "idioma": "es"
+    },
+    {
+      "id": 752,
+      "nombre": "🌾Forrajería",
+      "idioma": "es"
+    },
+    {
+      "id": 759,
+      "nombre": "NOTICIAS_NUEVOS",
+      "idioma": "global"
+    },
+    {
+      "id": 760,
+      "nombre": "PERSONAL_PRIVADO",
+      "idioma": "global"
+    },
+    {
+      "id": 766,
+      "nombre": "Nuevos",
+      "idioma": "es"
+    },
+    {
+      "id": 770,
+      "nombre": "📞 llamadas",
+      "idioma": "es"
+    },
+    {
+      "id": 775,
+      "nombre": "Privado",
+      "idioma": "es"
+    },
+    {
+      "id": 778,
+      "nombre": "🚀 Oportunidades laborales",
+      "idioma": "es"
+    },
+    {
+      "id": 779,
+      "nombre": "Prywatne",
+      "idioma": "pl"
+    },
+    {
+      "id": 780,
+      "nombre": "Nowe",
+      "idioma": "pl"
+    },
+    {
+      "id": 802,
+      "nombre": "🩺 obra social",
+      "idioma": "es"
+    },
+    {
+      "id": 865,
+      "nombre": "🪨 Dpia Fuller ",
+      "idioma": "es"
+    },
+    {
+      "id": 866,
+      "nombre": "🪨 dpia fuller",
+      "idioma": "es"
+    },
+    {
+      "id": 871,
+      "nombre": "Llamadas",
+      "idioma": "es"
+    },
+    {
+      "id": 875,
+      "nombre": "🏭 Empresas",
+      "idioma": "es"
+    },
+    {
+      "id": 881,
+      "nombre": "🩺 medici",
+      "idioma": "it"
+    },
+    {
+      "id": 882,
+      "nombre": "🦷 dentista",
+      "idioma": "it"
+    },
+    {
+      "id": 883,
+      "nombre": "💙 Psicologi",
+      "idioma": "it"
+    },
+    {
+      "id": 884,
+      "nombre": "🚨 Pronto soccorso",
+      "idioma": "it"
+    },
+    {
+      "id": 902,
+      "nombre": "📦 Envios",
+      "idioma": "es"
+    },
+    {
+      "id": 903,
+      "nombre": "Envios",
+      "idioma": "es"
+    },
+    {
+      "id": 937,
+      "nombre": "Esfera personal",
+      "idioma": "es"
+    },
+    {
+      "id": 954,
+      "nombre": "All",
+      "idioma": "es"
+    },
+    {
+      "id": 973,
+      "nombre": "Hogar mayorista",
+      "idioma": "es"
+    },
+    {
+      "id": 974,
+      "nombre": "Hogar minorista",
+      "idioma": "es"
+    },
+    {
+      "id": 975,
+      "nombre": "Indumentaria mayorista",
+      "idioma": "es"
+    },
+    {
+      "id": 976,
+      "nombre": "Indumentaria minorista",
+      "idioma": "es"
+    },
+    {
+      "id": 977,
+      "nombre": "Electronica mayorista",
+      "idioma": "es"
+    },
+    {
+      "id": 978,
+      "nombre": "Electronica minorista",
+      "idioma": "es"
+    },
+    {
+      "id": 979,
+      "nombre": "🐕 Pet shop mayorista",
+      "idioma": "es"
+    },
+    {
+      "id": 980,
+      "nombre": "🐕 Pet shop minorista",
+      "idioma": "es"
+    },
+    {
+      "id": 981,
+      "nombre": "🔞Sex shop mayorista",
+      "idioma": "es"
+    },
+    {
+      "id": 982,
+      "nombre": "🔞Sex shop minorista",
+      "idioma": "es"
+    }
+  ],
+  "scopes": [
+    {
+      "id": 2,
+      "nombre": "💻 Tecnología",
+      "idioma": "es"
+    },
+    {
+      "id": 3,
+      "nombre": "📚 Educacion",
+      "idioma": "es"
+    },
+    {
+      "id": 4,
+      "nombre": "🏥 Salud",
+      "idioma": "es"
+    },
+    {
+      "id": 5,
+      "nombre": "✍️ Tramites",
+      "idioma": "es"
+    },
+    {
+      "id": 6,
+      "nombre": "🚚 Distribuidores",
+      "idioma": "es"
+    },
+    {
+      "id": 9,
+      "nombre": "🧉 Regionales",
+      "idioma": "es"
+    },
+    {
+      "id": 10,
+      "nombre": "🛒 Supermercado",
+      "idioma": "es"
+    },
+    {
+      "id": 19,
+      "nombre": "💼 Laboral",
+      "idioma": "es"
+    },
+    {
+      "id": 24,
+      "nombre": "✈️Turismo",
+      "idioma": "es"
+    },
+    {
+      "id": 25,
+      "nombre": "🐶 Animales",
+      "idioma": "es"
+    },
+    {
+      "id": 26,
+      "nombre": "Naturaleza",
+      "idioma": "se"
+    },
+    {
+      "id": 28,
+      "nombre": "🧑 Amistad",
+      "idioma": "es"
+    },
+    {
+      "id": 29,
+      "nombre": "🤝 Filantropia",
+      "idioma": "es"
+    },
+    {
+      "id": 31,
+      "nombre": "🏫 Institucional",
+      "idioma": "es"
+    },
+    {
+      "id": 35,
+      "nombre": "💻 Technology",
+      "idioma": "in"
+    },
+    {
+      "id": 36,
+      "nombre": "🧥 Fashion",
+      "idioma": "in"
+    },
+    {
+      "id": 37,
+      "nombre": "🏥 Health",
+      "idioma": "in"
+    },
+    {
+      "id": 38,
+      "nombre": "📈 Business",
+      "idioma": "in"
+    },
+    {
+      "id": 39,
+      "nombre": "✍️ Errands",
+      "idioma": "in"
+    },
+    {
+      "id": 40,
+      "nombre": "👨‍👩‍👧 Family",
+      "idioma": "in"
+    },
+    {
+      "id": 41,
+      "nombre": "🧉 Handicrafts",
+      "idioma": "in"
+    },
+    {
+      "id": 42,
+      "nombre": "🛒 Supermarket",
+      "idioma": "in"
+    },
+    {
+      "id": 43,
+      "nombre": "💼 Work",
+      "idioma": "in"
+    },
+    {
+      "id": 44,
+      "nombre": "✈️ Tourism",
+      "idioma": "in"
+    },
+    {
+      "id": 45,
+      "nombre": "🐶 Nature",
+      "idioma": "pl"
+    },
+    {
+      "id": 46,
+      "nombre": "🧑 Friendship",
+      "idioma": "in"
+    },
+    {
+      "id": 47,
+      "nombre": "🤝 Philanthropy",
+      "idioma": "in"
+    },
+    {
+      "id": 48,
+      "nombre": "⚽ Deporte",
+      "idioma": "es"
+    },
+    {
+      "id": 49,
+      "nombre": "👥 Social",
+      "idioma": "es"
+    },
+    {
+      "id": 51,
+      "nombre": "💰 Inversiones ",
+      "idioma": "es"
+    },
+    {
+      "id": 52,
+      "nombre": "🎨 Arte",
+      "idioma": "es"
+    },
+    {
+      "id": 53,
+      "nombre": "💻  Tecnologia",
+      "idioma": "it"
+    },
+    {
+      "id": 54,
+      "nombre": "💼 Borsa da lavoro",
+      "idioma": "it"
+    },
+    {
+      "id": 55,
+      "nombre": "📚Istruzione",
+      "idioma": "it"
+    },
+    {
+      "id": 56,
+      "nombre": "📈 Affari",
+      "idioma": "it"
+    },
+    {
+      "id": 57,
+      "nombre": "🎨Art",
+      "idioma": "it"
+    },
+    {
+      "id": 58,
+      "nombre": "⚽ Sport",
+      "idioma": "it"
+    },
+    {
+      "id": 59,
+      "nombre": "👥Sociale",
+      "idioma": "it"
+    },
+    {
+      "id": 60,
+      "nombre": "🏥 Salute",
+      "idioma": "it"
+    },
+    {
+      "id": 61,
+      "nombre": "🧑 Amicizia",
+      "idioma": "it"
+    },
+    {
+      "id": 63,
+      "nombre": "👤 Personale",
+      "idioma": "it"
+    },
+    {
+      "id": 64,
+      "nombre": "🏡 Regionale",
+      "idioma": "it"
+    },
+    {
+      "id": 65,
+      "nombre": "🛒Supermercato",
+      "idioma": "it"
+    },
+    {
+      "id": 66,
+      "nombre": "💰 Investimenti",
+      "idioma": "it"
+    },
+    {
+      "id": 67,
+      "nombre": "✍️ Procedure",
+      "idioma": "it"
+    },
+    {
+      "id": 68,
+      "nombre": "👨‍👩‍👧 Familia",
+      "idioma": "es"
+    },
+    {
+      "id": 69,
+      "nombre": "🏷️Publicidad",
+      "idioma": "es"
+    },
+    {
+      "id": 70,
+      "nombre": "🎨 Creations",
+      "idioma": "in"
+    },
+    {
+      "id": 71,
+      "nombre": "📚 Educational",
+      "idioma": "in"
+    },
+    {
+      "id": 72,
+      "nombre": "⚽  Sports",
+      "idioma": "in"
+    },
+    {
+      "id": 73,
+      "nombre": "👥 Social activities",
+      "idioma": "in"
+    },
+    {
+      "id": 74,
+      "nombre": "👤 Myself ",
+      "idioma": "in"
+    },
+    {
+      "id": 76,
+      "nombre": "🏷️Publicity ",
+      "idioma": "in"
+    },
+    {
+      "id": 77,
+      "nombre": "🧥 Moda",
+      "idioma": "it"
+    },
+    {
+      "id": 79,
+      "nombre": "📚 Lettura",
+      "idioma": "it"
+    },
+    {
+      "id": 80,
+      "nombre": "💾 Computer science",
+      "idioma": "in"
+    },
+    {
+      "id": 81,
+      "nombre": "💻 Technologia",
+      "idioma": "pl"
+    },
+    {
+      "id": 82,
+      "nombre": "🏥 Health",
+      "idioma": "pl"
+    },
+    {
+      "id": 84,
+      "nombre": "🛒 Supermarket",
+      "idioma": "pl"
+    },
+    {
+      "id": 86,
+      "nombre": "🛍️ Moda",
+      "idioma": "pl"
+    },
+    {
+      "id": 87,
+      "nombre": "⚓ Nautica",
+      "idioma": "it"
+    },
+    {
+      "id": 88,
+      "nombre": "🐶 PetPlanet",
+      "idioma": "pl"
+    },
+    {
+      "id": 89,
+      "nombre": "🗝️Osobisty",
+      "idioma": "pl"
+    },
+    {
+      "id": 91,
+      "nombre": "💼 Borsa da Lavoro",
+      "idioma": "it"
+    },
+    {
+      "id": 92,
+      "nombre": "👥 Offerte di Lavoro",
+      "idioma": "it"
+    },
+    {
+      "id": 94,
+      "nombre": "🍷 Bar e Ristoranti",
+      "idioma": "it"
+    },
+    {
+      "id": 95,
+      "nombre": "👤Personal",
+      "idioma": "global"
+    },
+    {
+      "id": 96,
+      "nombre": "📈 Negocios",
+      "idioma": "es"
+    },
+    {
+      "id": 98,
+      "nombre": "🏗️ Construcción",
+      "idioma": "es"
+    },
+    {
+      "id": 99,
+      "nombre": "🛠️ Servicios",
+      "idioma": "es"
+    },
+    {
+      "id": 100,
+      "nombre": "🎓 Profesionales",
+      "idioma": "es"
+    },
+    {
+      "id": 101,
+      "nombre": "🎧 Call Center",
+      "idioma": "es"
+    },
+    {
+      "id": 104,
+      "nombre": "🍖 Alimentos",
+      "idioma": "es"
+    },
+    {
+      "id": 105,
+      "nombre": "🛠️ Servizi",
+      "idioma": "it"
+    },
+    {
+      "id": 106,
+      "nombre": "✨ Energía espiritual",
+      "idioma": "es"
+    },
+    {
+      "id": 107,
+      "nombre": "NOTICIAS",
+      "idioma": "global"
+    },
+    {
+      "id": 108,
+      "nombre": "📦Mayorista",
+      "idioma": "es"
+    },
+    {
+      "id": 109,
+      "nombre": "🛒Minorista",
+      "idioma": "es"
+    }
+  ],
+  "scope_links": [
+    {
+      "ambito_id": 2,
+      "ambitoCategoria_id": 18,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 2,
+      "ambitoCategoria_id": 19,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 2,
+      "ambitoCategoria_id": 20,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 6,
+      "ambitoCategoria_id": 23,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 69,
+      "ambitoCategoria_id": 27,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 76,
+      "ambitoCategoria_id": 28,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 4,
+      "ambitoCategoria_id": 29,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 4,
+      "ambitoCategoria_id": 30,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 4,
+      "ambitoCategoria_id": 31,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 24,
+      "ambitoCategoria_id": 32,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 24,
+      "ambitoCategoria_id": 33,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 9,
+      "ambitoCategoria_id": 35,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 9,
+      "ambitoCategoria_id": 36,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 10,
+      "ambitoCategoria_id": 37,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 10,
+      "ambitoCategoria_id": 38,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 10,
+      "ambitoCategoria_id": 39,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 10,
+      "ambitoCategoria_id": 40,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 19,
+      "ambitoCategoria_id": 41,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 4,
+      "ambitoCategoria_id": 81,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 10,
+      "ambitoCategoria_id": 88,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 10,
+      "ambitoCategoria_id": 89,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 10,
+      "ambitoCategoria_id": 96,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 10,
+      "ambitoCategoria_id": 97,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 42,
+      "ambitoCategoria_id": 99,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 10,
+      "ambitoCategoria_id": 99,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 37,
+      "ambitoCategoria_id": 81,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 42,
+      "ambitoCategoria_id": 38,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 42,
+      "ambitoCategoria_id": 96,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 42,
+      "ambitoCategoria_id": 88,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 42,
+      "ambitoCategoria_id": 97,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 65,
+      "ambitoCategoria_id": 102,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 65,
+      "ambitoCategoria_id": 103,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 65,
+      "ambitoCategoria_id": 104,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 65,
+      "ambitoCategoria_id": 105,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 2,
+      "ambitoCategoria_id": 106,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 2,
+      "ambitoCategoria_id": 107,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 2,
+      "ambitoCategoria_id": 81,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 2,
+      "ambitoCategoria_id": 108,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 2,
+      "ambitoCategoria_id": 109,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 53,
+      "ambitoCategoria_id": 108,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 53,
+      "ambitoCategoria_id": 109,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 53,
+      "ambitoCategoria_id": 107,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 53,
+      "ambitoCategoria_id": 106,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 53,
+      "ambitoCategoria_id": 112,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 53,
+      "ambitoCategoria_id": 113,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 53,
+      "ambitoCategoria_id": 114,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 53,
+      "ambitoCategoria_id": 115,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 53,
+      "ambitoCategoria_id": 116,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 77,
+      "ambitoCategoria_id": 117,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 77,
+      "ambitoCategoria_id": 118,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 77,
+      "ambitoCategoria_id": 119,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 77,
+      "ambitoCategoria_id": 120,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 77,
+      "ambitoCategoria_id": 121,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 77,
+      "ambitoCategoria_id": 122,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 77,
+      "ambitoCategoria_id": 123,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 77,
+      "ambitoCategoria_id": 124,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 77,
+      "ambitoCategoria_id": 125,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 77,
+      "ambitoCategoria_id": 126,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 77,
+      "ambitoCategoria_id": 127,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 77,
+      "ambitoCategoria_id": 128,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 77,
+      "ambitoCategoria_id": 129,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 77,
+      "ambitoCategoria_id": 130,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 57,
+      "ambitoCategoria_id": 131,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 57,
+      "ambitoCategoria_id": 132,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 57,
+      "ambitoCategoria_id": 133,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 57,
+      "ambitoCategoria_id": 134,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 57,
+      "ambitoCategoria_id": 135,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 57,
+      "ambitoCategoria_id": 136,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 57,
+      "ambitoCategoria_id": 137,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 57,
+      "ambitoCategoria_id": 138,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 57,
+      "ambitoCategoria_id": 139,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 57,
+      "ambitoCategoria_id": 140,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 57,
+      "ambitoCategoria_id": 141,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 57,
+      "ambitoCategoria_id": 142,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 57,
+      "ambitoCategoria_id": 143,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 79,
+      "ambitoCategoria_id": 144,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 79,
+      "ambitoCategoria_id": 145,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 79,
+      "ambitoCategoria_id": 146,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 79,
+      "ambitoCategoria_id": 147,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 36,
+      "ambitoCategoria_id": 148,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 36,
+      "ambitoCategoria_id": 149,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 36,
+      "ambitoCategoria_id": 150,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 36,
+      "ambitoCategoria_id": 151,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 84,
+      "ambitoCategoria_id": 152,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 84,
+      "ambitoCategoria_id": 153,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 84,
+      "ambitoCategoria_id": 154,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 81,
+      "ambitoCategoria_id": 155,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 81,
+      "ambitoCategoria_id": 156,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 81,
+      "ambitoCategoria_id": 157,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 81,
+      "ambitoCategoria_id": 158,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 81,
+      "ambitoCategoria_id": 159,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 81,
+      "ambitoCategoria_id": 160,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 81,
+      "ambitoCategoria_id": 161,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 84,
+      "ambitoCategoria_id": 266,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 84,
+      "ambitoCategoria_id": 270,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 84,
+      "ambitoCategoria_id": 271,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 84,
+      "ambitoCategoria_id": 272,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 84,
+      "ambitoCategoria_id": 273,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 84,
+      "ambitoCategoria_id": 274,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 81,
+      "ambitoCategoria_id": 275,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 84,
+      "ambitoCategoria_id": 276,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 84,
+      "ambitoCategoria_id": 277,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 86,
+      "ambitoCategoria_id": 278,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 86,
+      "ambitoCategoria_id": 279,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 86,
+      "ambitoCategoria_id": 280,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 86,
+      "ambitoCategoria_id": 281,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 86,
+      "ambitoCategoria_id": 282,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 84,
+      "ambitoCategoria_id": 283,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 84,
+      "ambitoCategoria_id": 284,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 81,
+      "ambitoCategoria_id": 279,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 82,
+      "ambitoCategoria_id": 285,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 82,
+      "ambitoCategoria_id": 286,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 82,
+      "ambitoCategoria_id": 287,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 82,
+      "ambitoCategoria_id": 288,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 82,
+      "ambitoCategoria_id": 289,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 82,
+      "ambitoCategoria_id": 290,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 79,
+      "ambitoCategoria_id": 291,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 87,
+      "ambitoCategoria_id": 292,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 87,
+      "ambitoCategoria_id": 294,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 87,
+      "ambitoCategoria_id": 295,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 87,
+      "ambitoCategoria_id": 296,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 87,
+      "ambitoCategoria_id": 297,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 87,
+      "ambitoCategoria_id": 304,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 87,
+      "ambitoCategoria_id": 305,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 87,
+      "ambitoCategoria_id": 306,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 87,
+      "ambitoCategoria_id": 307,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 87,
+      "ambitoCategoria_id": 308,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 60,
+      "ambitoCategoria_id": 309,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 64,
+      "ambitoCategoria_id": 310,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 82,
+      "ambitoCategoria_id": 312,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 82,
+      "ambitoCategoria_id": 361,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 95,
+      "ambitoCategoria_id": 362,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 58,
+      "ambitoCategoria_id": 369,
+      "estado": "Activo"
+    },
+    {
+      "ambito_id": 64,
+      "ambitoCategoria_id": 390,
+      "estado": "Activo"
+    },
+    {
+      "ambito_id": 94,
+      "ambitoCategoria_id": 408,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 94,
+      "ambitoCategoria_id": 409,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 4,
+      "ambitoCategoria_id": 411,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 95,
+      "ambitoCategoria_id": 429,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 95,
+      "ambitoCategoria_id": 437,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 6,
+      "ambitoCategoria_id": 438,
+      "estado": "activo"
+    },
+    {
+      "ambito_id": 5,
+      "ambitoCategoria_id": 22,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 97,
+      "ambitoCategoria_id": 469,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 98,
+      "ambitoCategoria_id": 473,
+      "estado": "activo"
+    },
+    {
+      "ambito_id": 101,
+      "ambitoCategoria_id": 518,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 99,
+      "ambitoCategoria_id": 517,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 100,
+      "ambitoCategoria_id": 519,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 99,
+      "ambitoCategoria_id": 522,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 99,
+      "ambitoCategoria_id": 524,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 99,
+      "ambitoCategoria_id": 523,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 4,
+      "ambitoCategoria_id": 549,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 104,
+      "ambitoCategoria_id": 624,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 26,
+      "ambitoCategoria_id": 622,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 30,
+      "ambitoCategoria_id": 623,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 26,
+      "ambitoCategoria_id": 42,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 4,
+      "ambitoCategoria_id": 626,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 22,
+      "ambitoCategoria_id": 625,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 99,
+      "ambitoCategoria_id": 627,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 99,
+      "ambitoCategoria_id": 629,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 4,
+      "ambitoCategoria_id": 630,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 101,
+      "ambitoCategoria_id": 651,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 101,
+      "ambitoCategoria_id": 652,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 4,
+      "ambitoCategoria_id": 26,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 4,
+      "ambitoCategoria_id": 678,
+      "estado": "activo"
+    },
+    {
+      "ambito_id": 106,
+      "ambitoCategoria_id": 712,
+      "estado": "activo"
+    },
+    {
+      "ambito_id": 106,
+      "ambitoCategoria_id": 713,
+      "estado": "activo"
+    },
+    {
+      "ambito_id": 106,
+      "ambitoCategoria_id": 714,
+      "estado": "activo"
+    },
+    {
+      "ambito_id": 31,
+      "ambitoCategoria_id": 728,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 31,
+      "ambitoCategoria_id": 729,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 31,
+      "ambitoCategoria_id": 730,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 26,
+      "ambitoCategoria_id": 711,
+      "estado": "INACTIVO"
+    },
+    {
+      "ambito_id": 31,
+      "ambitoCategoria_id": 737,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 105,
+      "ambitoCategoria_id": 739,
+      "estado": "activo"
+    },
+    {
+      "ambito_id": 105,
+      "ambitoCategoria_id": 741,
+      "estado": "activo"
+    },
+    {
+      "ambito_id": 105,
+      "ambitoCategoria_id": 743,
+      "estado": "activo"
+    },
+    {
+      "ambito_id": 25,
+      "ambitoCategoria_id": 751,
+      "estado": "activo"
+    },
+    {
+      "ambito_id": 25,
+      "ambitoCategoria_id": 752,
+      "estado": "activo"
+    },
+    {
+      "ambito_id": 107,
+      "ambitoCategoria_id": 759,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 95,
+      "ambitoCategoria_id": 760,
+      "estado": "INACTIVO"
+    },
+    {
+      "ambito_id": 101,
+      "ambitoCategoria_id": 778,
+      "estado": "activo"
+    },
+    {
+      "ambito_id": 95,
+      "ambitoCategoria_id": 760,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 98,
+      "ambitoCategoria_id": 865,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 101,
+      "ambitoCategoria_id": 875,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 60,
+      "ambitoCategoria_id": 881,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 60,
+      "ambitoCategoria_id": 882,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 60,
+      "ambitoCategoria_id": 883,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 60,
+      "ambitoCategoria_id": 884,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 104,
+      "ambitoCategoria_id": 34,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 99,
+      "ambitoCategoria_id": 902,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 108,
+      "ambitoCategoria_id": 975,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 108,
+      "ambitoCategoria_id": 977,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 108,
+      "ambitoCategoria_id": 979,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 108,
+      "ambitoCategoria_id": 981,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 109,
+      "ambitoCategoria_id": 973,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 109,
+      "ambitoCategoria_id": 976,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 109,
+      "ambitoCategoria_id": 978,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 109,
+      "ambitoCategoria_id": 980,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 109,
+      "ambitoCategoria_id": 982,
+      "estado": "ACTIVO"
+    },
+    {
+      "ambito_id": 109,
+      "ambitoCategoria_id": 974,
+      "estado": "ACTIVO"
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+﻿# Documentacion
+*.md
+*.mdx
+*.rst
+*.txt
+!requirements*.txt
+
+# Tests y cobertura
+tests/
+test/
+**/tests/
+**/test/
+test_*.py
+*_test.py
+conftest.py
+pytest.ini
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# SQL y migraciones manuales
+*.sql
+*.sql.gz
+migrations/
+*.sqlite
+*.sqlite3
+*.db
+
+# Entornos y configuraciones locales
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+*.egg-info/
+.uv-cache/
+.cache/
+
+# Herramientas de desarrollo
+.devcontainer/
+.vscode/
+.idea/
+.github/
+.pre-commit-config.yaml
+.editorconfig
+
+# Documentacion y archivos auxiliares
+docs/
+examples/
+samples/
+notebooks/
+*.ipynb
+*.log
+*.bak
+*.tmp
+*.orig
+*.patch
+
+# Archivos sensibles
+*.pem
+*.key
+*.p12
+*.pfx
+*credentials*.json
+*secret*.json
+
+# Archivos temporales del sistema
+.DS_Store
+Thumbs.db

@@ -1,0 +1,22 @@
+# No incluir secretos reales en la imagen; en producción se inyectan con
+# montajes de solo lectura al iniciar (ver .github/workflows/aws.yml).
+src/.env
+**/.env
+**/.env.*
+**/*credentials*.json
+**/*secrets*.json
+**/pruebasheetpython.json
+**/upload_to_gcs.json
+**/settings.yml
+**/*.pem
+**/*.key
+.venv/
+.uv-cache/
+**/__pycache__/
+**/*.pyc
+.git
+.gitignore
+
+# Private local query history
+src/instance/
+instance/

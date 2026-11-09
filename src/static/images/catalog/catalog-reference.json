@@ -1,0 +1,2339 @@
+[
+  {
+    "language": "es",
+    "ambitos": [
+      {
+        "ambito_id": 48,
+        "nombre": "Deporte",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 24,
+        "nombre": "Turismo",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 5,
+        "nombre": "Trámites",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 106,
+        "nombre": "energía espiritual",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 104,
+        "nombre": "Alimentos",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 100,
+        "nombre": "Profesionales",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 101,
+        "nombre": "Call Center",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 52,
+        "nombre": "Arte",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 98,
+        "nombre": "Construcción",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 4,
+        "nombre": "Salud",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 31,
+        "nombre": "Institucional",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 69,
+        "nombre": "Publicidad",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 25,
+        "nombre": "Animales",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 49,
+        "nombre": "Social",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 68,
+        "nombre": "Familia",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 51,
+        "nombre": "Inversiones",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 2,
+        "nombre": "Tecnologia",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 19,
+        "nombre": "Laboral",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 96,
+        "nombre": "Negocios",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 3,
+        "nombre": "Educacion",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 108,
+        "nombre": "Mayorista",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 29,
+        "nombre": "Amistad",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 6,
+        "nombre": "Distribuidores",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 10,
+        "nombre": "Supermercado",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 109,
+        "nombre": "Minorista",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 99,
+        "nombre": "Servicios",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 9,
+        "nombre": "Regionales",
+        "idioma": "es"
+      },
+      {
+        "ambito_id": 28,
+        "nombre": "Amistad",
+        "idioma": "es"
+      }
+    ],
+    "categorias": [
+      {
+        "categoria_id": 19,
+        "categoria_general_id": 2,
+        "ambito_id": 2,
+        "ambito_ids": [
+          2
+        ],
+        "nombre": "Teléfonos",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 714,
+        "categoria_general_id": null,
+        "ambito_id": 106,
+        "ambito_ids": [
+          106
+        ],
+        "nombre": "Feng Shui",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 651,
+        "categoria_general_id": null,
+        "ambito_id": 101,
+        "ambito_ids": [
+          101
+        ],
+        "nombre": "Legales",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 713,
+        "categoria_general_id": null,
+        "ambito_id": 106,
+        "ambito_ids": [
+          106
+        ],
+        "nombre": "Reiki",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 522,
+        "categoria_general_id": 150,
+        "ambito_id": 99,
+        "ambito_ids": [
+          99
+        ],
+        "nombre": "Refrigeracion",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 752,
+        "categoria_general_id": null,
+        "ambito_id": 25,
+        "ambito_ids": [
+          25
+        ],
+        "nombre": "Forrajería",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 523,
+        "categoria_general_id": 151,
+        "ambito_id": 99,
+        "ambito_ids": [
+          99
+        ],
+        "nombre": "Piscinas",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 32,
+        "categoria_general_id": 12,
+        "ambito_id": 24,
+        "ambito_ids": [
+          24
+        ],
+        "nombre": "Hoteles",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 737,
+        "categoria_general_id": null,
+        "ambito_id": 31,
+        "ambito_ids": [
+          31
+        ],
+        "nombre": "Institutos y Escuelas",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 875,
+        "categoria_general_id": null,
+        "ambito_id": 101,
+        "ambito_ids": [
+          101
+        ],
+        "nombre": "Empresas",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 730,
+        "categoria_general_id": null,
+        "ambito_id": 31,
+        "ambito_ids": [
+          31
+        ],
+        "nombre": "Proveedores",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 438,
+        "categoria_general_id": 145,
+        "ambito_id": 6,
+        "ambito_ids": [
+          6
+        ],
+        "nombre": "Pollerias",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 979,
+        "categoria_general_id": null,
+        "ambito_id": 108,
+        "ambito_ids": [
+          108
+        ],
+        "nombre": "Pet shop mayorista",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 980,
+        "categoria_general_id": null,
+        "ambito_id": 109,
+        "ambito_ids": [
+          109
+        ],
+        "nombre": "Pet shop minorista",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 751,
+        "categoria_general_id": null,
+        "ambito_id": 25,
+        "ambito_ids": [
+          25
+        ],
+        "nombre": "Veterinarias",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 429,
+        "categoria_general_id": 153,
+        "ambito_id": 95,
+        "ambito_ids": [
+          95
+        ],
+        "nombre": "Individual",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 623,
+        "categoria_general_id": null,
+        "ambito_id": 30,
+        "ambito_ids": [
+          30
+        ],
+        "nombre": "Consultorio",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 626,
+        "categoria_general_id": null,
+        "ambito_id": 4,
+        "ambito_ids": [
+          4
+        ],
+        "nombre": "Consultorios",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 437,
+        "categoria_general_id": 140,
+        "ambito_id": 95,
+        "ambito_ids": [
+          95
+        ],
+        "nombre": "Barberia Peluqueria",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 18,
+        "categoria_general_id": 1,
+        "ambito_id": 2,
+        "ambito_ids": [
+          2
+        ],
+        "nombre": "Informática",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 728,
+        "categoria_general_id": null,
+        "ambito_id": 31,
+        "ambito_ids": [
+          31
+        ],
+        "nombre": "Licitaciones",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 518,
+        "categoria_general_id": 148,
+        "ambito_id": 101,
+        "ambito_ids": [
+          101
+        ],
+        "nombre": "Empresas",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 770,
+        "categoria_general_id": 148,
+        "ambito_id": null,
+        "ambito_ids": [],
+        "nombre": "📞 llamadas",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 729,
+        "categoria_general_id": null,
+        "ambito_id": 31,
+        "ambito_ids": [
+          31
+        ],
+        "nombre": "Noticias",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 902,
+        "categoria_general_id": null,
+        "ambito_id": 99,
+        "ambito_ids": [
+          99
+        ],
+        "nombre": "Envioas",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 981,
+        "categoria_general_id": null,
+        "ambito_id": 108,
+        "ambito_ids": [
+          108
+        ],
+        "nombre": "Sex shop mayorista",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 982,
+        "categoria_general_id": null,
+        "ambito_id": 109,
+        "ambito_ids": [
+          109
+        ],
+        "nombre": "Sex shop minorista",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 517,
+        "categoria_general_id": 147,
+        "ambito_id": 99,
+        "ambito_ids": [
+          99
+        ],
+        "nombre": "Reparación",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 622,
+        "categoria_general_id": null,
+        "ambito_id": 26,
+        "ambito_ids": [
+          26
+        ],
+        "nombre": "Carpintería",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 625,
+        "categoria_general_id": null,
+        "ambito_id": 22,
+        "ambito_ids": [
+          22
+        ],
+        "nombre": "Carpintería",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 627,
+        "categoria_general_id": null,
+        "ambito_id": 99,
+        "ambito_ids": [
+          99
+        ],
+        "nombre": "Carpintería",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 524,
+        "categoria_general_id": 152,
+        "ambito_id": 99,
+        "ambito_ids": [
+          99
+        ],
+        "nombre": "Mantenimientos",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 711,
+        "categoria_general_id": null,
+        "ambito_id": 26,
+        "ambito_ids": [
+          26
+        ],
+        "nombre": "Tarot",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 712,
+        "categoria_general_id": null,
+        "ambito_id": 106,
+        "ambito_ids": [
+          106
+        ],
+        "nombre": "Clases",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 20,
+        "categoria_general_id": 3,
+        "ambito_id": 2,
+        "ambito_ids": [
+          2
+        ],
+        "nombre": "Dispositivos",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 778,
+        "categoria_general_id": null,
+        "ambito_id": 101,
+        "ambito_ids": [
+          101
+        ],
+        "nombre": "Oportunidades laborales",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 33,
+        "categoria_general_id": 13,
+        "ambito_id": 24,
+        "ambito_ids": [
+          24
+        ],
+        "nombre": "Transportes",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 35,
+        "categoria_general_id": 15,
+        "ambito_id": 9,
+        "ambito_ids": [
+          9
+        ],
+        "nombre": "Alimentos",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 954,
+        "categoria_general_id": 199,
+        "ambito_id": null,
+        "ambito_ids": [],
+        "nombre": "all",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 36,
+        "categoria_general_id": 16,
+        "ambito_id": 9,
+        "ambito_ids": [
+          9
+        ],
+        "nombre": "Artesanias",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 37,
+        "categoria_general_id": 17,
+        "ambito_id": 10,
+        "ambito_ids": [
+          10
+        ],
+        "nombre": "Bazar",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 39,
+        "categoria_general_id": 19,
+        "ambito_id": 10,
+        "ambito_ids": [
+          10
+        ],
+        "nombre": "Bebidas",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 88,
+        "categoria_general_id": 24,
+        "ambito_id": null,
+        "ambito_ids": [
+          10,
+          42
+        ],
+        "nombre": "bebidas alcohólicas",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 81,
+        "categoria_general_id": 23,
+        "ambito_id": null,
+        "ambito_ids": [
+          2,
+          4,
+          37
+        ],
+        "nombre": "Belleza",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 30,
+        "categoria_general_id": 10,
+        "ambito_id": 4,
+        "ambito_ids": [
+          4
+        ],
+        "nombre": "Bioquímica",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 34,
+        "categoria_general_id": 14,
+        "ambito_id": 104,
+        "ambito_ids": [
+          104
+        ],
+        "nombre": "Comedores",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 38,
+        "categoria_general_id": 18,
+        "ambito_id": null,
+        "ambito_ids": [
+          10,
+          42
+        ],
+        "nombre": "Comestibles",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 23,
+        "categoria_general_id": 5,
+        "ambito_id": 6,
+        "ambito_ids": [
+          6
+        ],
+        "nombre": "Delivery",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 977,
+        "categoria_general_id": null,
+        "ambito_id": 108,
+        "ambito_ids": [
+          108
+        ],
+        "nombre": "Electronica mayorista",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 978,
+        "categoria_general_id": null,
+        "ambito_id": 109,
+        "ambito_ids": [
+          109
+        ],
+        "nombre": "Electronica minorista",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 903,
+        "categoria_general_id": 196,
+        "ambito_id": null,
+        "ambito_ids": [],
+        "nombre": "envios",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 937,
+        "categoria_general_id": 198,
+        "ambito_id": null,
+        "ambito_ids": [],
+        "nombre": "esfera personal",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 31,
+        "categoria_general_id": 11,
+        "ambito_id": 4,
+        "ambito_ids": [
+          4
+        ],
+        "nombre": "Farmacia",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 22,
+        "categoria_general_id": 4,
+        "ambito_id": 5,
+        "ambito_ids": [
+          5
+        ],
+        "nombre": "Gestoría",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 973,
+        "categoria_general_id": null,
+        "ambito_id": 109,
+        "ambito_ids": [
+          109
+        ],
+        "nombre": "Hogar mayorista",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 974,
+        "categoria_general_id": null,
+        "ambito_id": 109,
+        "ambito_ids": [
+          109
+        ],
+        "nombre": "Hogar minorista ",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 975,
+        "categoria_general_id": null,
+        "ambito_id": 108,
+        "ambito_ids": [
+          108
+        ],
+        "nombre": "Indumentaria mayorista",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 976,
+        "categoria_general_id": null,
+        "ambito_id": 109,
+        "ambito_ids": [
+          109
+        ],
+        "nombre": "Indumentaria minorista",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 29,
+        "categoria_general_id": 9,
+        "ambito_id": 4,
+        "ambito_ids": [
+          4
+        ],
+        "nombre": "Kinesiología",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 27,
+        "categoria_general_id": 7,
+        "ambito_id": 69,
+        "ambito_ids": [
+          69
+        ],
+        "nombre": "Publicidad",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 871,
+        "categoria_general_id": 148,
+        "ambito_id": null,
+        "ambito_ids": [],
+        "nombre": "llamadas",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 629,
+        "categoria_general_id": null,
+        "ambito_id": 99,
+        "ambito_ids": [
+          99
+        ],
+        "nombre": "Mecanicos",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 26,
+        "categoria_general_id": 6,
+        "ambito_id": 4,
+        "ambito_ids": [
+          4
+        ],
+        "nombre": "Médicos",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 549,
+        "categoria_general_id": 173,
+        "ambito_id": 4,
+        "ambito_ids": [
+          4
+        ],
+        "nombre": "Natura",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 766,
+        "categoria_general_id": 184,
+        "ambito_id": null,
+        "ambito_ids": [],
+        "nombre": "nuevos",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 42,
+        "categoria_general_id": 22,
+        "ambito_id": 26,
+        "ambito_ids": [
+          26
+        ],
+        "nombre": "Odontología",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 678,
+        "categoria_general_id": null,
+        "ambito_id": 4,
+        "ambito_ids": [
+          4
+        ],
+        "nombre": "Odontólogos",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 40,
+        "categoria_general_id": 20,
+        "ambito_id": 10,
+        "ambito_ids": [
+          10
+        ],
+        "nombre": "Plantas",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 775,
+        "categoria_general_id": 185,
+        "ambito_id": null,
+        "ambito_ids": [],
+        "nombre": "privado",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 411,
+        "categoria_general_id": 154,
+        "ambito_id": 4,
+        "ambito_ids": [
+          4
+        ],
+        "nombre": "Productos",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 630,
+        "categoria_general_id": null,
+        "ambito_id": 4,
+        "ambito_ids": [
+          4
+        ],
+        "nombre": "Psicológicos",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 89,
+        "categoria_general_id": 25,
+        "ambito_id": 10,
+        "ambito_ids": [
+          10
+        ],
+        "nombre": "repostería",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 41,
+        "categoria_general_id": 21,
+        "ambito_id": 19,
+        "ambito_ids": [
+          19
+        ],
+        "nombre": "Trabajo Remoto",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 624,
+        "categoria_general_id": null,
+        "ambito_id": 104,
+        "ambito_ids": [
+          104
+        ],
+        "nombre": "Carnicería",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 519,
+        "categoria_general_id": 149,
+        "ambito_id": 100,
+        "ambito_ids": [
+          100
+        ],
+        "nombre": "Profesional de oficina",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 473,
+        "categoria_general_id": 146,
+        "ambito_id": 98,
+        "ambito_ids": [
+          98
+        ],
+        "nombre": "Construcción en Seco",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 802,
+        "categoria_general_id": 191,
+        "ambito_id": null,
+        "ambito_ids": [],
+        "nombre": "🩺 obra social",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 652,
+        "categoria_general_id": null,
+        "ambito_id": 101,
+        "ambito_ids": [
+          101
+        ],
+        "nombre": "Obra social",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 866,
+        "categoria_general_id": 193,
+        "ambito_id": null,
+        "ambito_ids": [],
+        "nombre": "🪨 dpia fuller",
+        "idioma": "es"
+      },
+      {
+        "categoria_id": 865,
+        "categoria_general_id": null,
+        "ambito_id": 98,
+        "ambito_ids": [
+          98
+        ],
+        "nombre": "Dpia Fuller",
+        "idioma": "es"
+      }
+    ]
+  },
+  {
+    "language": "in",
+    "ambitos": [
+      {
+        "ambito_id": 72,
+        "nombre": "Sports",
+        "idioma": "in"
+      },
+      {
+        "ambito_id": 44,
+        "nombre": "Tourism",
+        "idioma": "in"
+      },
+      {
+        "ambito_id": 39,
+        "nombre": "Errands",
+        "idioma": "in"
+      },
+      {
+        "ambito_id": 70,
+        "nombre": "Creations",
+        "idioma": "in"
+      },
+      {
+        "ambito_id": 37,
+        "nombre": "Health",
+        "idioma": "in"
+      },
+      {
+        "ambito_id": 76,
+        "nombre": "Publicity",
+        "idioma": "in"
+      },
+      {
+        "ambito_id": 74,
+        "nombre": "Myself",
+        "idioma": "in"
+      },
+      {
+        "ambito_id": 73,
+        "nombre": "Social activities",
+        "idioma": "in"
+      },
+      {
+        "ambito_id": 40,
+        "nombre": "Family",
+        "idioma": "in"
+      },
+      {
+        "ambito_id": 35,
+        "nombre": "Technology",
+        "idioma": "in"
+      },
+      {
+        "ambito_id": 43,
+        "nombre": "Work",
+        "idioma": "in"
+      },
+      {
+        "ambito_id": 80,
+        "nombre": " Computer science",
+        "idioma": "in"
+      },
+      {
+        "ambito_id": 38,
+        "nombre": "Business",
+        "idioma": "in"
+      },
+      {
+        "ambito_id": 71,
+        "nombre": "Educational",
+        "idioma": "in"
+      },
+      {
+        "ambito_id": 47,
+        "nombre": "Philanthropy",
+        "idioma": "in"
+      },
+      {
+        "ambito_id": 42,
+        "nombre": "Supermarket",
+        "idioma": "in"
+      },
+      {
+        "ambito_id": 41,
+        "nombre": "Handicrafts",
+        "idioma": "in"
+      },
+      {
+        "ambito_id": 46,
+        "nombre": "Friendship",
+        "idioma": "in"
+      },
+      {
+        "ambito_id": 36,
+        "nombre": "Fashion",
+        "idioma": "in"
+      }
+    ],
+    "categorias": [
+      {
+        "categoria_id": 99,
+        "categoria_general_id": 28,
+        "ambito_id": null,
+        "ambito_ids": [
+          10,
+          42
+        ],
+        "nombre": "alcoholic beverages",
+        "idioma": "in"
+      },
+      {
+        "categoria_id": 97,
+        "categoria_general_id": 27,
+        "ambito_id": null,
+        "ambito_ids": [
+          10,
+          42
+        ],
+        "nombre": "decoracion",
+        "idioma": "in"
+      },
+      {
+        "categoria_id": 150,
+        "categoria_general_id": 88,
+        "ambito_id": 36,
+        "ambito_ids": [
+          36
+        ],
+        "nombre": "ropa de hombre",
+        "idioma": "in"
+      },
+      {
+        "categoria_id": 151,
+        "categoria_general_id": 89,
+        "ambito_id": 36,
+        "ambito_ids": [
+          36
+        ],
+        "nombre": "ropa de mujer",
+        "idioma": "in"
+      },
+      {
+        "categoria_id": 148,
+        "categoria_general_id": 86,
+        "ambito_id": 36,
+        "ambito_ids": [
+          36
+        ],
+        "nombre": "ropa unisex",
+        "idioma": "in"
+      },
+      {
+        "categoria_id": 96,
+        "categoria_general_id": 26,
+        "ambito_id": null,
+        "ambito_ids": [
+          10,
+          42
+        ],
+        "nombre": "salud / outdoor",
+        "idioma": "in"
+      },
+      {
+        "categoria_id": 28,
+        "categoria_general_id": 8,
+        "ambito_id": 76,
+        "ambito_ids": [
+          76
+        ],
+        "nombre": "works",
+        "idioma": "in"
+      },
+      {
+        "categoria_id": 149,
+        "categoria_general_id": 87,
+        "ambito_id": 36,
+        "ambito_ids": [
+          36
+        ],
+        "nombre": "zapatos",
+        "idioma": "in"
+      }
+    ]
+  },
+  {
+    "language": "pl",
+    "ambitos": [
+      {
+        "ambito_id": 82,
+        "nombre": "Health",
+        "idioma": "pl"
+      },
+      {
+        "ambito_id": 45,
+        "nombre": "Nature",
+        "idioma": "pl"
+      },
+      {
+        "ambito_id": 88,
+        "nombre": "PetPlanet",
+        "idioma": "pl"
+      },
+      {
+        "ambito_id": 81,
+        "nombre": "Technologia",
+        "idioma": "pl"
+      },
+      {
+        "ambito_id": 89,
+        "nombre": "Osobisty",
+        "idioma": "pl"
+      },
+      {
+        "ambito_id": 86,
+        "nombre": "Moda",
+        "idioma": "pl"
+      },
+      {
+        "ambito_id": 84,
+        "nombre": "Supermarket",
+        "idioma": "pl"
+      }
+    ],
+    "categorias": [
+      {
+        "categoria_id": 154,
+        "categoria_general_id": 92,
+        "ambito_id": 84,
+        "ambito_ids": [
+          84
+        ],
+        "nombre": "accesorio de organización",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 157,
+        "categoria_general_id": 95,
+        "ambito_id": 81,
+        "ambito_ids": [
+          81
+        ],
+        "nombre": "accessories",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 279,
+        "categoria_general_id": 110,
+        "ambito_id": null,
+        "ambito_ids": [
+          81,
+          86
+        ],
+        "nombre": "akcesoria",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 266,
+        "categoria_general_id": 100,
+        "ambito_id": 84,
+        "ambito_ids": [
+          84
+        ],
+        "nombre": "alkohole",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 290,
+        "categoria_general_id": 121,
+        "ambito_id": 82,
+        "ambito_ids": [
+          82
+        ],
+        "nombre": "aplikacja_dieta",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 153,
+        "categoria_general_id": 91,
+        "ambito_id": 84,
+        "ambito_ids": [
+          84
+        ],
+        "nombre": "app de productividad",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 161,
+        "categoria_general_id": 99,
+        "ambito_id": 81,
+        "ambito_ids": [
+          81
+        ],
+        "nombre": "apps",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 156,
+        "categoria_general_id": 94,
+        "ambito_id": 81,
+        "ambito_ids": [
+          81
+        ],
+        "nombre": "audio",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 276,
+        "categoria_general_id": 107,
+        "ambito_id": 84,
+        "ambito_ids": [
+          84
+        ],
+        "nombre": "biuro / dom",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 278,
+        "categoria_general_id": 109,
+        "ambito_id": 86,
+        "ambito_ids": [
+          86
+        ],
+        "nombre": "buty",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 152,
+        "categoria_general_id": 90,
+        "ambito_id": 84,
+        "ambito_ids": [
+          84
+        ],
+        "nombre": "cargador inteligente",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 159,
+        "categoria_general_id": 97,
+        "ambito_id": 81,
+        "ambito_ids": [
+          81
+        ],
+        "nombre": "components",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 270,
+        "categoria_general_id": 101,
+        "ambito_id": 84,
+        "ambito_ids": [
+          84
+        ],
+        "nombre": "dekoracja",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 277,
+        "categoria_general_id": 108,
+        "ambito_id": 84,
+        "ambito_ids": [
+          84
+        ],
+        "nombre": "dekoracja zewnętrzna",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 160,
+        "categoria_general_id": 98,
+        "ambito_id": 81,
+        "ambito_ids": [
+          81
+        ],
+        "nombre": "digital-templates",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 273,
+        "categoria_general_id": 104,
+        "ambito_id": 84,
+        "ambito_ids": [
+          84
+        ],
+        "nombre": "dom / ekologia",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 287,
+        "categoria_general_id": 118,
+        "ambito_id": 82,
+        "ambito_ids": [
+          82
+        ],
+        "nombre": "habit_tracker_salud",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 272,
+        "categoria_general_id": 103,
+        "ambito_id": 84,
+        "ambito_ids": [
+          84
+        ],
+        "nombre": "higiena osobista",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 289,
+        "categoria_general_id": 120,
+        "ambito_id": 82,
+        "ambito_ids": [
+          82
+        ],
+        "nombre": "keto_przewodnik",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 361,
+        "categoria_general_id": 6,
+        "ambito_id": 82,
+        "ambito_ids": [
+          82
+        ],
+        "nombre": "Lekarze",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 274,
+        "categoria_general_id": 105,
+        "ambito_id": 84,
+        "ambito_ids": [
+          84
+        ],
+        "nombre": "meble",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 286,
+        "categoria_general_id": 117,
+        "ambito_id": 82,
+        "ambito_ids": [
+          82
+        ],
+        "nombre": "medytacja_przewodnik",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 780,
+        "categoria_general_id": 187,
+        "ambito_id": null,
+        "ambito_ids": [],
+        "nombre": "nowe",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 282,
+        "categoria_general_id": 113,
+        "ambito_id": 86,
+        "ambito_ids": [
+          86
+        ],
+        "nombre": "odzież damska",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 281,
+        "categoria_general_id": 112,
+        "ambito_id": 86,
+        "ambito_ids": [
+          86
+        ],
+        "nombre": "odzież męska",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 280,
+        "categoria_general_id": 111,
+        "ambito_id": 86,
+        "ambito_ids": [
+          86
+        ],
+        "nombre": "odzież unisex",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 288,
+        "categoria_general_id": 119,
+        "ambito_id": 82,
+        "ambito_ids": [
+          82
+        ],
+        "nombre": "planer_posilkow",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 285,
+        "categoria_general_id": 116,
+        "ambito_id": 82,
+        "ambito_ids": [
+          82
+        ],
+        "nombre": "planner_salud_mental",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 312,
+        "categoria_general_id": 135,
+        "ambito_id": 82,
+        "ambito_ids": [
+          82
+        ],
+        "nombre": "planner_zdrowia",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 779,
+        "categoria_general_id": 186,
+        "ambito_id": null,
+        "ambito_ids": [],
+        "nombre": "prywatne",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 362,
+        "categoria_general_id": 169,
+        "ambito_id": 95,
+        "ambito_ids": [
+          95
+        ],
+        "nombre": "Sfera osobista",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 158,
+        "categoria_general_id": 96,
+        "ambito_id": 81,
+        "ambito_ids": [
+          81
+        ],
+        "nombre": "smart-home",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 284,
+        "categoria_general_id": 115,
+        "ambito_id": 84,
+        "ambito_ids": [
+          84
+        ],
+        "nombre": "technologia",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 275,
+        "categoria_general_id": 106,
+        "ambito_id": 81,
+        "ambito_ids": [
+          81
+        ],
+        "nombre": "technologia / dom",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 155,
+        "categoria_general_id": 93,
+        "ambito_id": 81,
+        "ambito_ids": [
+          81
+        ],
+        "nombre": "wearables",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 271,
+        "categoria_general_id": 102,
+        "ambito_id": 84,
+        "ambito_ids": [
+          84
+        ],
+        "nombre": "zdrowie / na świeżym powietrzu",
+        "idioma": "pl"
+      },
+      {
+        "categoria_id": 283,
+        "categoria_general_id": 114,
+        "ambito_id": 84,
+        "ambito_ids": [
+          84
+        ],
+        "nombre": "zdrowie i dobre samopoczucie",
+        "idioma": "pl"
+      }
+    ]
+  },
+  {
+    "language": "it",
+    "ambitos": [
+      {
+        "ambito_id": 87,
+        "nombre": "Nautica",
+        "idioma": "it"
+      },
+      {
+        "ambito_id": 58,
+        "nombre": "Sport",
+        "idioma": "it"
+      },
+      {
+        "ambito_id": 67,
+        "nombre": "Procedure",
+        "idioma": "it"
+      },
+      {
+        "ambito_id": 94,
+        "nombre": "Bar e Ristoranti",
+        "idioma": "it"
+      },
+      {
+        "ambito_id": 57,
+        "nombre": "Art",
+        "idioma": "it"
+      },
+      {
+        "ambito_id": 64,
+        "nombre": "Regionale",
+        "idioma": "it"
+      },
+      {
+        "ambito_id": 60,
+        "nombre": "Salute",
+        "idioma": "it"
+      },
+      {
+        "ambito_id": 63,
+        "nombre": "Personale",
+        "idioma": "it"
+      },
+      {
+        "ambito_id": 92,
+        "nombre": "Lavoro",
+        "idioma": "it"
+      },
+      {
+        "ambito_id": 59,
+        "nombre": "Sociale",
+        "idioma": "it"
+      },
+      {
+        "ambito_id": 66,
+        "nombre": "Investimenti",
+        "idioma": "it"
+      },
+      {
+        "ambito_id": 53,
+        "nombre": "Tecnologia",
+        "idioma": "it"
+      },
+      {
+        "ambito_id": 54,
+        "nombre": "Travaglio",
+        "idioma": "it"
+      },
+      {
+        "ambito_id": 91,
+        "nombre": "Lavoro",
+        "idioma": "it"
+      },
+      {
+        "ambito_id": 56,
+        "nombre": "Affari",
+        "idioma": "it"
+      },
+      {
+        "ambito_id": 79,
+        "nombre": "Lettura",
+        "idioma": "it"
+      },
+      {
+        "ambito_id": 55,
+        "nombre": "Istruzione",
+        "idioma": "it"
+      },
+      {
+        "ambito_id": 65,
+        "nombre": "Supermercato",
+        "idioma": "it"
+      },
+      {
+        "ambito_id": 105,
+        "nombre": "Servizi",
+        "idioma": "it"
+      },
+      {
+        "ambito_id": 61,
+        "nombre": "Amicizia",
+        "idioma": "it"
+      },
+      {
+        "ambito_id": 77,
+        "nombre": "Moda",
+        "idioma": "it"
+      }
+    ],
+    "categorias": [
+      {
+        "categoria_id": 739,
+        "categoria_general_id": null,
+        "ambito_id": 105,
+        "ambito_ids": [
+          105
+        ],
+        "nombre": "Parrucchieri",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 883,
+        "categoria_general_id": null,
+        "ambito_id": 60,
+        "ambito_ids": [
+          60
+        ],
+        "nombre": "Psicologi",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 884,
+        "categoria_general_id": null,
+        "ambito_id": 60,
+        "ambito_ids": [
+          60
+        ],
+        "nombre": "Pronto soccorso",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 743,
+        "categoria_general_id": null,
+        "ambito_id": 105,
+        "ambito_ids": [
+          105
+        ],
+        "nombre": "Servizio elettrico",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 106,
+        "categoria_general_id": 47,
+        "ambito_id": null,
+        "ambito_ids": [
+          2,
+          53
+        ],
+        "nombre": "accesorios",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 137,
+        "categoria_general_id": 75,
+        "ambito_id": 57,
+        "ambito_ids": [
+          57
+        ],
+        "nombre": "accesorios de taller",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 143,
+        "categoria_general_id": 81,
+        "ambito_id": 57,
+        "ambito_ids": [
+          57
+        ],
+        "nombre": "accesorios pintura",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 118,
+        "categoria_general_id": 56,
+        "ambito_id": 77,
+        "ambito_ids": [
+          77
+        ],
+        "nombre": "accessori beauty/content",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 120,
+        "categoria_general_id": 58,
+        "ambito_id": 77,
+        "ambito_ids": [
+          77
+        ],
+        "nombre": "accessori uomo/donna",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 119,
+        "categoria_general_id": 57,
+        "ambito_id": 77,
+        "ambito_ids": [
+          77
+        ],
+        "nombre": "accessori wellness",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 129,
+        "categoria_general_id": 67,
+        "ambito_id": 77,
+        "ambito_ids": [
+          77
+        ],
+        "nombre": "accessori/tendenza streetstyle",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 130,
+        "categoria_general_id": 68,
+        "ambito_id": 77,
+        "ambito_ids": [
+          77
+        ],
+        "nombre": "accessorio party donna",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 123,
+        "categoria_general_id": 61,
+        "ambito_id": 77,
+        "ambito_ids": [
+          77
+        ],
+        "nombre": "accessorio unisex",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 126,
+        "categoria_general_id": 64,
+        "ambito_id": 77,
+        "ambito_ids": [
+          77
+        ],
+        "nombre": "accessorio utile",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 125,
+        "categoria_general_id": 63,
+        "ambito_id": 77,
+        "ambito_ids": [
+          77
+        ],
+        "nombre": "accessorio/cappello",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 117,
+        "categoria_general_id": 55,
+        "ambito_id": 77,
+        "ambito_ids": [
+          77
+        ],
+        "nombre": "accessorio/donna",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 139,
+        "categoria_general_id": 77,
+        "ambito_id": 57,
+        "ambito_ids": [
+          57
+        ],
+        "nombre": "almacenamiento",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 133,
+        "categoria_general_id": 71,
+        "ambito_id": 57,
+        "ambito_ids": [
+          57
+        ],
+        "nombre": "artigianato/ceramica",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 116,
+        "categoria_general_id": 54,
+        "ambito_id": 53,
+        "ambito_ids": [
+          53
+        ],
+        "nombre": "auriculares",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 141,
+        "categoria_general_id": 79,
+        "ambito_id": 57,
+        "ambito_ids": [
+          57
+        ],
+        "nombre": "ayuda visual",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 408,
+        "categoria_general_id": 171,
+        "ambito_id": 94,
+        "ambito_ids": [
+          94
+        ],
+        "nombre": "Bar",
+        "idioma": "It"
+      },
+      {
+        "categoria_id": 369,
+        "categoria_general_id": 138,
+        "ambito_id": 58,
+        "ambito_ids": [
+          58
+        ],
+        "nombre": "Calcio",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 146,
+        "categoria_general_id": 84,
+        "ambito_id": 79,
+        "ambito_ids": [
+          79
+        ],
+        "nombre": "colección digital",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 131,
+        "categoria_general_id": 69,
+        "ambito_id": 57,
+        "ambito_ids": [
+          57
+        ],
+        "nombre": "decorazione parete",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 138,
+        "categoria_general_id": 76,
+        "ambito_id": 57,
+        "ambito_ids": [
+          57
+        ],
+        "nombre": "dibujo técnico y artístico",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 104,
+        "categoria_general_id": 45,
+        "ambito_id": 65,
+        "ambito_ids": [
+          65
+        ],
+        "nombre": "dulces",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 147,
+        "categoria_general_id": 85,
+        "ambito_id": 79,
+        "ambito_ids": [
+          79
+        ],
+        "nombre": "ebook artístico",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 291,
+        "categoria_general_id": 122,
+        "ambito_id": 79,
+        "ambito_ids": [
+          79
+        ],
+        "nombre": "ebook creativo",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 109,
+        "categoria_general_id": 50,
+        "ambito_id": null,
+        "ambito_ids": [
+          2,
+          53
+        ],
+        "nombre": "entretenimiento",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 108,
+        "categoria_general_id": 49,
+        "ambito_id": null,
+        "ambito_ids": [
+          2,
+          53
+        ],
+        "nombre": "gimnasio",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 140,
+        "categoria_general_id": 78,
+        "ambito_id": 57,
+        "ambito_ids": [
+          57
+        ],
+        "nombre": "grabado y estampación",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 144,
+        "categoria_general_id": 82,
+        "ambito_id": 79,
+        "ambito_ids": [
+          79
+        ],
+        "nombre": "guía creativa",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 136,
+        "categoria_general_id": 74,
+        "ambito_id": 57,
+        "ambito_ids": [
+          57
+        ],
+        "nombre": "herramientas de pintura",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 114,
+        "categoria_general_id": 52,
+        "ambito_id": 53,
+        "ambito_ids": [
+          53
+        ],
+        "nombre": "home smart",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 113,
+        "categoria_general_id": 1,
+        "ambito_id": 53,
+        "ambito_ids": [
+          53
+        ],
+        "nombre": "informática",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 145,
+        "categoria_general_id": 83,
+        "ambito_id": 79,
+        "ambito_ids": [
+          79
+        ],
+        "nombre": "manual digital",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 142,
+        "categoria_general_id": 80,
+        "ambito_id": 57,
+        "ambito_ids": [
+          57
+        ],
+        "nombre": "marcadores artísticos",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 294,
+        "categoria_general_id": 125,
+        "ambito_id": 87,
+        "ambito_ids": [
+          87
+        ],
+        "nombre": "nautica/accessori",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 296,
+        "categoria_general_id": 127,
+        "ambito_id": 87,
+        "ambito_ids": [
+          87
+        ],
+        "nombre": "nautica/ancoraggio",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 297,
+        "categoria_general_id": 128,
+        "ambito_id": 87,
+        "ambito_ids": [
+          87
+        ],
+        "nombre": "nautica/calzature",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 305,
+        "categoria_general_id": 130,
+        "ambito_id": 87,
+        "ambito_ids": [
+          87
+        ],
+        "nombre": "nautica/cover",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 306,
+        "categoria_general_id": 131,
+        "ambito_id": 87,
+        "ambito_ids": [
+          87
+        ],
+        "nombre": "nautica/elettronica",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 307,
+        "categoria_general_id": 132,
+        "ambito_id": 87,
+        "ambito_ids": [
+          87
+        ],
+        "nombre": "nautica/energia",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 295,
+        "categoria_general_id": 126,
+        "ambito_id": 87,
+        "ambito_ids": [
+          87
+        ],
+        "nombre": "nautica/manutenzione",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 308,
+        "categoria_general_id": 133,
+        "ambito_id": 87,
+        "ambito_ids": [
+          87
+        ],
+        "nombre": "nautica/propulsione",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 293,
+        "categoria_general_id": 124,
+        "ambito_id": null,
+        "ambito_ids": [],
+        "nombre": "nautica/sicurezza",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 304,
+        "categoria_general_id": 129,
+        "ambito_id": 87,
+        "ambito_ids": [
+          87
+        ],
+        "nombre": "nautica/snorkeling",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 292,
+        "categoria_general_id": 123,
+        "ambito_id": 87,
+        "ambito_ids": [
+          87
+        ],
+        "nombre": "nautica/sup",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 351,
+        "categoria_general_id": 136,
+        "ambito_id": null,
+        "ambito_ids": [],
+        "nombre": "null",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 390,
+        "categoria_general_id": 144,
+        "ambito_id": 64,
+        "ambito_ids": [
+          64
+        ],
+        "nombre": "Offerta",
+        "idioma": "It"
+      },
+      {
+        "categoria_id": 105,
+        "categoria_general_id": 46,
+        "ambito_id": 65,
+        "ambito_ids": [
+          65
+        ],
+        "nombre": "panadería tradicional",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 135,
+        "categoria_general_id": 73,
+        "ambito_id": 57,
+        "ambito_ids": [
+          57
+        ],
+        "nombre": "papelería artística",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 310,
+        "categoria_general_id": 143,
+        "ambito_id": 64,
+        "ambito_ids": [
+          64
+        ],
+        "nombre": "Pasticceria",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 309,
+        "categoria_general_id": 137,
+        "ambito_id": 60,
+        "ambito_ids": [
+          60
+        ],
+        "nombre": "Psicologi",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 397,
+        "categoria_general_id": 139,
+        "ambito_id": null,
+        "ambito_ids": [],
+        "nombre": "psicologia",
+        "idioma": "It"
+      },
+      {
+        "categoria_id": 409,
+        "categoria_general_id": 172,
+        "ambito_id": 94,
+        "ambito_ids": [
+          94
+        ],
+        "nombre": "Ristorante",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 115,
+        "categoria_general_id": 53,
+        "ambito_id": 53,
+        "ambito_ids": [
+          53
+        ],
+        "nombre": "salud",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 103,
+        "categoria_general_id": 44,
+        "ambito_id": 65,
+        "ambito_ids": [
+          65
+        ],
+        "nombre": "scarpe da ginnastica",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 128,
+        "categoria_general_id": 66,
+        "ambito_id": 77,
+        "ambito_ids": [
+          77
+        ],
+        "nombre": "scarpe uomo",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 121,
+        "categoria_general_id": 59,
+        "ambito_id": 77,
+        "ambito_ids": [
+          77
+        ],
+        "nombre": "scarpe/donna",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 134,
+        "categoria_general_id": 72,
+        "ambito_id": 57,
+        "ambito_ids": [
+          57
+        ],
+        "nombre": "stampa da parete",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 132,
+        "categoria_general_id": 70,
+        "ambito_id": 57,
+        "ambito_ids": [
+          57
+        ],
+        "nombre": "stampa decorativa",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 107,
+        "categoria_general_id": 48,
+        "ambito_id": null,
+        "ambito_ids": [
+          2,
+          53
+        ],
+        "nombre": "tecnología",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 112,
+        "categoria_general_id": 51,
+        "ambito_id": 53,
+        "ambito_ids": [
+          53
+        ],
+        "nombre": "telefonia",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 127,
+        "categoria_general_id": 65,
+        "ambito_id": 77,
+        "ambito_ids": [
+          77
+        ],
+        "nombre": "top donna",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 122,
+        "categoria_general_id": 60,
+        "ambito_id": 77,
+        "ambito_ids": [
+          77
+        ],
+        "nombre": "uomo/camicia",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 124,
+        "categoria_general_id": 62,
+        "ambito_id": 77,
+        "ambito_ids": [
+          77
+        ],
+        "nombre": "uomo/pantaloni",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 882,
+        "categoria_general_id": null,
+        "ambito_id": 60,
+        "ambito_ids": [
+          60
+        ],
+        "nombre": "dentista",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 741,
+        "categoria_general_id": null,
+        "ambito_id": 105,
+        "ambito_ids": [
+          105
+        ],
+        "nombre": "Carpenteria",
+        "idioma": "it"
+      },
+      {
+        "categoria_id": 881,
+        "categoria_general_id": null,
+        "ambito_id": 60,
+        "ambito_ids": [
+          60
+        ],
+        "nombre": "medici",
+        "idioma": "it"
+      }
+    ]
+  }
+]

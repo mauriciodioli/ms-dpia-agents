@@ -1,0 +1,16 @@
+# Isolated catalog and browser tests (no production credentials required).
+flask
+requests>=2.32.3,<3
+google-auth
+flask-sqlalchemy
+flask-marshmallow
+marshmallow-sqlalchemy
+playwright
+cryptography
+unidecode
+pyyaml
+jsonschema>=4.23,<5
+tzdata
+
+pillow>=10,<14
+redis>=5.0,<7
