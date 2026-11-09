@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#292078">
+  <title>DPIA Agents · Tu espacio de agentes</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='agents-workspace.css') }}">
+  <script src="{{ url_for('static', filename='agents-workspace.js') }}" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#content">Saltar al contenido</a>
+  <aside class="sidebar" id="navigation">
+    <a class="brand" href="/" data-nav><span class="brand-mark" aria-hidden="true">d.</span><span>DPIA <strong>Agents</strong><small>ESPACIO DE TRABAJO</small></span></a>
+    <p class="nav-label">TU ESPACIO</p>
+    <nav aria-label="Navegación principal">
+      <a href="/" data-nav><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 11 12 3l9 8v10h-6v-7H9v7H3Z"/></svg></span>Inicio</a>
+      <a href="/agents" data-nav><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 3h7v7H3Zm11 0h7v7h-7ZM3 14h7v7H3Zm11 0h7v7h-7Z"/></svg></span>Mis agentes</a>
+      <a href="/schedules" data-nav><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 4v5l4 2"/></svg></span>Programaciones</a>
+      <a href="/executions" data-nav><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></span>Ejecuciones</a>
+      <a href="/integrations" data-nav><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 3v4m8-4v4M6 7h12v4a6 6 0 0 1-12 0V7Zm6 10v4"/></svg></span>Integraciones</a>
+      <a href="/administration" data-nav id="admin-nav" hidden><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 3 3 7v5c0 5 9 9 9 9s9-4 9-9V7Z"/></svg></span>Administración</a>
+    </nav>
+    <div class="sidebar-bottom"><span class="small-dot"></span> Tu espacio, tus agentes<p>Configuración y seguimiento<br>en un solo lugar.</p></div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar">
+      <button id="menu-toggle" class="icon-button" aria-label="Abrir navegación" aria-expanded="false" aria-controls="navigation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <span class="breadcrumb">Workspace <span aria-hidden="true">/</span> <strong id="section-label">Inicio</strong></span>
+      <div class="account"><span id="account-label">Acceso seguro</span><button id="logout" class="quiet" hidden>Cerrar sesión</button></div>
+    </header>
+    <main id="content" tabindex="-1" aria-busy="true"><p class="loading" role="status">Cargando tu espacio…</p></main>
+    <footer>DPIA Agents <span>Diseñá. Configurá. Supervisá.</span></footer>
+  </div>
+  <div id="notice" class="notice" role="status" hidden></div>
+  <dialog id="result-dialog" aria-labelledby="result-title"><div class="section-head"><h2 id="result-title">Resultado</h2><button id="close-result" class="quiet">Cerrar</button></div><div id="result-content"></div></dialog>
+  <noscript>Activá JavaScript para acceder a DPIA Agents.</noscript>
+</body>
+</html>

@@ -1,13 +1,23 @@
 """Rutas de las páginas principales de la aplicación."""
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, make_response
 
 main_bp = Blueprint("main", __name__)
 
 
 @main_bp.get("/")
-def index():
-    from services.query_sources import ENABLED_EXTERNAL
-    return render_template("index.html", enabled_scraping_marketplaces=list(ENABLED_EXTERNAL))
+@main_bp.get("/agents")
+@main_bp.get("/agents/new")
+@main_bp.get("/agents/<agent_id>/edit")
+@main_bp.get("/schedules")
+@main_bp.get("/executions")
+@main_bp.get("/integrations")
+@main_bp.get("/administration")
+def index(agent_id=None):
+    response = make_response(render_template("agents_workspace.html"))
+    response.headers['Cache-Control'] = 'no-store'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    return response
 
 
 @main_bp.get('/api/publicaciones/locales')

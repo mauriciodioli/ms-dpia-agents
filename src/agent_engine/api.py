@@ -303,7 +303,7 @@ def admin_overview(conn, principal, repo):
 @admin.get('/admin/agents')
 @endpoint(admin_only=True, html=True)
 def panel(conn, principal, repo):
-    return render_template('agent_engine_admin.html')
+    return render_template('agents_workspace.html')
 
 
 @api.get('/admin/jobs/<job_id>/result')
@@ -318,3 +318,20 @@ def admin_result(conn, principal, repo, job_id):
 def contracts(conn, principal, repo):
     from .specification import openapi_document
     return {'openapi': openapi_document()}
+
+
+@api.get('/session')
+@endpoint()
+def workspace_session(conn, principal, repo):
+    """Minimal live permissions and tool contracts for the first-party workspace."""
+    from .tools import default_registry
+    arguments()
+    if principal.kind != 'SESSION':
+        raise EngineError('session_required', 403)
+    return {'session': {'admin': principal.admin, 'scopes': sorted(principal.scopes)},
+            'tools': [{'id': tool.id, 'provider': tool.provider,
+                       'input_schema': tool.input_schema,
+                       'implementation_status': tool.implementation_status}
+                      for tool in default_registry().tools.values()],
+            'availability': {'execution': False, 'integrations_management': False,
+                             'users_management': False}}

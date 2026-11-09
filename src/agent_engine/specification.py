@@ -10,7 +10,7 @@ def openapi_document():
         '/agents/{agent_id}/status': 'agents:read', '/agents/{agent_id}/executions': 'jobs:read',
         '/jobs': 'jobs:read', '/jobs/{job_id}': 'jobs:read',
         '/jobs/{job_id}/events': 'jobs:read', '/jobs/{job_id}/result': 'results:read',
-        '/metrics': 'metrics:read', '/contracts': None,
+        '/metrics': 'metrics:read', '/contracts': None, '/session': None,
         '/clients': None, '/admin/overview': None,
         '/admin/jobs/{job_id}/result': None,
     }
@@ -63,7 +63,7 @@ def openapi_document():
     paths['/agents/{agent_id}/schedules']['get'] = {
         'x-required-scope': 'jobs:read', 'parameters': [{'name': 'agent_id', 'in': 'path', 'required': True, 'schema': c.UUID}],
         'responses': {'200': {'description': 'Owner-scoped schedules'}}}
-    for path in ('/clients', '/admin/overview', '/admin/jobs/{job_id}/result'):
+    for path in ('/session', '/clients', '/admin/overview', '/admin/jobs/{job_id}/result'):
         paths[path]['get']['security'] = [{'session': []}]
     return {
         'openapi': '3.1.0', 'info': {'title': 'DPIA Agent Engine', 'version': '1.0.0'},

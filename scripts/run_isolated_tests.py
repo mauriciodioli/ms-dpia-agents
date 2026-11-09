@@ -24,13 +24,16 @@ def local_only(method):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--unit-only', action='store_true', help='Exclude browser UI modules')
+    parser.add_argument('--module', action='append', help='Run a specific test module; repeat to select several')
     args = parser.parse_args()
     import pymysql
     with patch('socket.socket.connect', local_only(original_connect)), \
             patch('socket.socket.connect_ex', local_only(original_connect_ex)), \
             patch.object(pymysql, 'connect', side_effect=AssertionError('Live MySQL forbidden')), \
             patch('pymysql.connections.Connection.connect', side_effect=AssertionError('Live MySQL forbidden')):
-        if args.unit_only:
+        if args.module:
+            suite = unittest.defaultTestLoader.loadTestsFromNames(args.module)
+        elif args.unit_only:
             suite = unittest.TestSuite()
             for path in sorted((ROOT / 'tests').glob('test_*.py')):
                 tree = ast.parse(path.read_text(encoding='utf-8'))
