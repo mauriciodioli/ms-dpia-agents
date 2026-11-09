@@ -1,3 +1,4 @@
+
 name: Deploy ms-dpia-agents
 
 on:
@@ -25,6 +26,7 @@ jobs:
     env:
       EC2_HOST: ec2-54-234-169-22.compute-1.amazonaws.com
       HOST_PORT: "8302"
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -57,66 +59,133 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -eu
+
             CONTAINER='${{ env.DEPLOYMENT_VERSION }}'
             IMAGE='docker.io/${{ env.IMAGE_NAMESPACE }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}'
+            PREVIOUS_IMAGE=''
+            STARTED_NEW=false
+
             test "$CONTAINER" = 'ms202612agents'
             test '${{ env.DOCKER_IMAGE_NAME }}' = 'ms202612agents'
             test '${{ env.HOST_PORT }}' = '8302'
+
             command -v python3 >/dev/null
             command -v ss >/dev/null
             docker network inspect red_app >/dev/null
+
             test -r /home/ubuntu/.env
             test -r /home/ubuntu/google_oauth_credentials.json
 
-            # Refuse to replace a same-named container owned by another project.
-            RUNNING=false
+            # Check ownership before replacing the container.
             if docker container inspect "$CONTAINER" >/dev/null 2>&1; then
               test "$(docker inspect --format '{{ index .Config.Labels "com.dpia.service" }}' "$CONTAINER")" = 'ms-dpia-agents'
-              RUNNING=$(docker inspect --format '{{.State.Running}}' "$CONTAINER")
+              PREVIOUS_IMAGE=$(docker inspect --format '{{.Image}}' "$CONTAINER")
             fi
-            # Check all other containers, including wildcard/IP-specific bindings.
+
+            # Never interfere with another container using port 8302.
             for id in $(docker ps -aq); do
               test "$(docker inspect --format '{{.Name}}' "$id")" = "/$CONTAINER" && continue
+
               docker inspect --format '{{json .HostConfig.PortBindings}}' "$id" |
                 python3 -c 'import json,sys; bindings=json.load(sys.stdin) or {}; sys.exit(1 if any(b.get("HostPort")=="8302" for group in bindings.values() for b in (group or [])) else 0)'
             done
-            if test "$RUNNING" != true; then
-              test -z "$(ss -H -ltn 'sport = :8302')"
-              python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",8302)); s.close()'
-            fi
-            # Read-only files are available before Python starts. No credential output.
+
+            # Prepare read-only credential mounts.
             set -- --mount type=bind,src=/home/ubuntu/.env,dst=/src/.env,readonly
+
             for file in client_secrets.json credentials_module.json upload_to_gcs.json pruebasheetpython.json google_oauth_credentials.json; do
               if test -f "/home/ubuntu/$file"; then
                 test -r "/home/ubuntu/$file"
                 set -- "$@" --mount "type=bind,src=/home/ubuntu/$file,dst=/src/utils/$file,readonly"
               fi
             done
+
+            # Download before stopping the current service.
             docker pull "$IMAGE"
+
+            wait_for_port() {
+              attempt=1
+              while [ "$attempt" -le 30 ]; do
+                if python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",8302)); s.close()' 2>/dev/null; then
+                  return 0
+                fi
+                echo "Waiting for port 8302 ($attempt/30)"
+                sleep 1
+                attempt=$((attempt + 1))
+              done
+              return 1
+            }
+
+            start_container() {
+              TARGET_IMAGE="$1"
+              docker run -d \
+                --name "$CONTAINER" \
+                --label com.dpia.service=ms-dpia-agents \
+                --network red_app \
+                -p 127.0.0.1:8302:8302 \
+                --restart unless-stopped \
+                -e HOST=0.0.0.0 \
+                -e PORT=8302 \
+                -e FLASK_ENV=production \
+                -e AGENTS_TRUSTED_PROXY_IPS=172.18.0.1 \
+                "$@" "$TARGET_IMAGE"
+            }
+
+            check_container() {
+              if ! docker exec "$CONTAINER" python -c 'import config; assert config.PORT==8302; assert config.GOOGLE_CLIENT_ID.strip()' >/dev/null 2>&1; then
+                return 1
+              fi
+
+              for attempt in $(seq 1 30); do
+                if docker exec "$CONTAINER" python -c 'import socket; s=socket.create_connection(("127.0.0.1",8302),timeout=2); s.close()' >/dev/null 2>&1; then
+                  return 0
+                fi
+                sleep 2
+              done
+
+              return 1
+            }
+
+            # Stop only the DPIA Agents container.
             if docker container inspect "$CONTAINER" >/dev/null 2>&1; then
               docker stop "$CONTAINER"
               docker rm "$CONTAINER"
             fi
-            # Recheck immediately before publishing; Docker also rejects port races.
-            test -z "$(ss -H -ltn 'sport = :8302')"
-            python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",8302)); s.close()'
-            docker run -d --name "$CONTAINER" --label com.dpia.service=ms-dpia-agents \
-              --network red_app -p 127.0.0.1:8302:8302 --restart unless-stopped \
-              -e HOST=0.0.0.0 -e PORT=8302 -e FLASK_ENV=production \
-              -e AGENTS_TRUSTED_PROXY_IPS=172.18.0.1 \
-              "$@" "$IMAGE"
-            # Silence diagnostics: configuration exceptions may contain credentials.
-            if ! docker exec "$CONTAINER" python -c 'import config; assert config.PORT==8302; assert config.GOOGLE_CLIENT_ID.strip()' >/dev/null 2>&1; then
-              echo 'Configuration check failed; inspect configuration securely.'
+
+            # Wait until Docker releases the host port.
+            if ! wait_for_port; then
+              echo "ERROR: Port 8302 was not released."
               exit 1
             fi
-            # A TCP probe avoids HTTP hooks that can write activity logs to MySQL.
-            for attempt in $(seq 1 30); do
-              if docker exec "$CONTAINER" python -c 'import socket; s=socket.create_connection(("127.0.0.1",8302),timeout=2); s.close()' >/dev/null 2>&1; then
-                echo 'ms-dpia-agents listening on port 8302'
-                exit 0
+
+            # Start the new version.
+            if start_container "$IMAGE" "$@"; then
+              STARTED_NEW=true
+            fi
+
+            if [ "$STARTED_NEW" = true ] && check_container; then
+              echo "SUCCESS: ms-dpia-agents listening on port 8302"
+              exit 0
+            fi
+
+            echo "ERROR: New version failed health checks."
+
+            # Remove only the failed DPIA Agents container.
+            if docker container inspect "$CONTAINER" >/dev/null 2>&1; then
+              docker rm -f "$CONTAINER"
+            fi
+
+            # Restore previous image if available.
+            if [ -n "$PREVIOUS_IMAGE" ]; then
+              echo "Attempting rollback of ms-dpia-agents."
+
+              if wait_for_port && start_container "$PREVIOUS_IMAGE" "$@" && check_container; then
+                echo "ROLLBACK SUCCESS: Previous version restored."
+              else
+                echo "ROLLBACK FAILED: Manual investigation required."
               fi
-              sleep 2
-            done
-            echo 'ms-dpia-agents did not start on port 8302'
+            else
+              echo "No previous container image available for rollback."
+            fi
+
             exit 1
