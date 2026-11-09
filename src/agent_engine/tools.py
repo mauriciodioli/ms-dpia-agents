@@ -47,6 +47,13 @@ class ToolRegistry:
 def default_registry() -> ToolRegistry:
     registry = ToolRegistry()
     registry.register(ToolSpec(
+        id='dpia.test.echo', provider='local.test', capability='local-test',
+        implementation_status='LOCAL_TEST_ONLY',
+        contract_reference='agent_engine.demo_handler; no external network calls',
+        input_schema={'type': 'object', 'additionalProperties': False,
+                      'properties': {'message': {'type': 'string', 'maxLength': 500}}},
+    ))
+    registry.register(ToolSpec(
         id='dpia.amazon.search', provider='dpia.scraper', capability='search',
         implementation_status='EXISTING_CONTRACT_ENGINE_ADAPTER_PENDING',
         contract_reference='services.query_execution.dispatch_external; services.base44_images.Base44Images.job',

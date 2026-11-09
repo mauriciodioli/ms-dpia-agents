@@ -76,16 +76,22 @@ def recover_command(batch_size):
 
 
 @click.command('agent-worker')
+@click.option('--local-test', is_flag=True, help='Explicitly enable the no-provider demo handler.')
 @click.option('--capability', multiple=True, required=True)
 @click.option('--watch', is_flag=True)
 @click.option('--interval', type=click.IntRange(1, 60), default=5)
 @with_appcontext
-def worker_command(capability, watch, interval):
+def worker_command(capability, watch, interval, local_test):
     """Generic runner. Requires explicitly installed trusted Phase D handlers."""
     from .worker import Worker, HandlerRegistry
     from .task_box import TaskBox
     from .streams import RedisStreams
     handlers = current_app.extensions.get('agent_engine_handlers')
+    if local_test:
+        if set(capability) != {'local-test'}:
+            raise click.ClickException('local_test_requires_local_test_capability_only')
+        from .demo_handler import demo_handlers
+        handlers = demo_handlers()
     if not isinstance(handlers, HandlerRegistry) or not handlers.handlers:
         raise click.ClickException('worker_handlers_not_configured')
     try:

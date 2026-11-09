@@ -35,7 +35,8 @@
   };
   const names = {
     'openai.analysis': 'Análisis con OpenAI',
-    'dpia.amazon.search': 'Búsqueda de productos'
+    'dpia.amazon.search': 'Búsqueda de productos',
+    'dpia.test.echo': 'Prueba interna (sin APIs)'
   };
   const errors = {
     revision_conflict: 'La configuración cambió en otra sesión. Recargá el agente antes de guardar.',
@@ -370,7 +371,7 @@
     form.append(general);
     const toolPanel = node('fieldset', undefined, 'panel');
     toolPanel.append(node('legend', '02 · Herramientas y parámetros'), node('p',
-      'Podés guardar parámetros. Los adaptadores de ejecución todavía están pendientes.', 'help'));
+      'Podés configurar una prueba local gratuita. Los adaptadores de OpenAI y scraping siguen pendientes.', 'help'));
     const selected = [];
     context.tools.forEach(t => {
       const label = node('label', undefined, 'tool-choice'),
@@ -379,7 +380,8 @@
       check.name = 'capability';
       check.value = t.id;
       check.checked = a ? a.capabilities.includes(t.id) : t.id === 'openai.analysis';
-      label.append(check, node('span', names[t.id] || t.id), pending());
+      label.append(check, node('span', names[t.id] || t.id),
+        t.id === 'dpia.test.echo' ? node('span', 'Local', 'badge active') : pending());
       toolPanel.append(label);
       const host = node('div', undefined, 'tool-fields');
       host.hidden = !check.checked;
@@ -699,6 +701,69 @@
   }
   async function executionsPage() {
     heading('Ejecuciones', 'Historial real de los trabajos de tu cuenta.');
+    const launch = node('section', undefined, 'panel');
+    launch.append(node('h2', 'Ejecutar prueba interna'),
+      node('p', 'Solo usa el adaptador local. No llama a OpenAI ni a Apify. El resultado queda sin verificar.', 'help'));
+    const launchForm = node('form');
+    const agentSelect = field(launchForm, 'Agente habilitado con prueba interna',
+      'manual-agent', 'select', '');
+    const initial = node('option', 'Elegí un agente');
+    initial.value = '';
+    agentSelect.append(initial);
+    const message = field(launchForm, 'Mensaje de prueba', 'manual-message',
+      'text', 'Verificar circuito de DPIA Agents', {maxLength: 500});
+    const launchButton = btn('Ejecutar ahora', async () => {
+      if (!agentSelect.value) { notify('Elegí un agente con la herramienta de prueba interna.'); return; }
+      launchButton.disabled = true;
+      try {
+        const selected = (await api('/agents/' + encodeURIComponent(agentSelect.value))).agent;
+        if (selected.configuration_state !== 'ENABLED' ||
+            !selected.capabilities.includes('dpia.test.echo')) {
+          throw new Error('El agente debe estar habilitado y tener la herramienta Prueba interna.');
+        }
+        const limits = {
+          max_tool_calls: 1,
+          max_output_tokens: Math.min(2000, selected.limits.max_output_tokens),
+          max_duration_seconds: Math.min(300, selected.limits.max_duration_seconds),
+          max_corrections: 0
+        };
+        const key = 'local-test-' + crypto.randomUUID();
+        const data = await api('/agents/' + encodeURIComponent(selected.id) + '/requests', {
+          method: 'POST',
+          headers: {'Idempotency-Key': key},
+          body: JSON.stringify({
+            instructions: 'Prueba técnica local sin proveedores externos',
+            pipeline: [{tool: 'dpia.test.echo', parameters: {message: message.value}}],
+            limits
+          })
+        });
+        notify('Trabajo creado: ' + data.job.id + '. Para procesarlo, iniciá el outbox y worker local.');
+        await load();
+      } catch (e) {
+        notify(e.message || 'No se pudo crear el trabajo de prueba.');
+      } finally { launchButton.disabled = false; }
+    }, 'primary');
+    launchForm.append(launchButton);
+    launch.append(launchForm);
+    root.append(launch);
+    (async () => {
+      try {
+        let cursor = null;
+        do {
+          const data = await api('/agents?limit=100' +
+            (cursor ? '&after=' + encodeURIComponent(cursor) : ''));
+          data.items.filter(a => a.configuration_state === 'ENABLED' &&
+            a.capabilities.includes('dpia.test.echo')).forEach(a => {
+            const option = node('option', a.name);
+            option.value = a.id;
+            agentSelect.append(option);
+          });
+          cursor = data.next_cursor;
+        } while (cursor);
+        if (agentSelect.options.length === 1)
+          launch.append(banner('Primero agregá Prueba interna al agente desde Configurar y guardá los cambios.'));
+      } catch (e) { showError(e, launch); }
+    })();
     const filters = node('div', undefined, 'filters'),
       state = field(filters, 'Estado', 'state', 'select', ''),
       all = node('option', 'Todos los estados');
