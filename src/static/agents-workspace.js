@@ -181,6 +181,28 @@
     host.append(row);
   }
 
+  async function toggleAgent(a, button) {
+    const enabling = a.configuration_state !== 'ENABLED';
+    button.disabled = true;
+    try {
+      const result = await api('/agents/' + encodeURIComponent(a.id) +
+        (enabling ? '/activate' : '/deactivate'), {
+          method: 'POST',
+          body: JSON.stringify({expected_revision: a.revision})
+        });
+      notify(result.agent.configuration_state === 'ENABLED' ?
+        'Agente habilitado. Ya puede recibir solicitudes.' :
+        'Agente deshabilitado. No se admitirán nuevas solicitudes.');
+      await render();
+    } catch (e) {
+      button.disabled = false;
+      if (e.name === 'AbortError') return;
+      if (e.status === 401) { await render(); return; }
+      notify(e.message || 'No se pudo cambiar el estado del agente.');
+      if (e.status === 409) await render();
+    }
+  }
+
   function card(a) {
     const c = node('article', undefined, 'agent-card'),
       top = node('div', undefined, 'card-top');
@@ -188,8 +210,13 @@
     const meta = node('div', undefined, 'meta');
     meta.append(badge(a.activity_state), node('span', a.timezone));
     const bottom = node('div', undefined, 'card-bottom');
-    bottom.append(node('span', 'Revisión ' + a.revision, 'muted'), link('Configurar →', '/agents/' + a.id +
-      '/edit', 'quiet'));
+    const actions = node('div', undefined, 'agent-actions');
+    const enabled = a.configuration_state === 'ENABLED';
+    actions.append(btn(enabled ? 'Deshabilitar' : 'Habilitar',
+      function () { return toggleAgent(a, this); },
+      enabled ? 'secondary' : 'primary'));
+    actions.append(link('Configurar →', '/agents/' + a.id + '/edit', 'quiet'));
+    bottom.append(node('span', 'Revisión ' + a.revision, 'muted'), actions);
     c.append(top, node('h3', a.name), node('p', a.description || 'Sin descripción'), meta, bottom);
     return c;
   }
