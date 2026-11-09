@@ -726,7 +726,7 @@
           max_tool_calls: 1,
           max_output_tokens: Math.min(2000, selected.limits.max_output_tokens),
           max_duration_seconds: Math.min(300, selected.limits.max_duration_seconds),
-          max_corrections: 0
+          max_corrections: Math.min(2, selected.limits.max_corrections)
         };
         const key = 'local-test-' + crypto.randomUUID();
         const data = await api('/agents/' + encodeURIComponent(selected.id) + '/requests', {
@@ -804,7 +804,7 @@
         else table(host, ['Trabajo', 'Estado', 'Creación', 'Progreso', 'Resultado'], data.items.map(
           j => [j.id, badge(j.state), date(j.created_at), j.progress === null ? 'No disponible' : j
             .progress + '%', j.state === 'DELIVERED' ? btn('Ver resultado', () => result(j.id),
-              'quiet') : j.state === 'REVIEWING' ? btn('Revisar resultado', () => reviewResult(j.id), 'quiet') : 'Todavía no disponible'
+              'quiet') : j.state === 'REVIEWING' ? btn('Revisar resultado', () => reviewResult(j.id), 'quiet') : j.state === 'CORRECTION_REQUIRED' ? btn('Ver corrección', () => correctionHistory(j.id), 'quiet') : 'Todavía no disponible'
           ]));
         pages(host, cursors.length > 1 ? () => {
           cursors.pop();
@@ -823,6 +823,45 @@
     };
     await load();
   }
+  async function correctionHistory(id) {
+    const dialog = document.querySelector('#result-dialog');
+    const host = document.querySelector('#result-content');
+    host.replaceChildren(node('p', 'Cargando historial…'));
+    dialog.showModal();
+    try {
+      const data = await api('/jobs/' + encodeURIComponent(id) + '/review-history');
+      host.replaceChildren(node('h3', 'Historial de correcciones'));
+      host.append(node('p', 'Correcciones solicitadas: ' + data.correction_count +
+        ' / ' + data.max_corrections));
+      data.results.forEach(r => {
+        host.append(node('h4', 'Versión ' + r.version),
+          node('p', r.payload.summary || 'Sin resumen'),
+          node('p', 'Evidencia: ' + r.evidence_status));
+        if (Array.isArray(r.payload.warnings)) r.payload.warnings.forEach(w => host.append(banner(w)));
+      });
+      data.reviews.forEach(r => host.append(node('p', 'Revisión ' + r.cycle + ': ' +
+        r.decision + ' · Motivos: ' + r.reason_codes.join(', '))));
+      if (data.state === 'CORRECTION_REQUIRED') {
+        const retry = btn('Reprocesar prueba interna', async () => {
+          if (!window.confirm('¿Volver a ejecutar la prueba local? No se usan APIs externas.')) return;
+          retry.disabled = true;
+          try {
+            await api('/jobs/' + encodeURIComponent(id) + '/retry-correction', {
+              method: 'POST', body: JSON.stringify({expected_revision: data.revision})
+            });
+            dialog.close();
+            window.location.reload();
+          } catch (e) { notify(e.message || 'No se pudo reprocesar.'); retry.disabled = false; }
+        }, 'primary');
+        if (data.correction_count > data.max_corrections || data.correction_count > 2) {
+          retry.disabled = true;
+          host.append(banner('Este trabajo no permite más correcciones. Creá una nueva prueba.'));
+        }
+        host.append(retry);
+      }
+    } catch (e) { showError(e, host); }
+  }
+
   async function reviewResult(id) {
     const dialog = document.querySelector('#result-dialog');
     const host = document.querySelector('#result-content');

@@ -188,6 +188,9 @@ class TaskBox:
             used = conn.execute(select(func.sum(m.tasks.c.attempt_count)).where(
                 m.tasks.c.owner_id == job['owner_id'], m.tasks.c.job_id == job['id'])).scalar() or 0
             budget = job['request_snapshot'].get('limits', {}).get('max_tool_calls', 0)
+            if task['tool_id'] == 'dpia.test.echo':
+                budget *= (1 + min(job['correction_count'],
+                    job['request_snapshot'].get('limits', {}).get('max_corrections', 0)))
             if task['attempt_count'] >= self.policy.max_attempts or used >= budget:
                 self._fail(conn, job, 'TASK_ATTEMPT_BUDGET_EXCEEDED')
                 return 'ACK', None

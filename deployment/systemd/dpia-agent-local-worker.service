@@ -1,0 +1,14 @@
+[Unit]
+Description=DPIA Agents local-worker (existing container, local-only)
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/docker exec ms202612agents sh -c 'cd /src && flask agent-worker --local-test --capability local-test --watch --interval 5'
+Restart=always
+RestartSec=10
+StartLimitIntervalSec=0
+
+[Install]
+WantedBy=multi-user.target

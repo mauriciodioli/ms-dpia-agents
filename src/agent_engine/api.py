@@ -287,6 +287,48 @@ def decide_job_review(conn, principal, repo, job_id):
     return {'review_decision': decision}
 
 
+@api.get('/jobs/<job_id>/review-history')
+@endpoint('jobs:read')
+def job_review_history(conn, principal, repo, job_id):
+    """Owner-only previous result versions and review decisions."""
+    from . import models as m
+    arguments()
+    if principal.kind != 'SESSION':
+        raise EngineError('reviewer_session_required', 403)
+    job_id = identifier(job_id)
+    job = repo.job(job_id)
+    results = conn.execute(select(m.results).where(m.results.c.owner_id == principal.owner_id,
+        m.results.c.job_id == job_id).order_by(m.results.c.version)).mappings().all()
+    reviews = conn.execute(select(m.reviews).where(m.reviews.c.owner_id == principal.owner_id,
+        m.reviews.c.job_id == job_id).order_by(m.reviews.c.cycle)).mappings().all()
+    return {'state': job['state'], 'revision': job['revision'],
+        'correction_count': job['correction_count'],
+        'max_corrections': job['request_snapshot'].get('limits', {}).get('max_corrections', 0),
+        'results': [{'id': r['id'], 'version': r['version'], 'payload': r['payload'],
+                     'evidence_status': r['evidence_status']} for r in results],
+        'reviews': [{'result_id': r['result_id'], 'cycle': r['cycle'],
+                     'decision': r['decision'], 'reason_codes': r['reason_codes']} for r in reviews]}
+
+
+@api.post('/jobs/<job_id>/retry-correction')
+@endpoint('jobs:create', write=True)
+def retry_job_correction(conn, principal, repo, job_id):
+    """Explicit owner action. Local demo only; no provider replay."""
+    from .corrections import retry_local_correction
+    arguments()
+    engine_write(principal)
+    if principal.kind != 'SESSION':
+        raise EngineError('reviewer_session_required', 403)
+    job_id = identifier(job_id)
+    repo.job(job_id)
+    body = json_body()
+    if set(body) != {'expected_revision'} or type(body['expected_revision']) is not int:
+        raise EngineError('invalid_contract')
+    return {'retry': retry_local_correction(conn, owner_id=principal.owner_id,
+        job_id=job_id, actor_id=principal.actor_id,
+        expected_revision=body['expected_revision'])}
+
+
 @api.get('/jobs/<job_id>/events')
 @endpoint('jobs:read')
 def job_events(conn, principal, repo, job_id):
