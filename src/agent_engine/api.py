@@ -245,6 +245,48 @@ def get_result(conn, principal, repo, job_id):
     return repo.result(identifier(job_id))
 
 
+@api.get('/jobs/<job_id>/review')
+@endpoint('jobs:read')
+def inspect_job_review(conn, principal, repo, job_id):
+    """Owner-only review preview; does not make results publicly deliverable."""
+    from .review_coordinator import ReviewCoordinator
+    from . import models as m
+    arguments()
+    if principal.kind != 'SESSION':
+        raise EngineError('reviewer_session_required', 403)
+    job_id = identifier(job_id)
+    repo.job(job_id)  # tenant boundary
+    report = ReviewCoordinator(conn).inspect(owner_id=principal.owner_id, job_id=job_id)
+    result_row = conn.execute(select(m.results.c.payload).where(
+        m.results.c.owner_id == principal.owner_id,
+        m.results.c.id == report['result_id'],
+        m.results.c.job_id == job_id)).scalar_one()
+    return {'review': report, 'result': result_row}
+
+
+@api.post('/jobs/<job_id>/review')
+@endpoint('jobs:create', write=True)
+def decide_job_review(conn, principal, repo, job_id):
+    """Explicit session decision, never an automatic evidence approval."""
+    from .review_coordinator import ReviewCoordinator
+    arguments()
+    engine_write(principal)
+    if principal.kind != 'SESSION':
+        raise EngineError('reviewer_session_required', 403)
+    job_id = identifier(job_id)
+    repo.job(job_id)
+    body = json_body()
+    if set(body) != {'decision', 'reason_codes', 'expected_revision'}:
+        raise EngineError('invalid_contract')
+    report = ReviewCoordinator(conn).inspect(owner_id=principal.owner_id, job_id=job_id)
+    if type(body['expected_revision']) is not int or body['expected_revision'] != report['revision']:
+        raise EngineError('revision_conflict', 409)
+    decision = ReviewCoordinator(conn).decide(
+        owner_id=principal.owner_id, job_id=job_id, actor_id=principal.actor_id,
+        decision=body['decision'], reason_codes=body['reason_codes'])
+    return {'review_decision': decision}
+
+
 @api.get('/jobs/<job_id>/events')
 @endpoint('jobs:read')
 def job_events(conn, principal, repo, job_id):

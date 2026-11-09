@@ -1076,3 +1076,8 @@ input, select, textarea { margin-top: 8px; }
   .header-brand img { width: 30px; height: 30px; }
   .breadcrumb { font-size: 11px; }
 }
+
+/* Local execution and review controls */
+.manual-execution-form > button.primary { margin-top: 18px; }
+.review-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
+.review-actions button:disabled { opacity: .5; cursor: not-allowed; }

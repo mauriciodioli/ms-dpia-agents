@@ -704,7 +704,7 @@
     const launch = node('section', undefined, 'panel');
     launch.append(node('h2', 'Ejecutar prueba interna'),
       node('p', 'Solo usa el adaptador local. No llama a OpenAI ni a Apify. El resultado queda sin verificar.', 'help'));
-    const launchForm = node('form');
+    const launchForm = node('form', undefined, 'manual-execution-form');
     const agentSelect = field(launchForm, 'Agente habilitado con prueba interna',
       'manual-agent', 'select', '');
     const initial = node('option', 'Elegí un agente');
@@ -804,7 +804,7 @@
         else table(host, ['Trabajo', 'Estado', 'Creación', 'Progreso', 'Resultado'], data.items.map(
           j => [j.id, badge(j.state), date(j.created_at), j.progress === null ? 'No disponible' : j
             .progress + '%', j.state === 'DELIVERED' ? btn('Ver resultado', () => result(j.id),
-              'quiet') : 'Todavía no disponible'
+              'quiet') : j.state === 'REVIEWING' ? btn('Revisar resultado', () => reviewResult(j.id), 'quiet') : 'Todavía no disponible'
           ]));
         pages(host, cursors.length > 1 ? () => {
           cursors.pop();
@@ -822,6 +822,72 @@
       load();
     };
     await load();
+  }
+  async function reviewResult(id) {
+    const dialog = document.querySelector('#result-dialog');
+    const host = document.querySelector('#result-content');
+    host.replaceChildren(node('p', 'Cargando revisión…'));
+    dialog.showModal();
+    try {
+      const data = await api('/jobs/' + encodeURIComponent(id) + '/review');
+      const report = data.review;
+      host.replaceChildren(node('h3', 'Resultado en revisión'));
+      const payload = data.result || {};
+      host.append(node('p', payload.summary || 'Sin resumen disponible.'));
+      if (Array.isArray(payload.findings) && payload.findings.length) {
+        const findings = node('ul');
+        payload.findings.forEach(f => findings.append(node('li', f.text || JSON.stringify(f))));
+        host.append(node('h4', 'Hallazgos'), findings);
+      }
+      if (Array.isArray(payload.warnings)) payload.warnings.forEach(w => host.append(banner(w)));
+      host.append(node('h4', 'Informe del verificador'));
+      const status = node('p', 'Estructura: ' +
+        (report.report.structurally_valid ? 'válida' : 'inválida') +
+        ' · Evidencia: ' + report.evidence_status +
+        ' · Aprobación: ' + (report.ready_for_approval ? 'permitida' : 'bloqueada'));
+      host.append(status);
+      if (report.report.reason_codes.length)
+        host.append(node('p', 'Observaciones: ' + report.report.reason_codes.join(', ')));
+      const actions = node('div', undefined, 'review-actions');
+      const reason = field(host, 'Motivo (código en mayúsculas, sin espacios)',
+        'review-reason', 'text', 'RESULTADO_NO_VERIFICADO',
+        {maxLength: 80});
+      reason.pattern = '[A-Z0-9_]+';
+      const submit = async (decision) => {
+        if (!window.confirm('¿Confirmás la decisión ' + decision + '? Esta acción cambia el estado del trabajo.'))
+          return;
+        const code = reason.value.trim();
+        if (decision !== 'APPROVED' && !/^[A-Z0-9_]{1,80}$/.test(code)) {
+          notify('Ingresá un motivo válido, por ejemplo RESULTADO_NO_VERIFICADO.');
+          return;
+        }
+        actions.querySelectorAll('button').forEach(b => b.disabled = true);
+        try {
+          await api('/jobs/' + encodeURIComponent(id) + '/review', {
+            method: 'POST',
+            body: JSON.stringify({
+              decision, reason_codes: decision === 'APPROVED' ? [] : [code],
+              expected_revision: report.revision
+            })
+          });
+          dialog.close();
+          notify('Decisión registrada: ' + decision + '. Actualizá el historial.');
+          window.location.reload();
+        } catch (e) {
+          notify(e.message || 'No se pudo registrar la revisión.');
+          actions.querySelectorAll('button').forEach(b => b.disabled = false);
+        }
+      };
+      actions.append(
+        btn('Solicitar corrección', () => submit('CORRECTION_REQUIRED'), 'secondary'),
+        btn('Rechazar', () => submit('REJECTED'), 'secondary'),
+        btn('Aprobar', () => submit('APPROVED'), 'primary')
+      );
+      actions.lastChild.disabled = !report.ready_for_approval;
+      host.append(actions);
+    } catch (e) {
+      showError(e, host);
+    }
   }
   async function result(id, admin = false) {
     const dialog = document.querySelector('#result-dialog'),
