@@ -1053,3 +1053,26 @@ svg {
 }
 
 input, select, textarea { margin-top: 8px; }
+
+/* Official brand assets from LOGOS IA. */
+.brand-logo {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.header-brand {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.header-brand img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+.topbar .breadcrumb { flex: 1; }
+@media (max-width: 700px) {
+  .header-brand { order: -1; }
+  .header-brand img { width: 30px; height: 30px; }
+  .breadcrumb { font-size: 11px; }
+}
