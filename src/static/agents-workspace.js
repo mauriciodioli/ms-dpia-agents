@@ -369,7 +369,115 @@
         category_id: 'ID de categoría',
         language: 'Idioma'
       };
-      Object.entries(t.input_schema.properties).forEach(([key, schema]) => {
+      if (t.id === 'dpia.amazon.search') {
+        const schema = t.input_schema.properties;
+        const initial = params;
+        const inputs = {};
+        const add = (key, label, type = 'select') => {
+          inputs[key] = field(host, label, t.id + ':' + key, type, initial[key] ?? '', {
+            required: check.checked, disabled: !check.checked
+          });
+          controls.push({key, input: inputs[key], required: true, schema: schema[key]});
+          return inputs[key];
+        };
+        const options = (input, items, placeholder, saved) => {
+          input.replaceChildren();
+          const blank = node('option', placeholder);
+          blank.value = '';
+          input.append(blank);
+          items.forEach(([value, label]) => {
+            const opt = node('option', label);
+            opt.value = String(value);
+            input.append(opt);
+          });
+          input.value = items.some(([v]) => String(v) === String(saved)) ? String(saved) : '';
+        };
+        add('country', 'País');
+        add('city', 'Ciudad');
+        add('scope_id', 'Ámbito');
+        add('category_id', 'Categoría');
+        add('postal_id', 'Código postal');
+        add('language', 'Idioma');
+        add('query', 'Búsqueda', 'text');
+        inputs.query.maxLength = 500;
+        inputs.country.required = true;
+        let cities = [], catalog = null, serial = 0;
+        const setBusy = (busy) => {
+          ['city', 'scope_id', 'category_id', 'postal_id'].forEach(k => {
+            inputs[k].disabled = !check.checked || busy;
+          });
+        };
+        const loadCity = async (savedScope = '', savedCategory = '', savedPostal = '') => {
+          const token = ++serial;
+          catalog = null;
+          options(inputs.scope_id, [], 'Elegí un ámbito');
+          options(inputs.category_id, [], 'Elegí una categoría');
+          options(inputs.postal_id, [], 'Elegí un código postal');
+          if (!inputs.city.value) return;
+          setBusy(true);
+          try {
+            const q = new URLSearchParams({
+              pais: inputs.country.value, ciudad: inputs.city.value,
+              idioma: inputs.language.value
+            });
+            const data = await request('/api/catalogos/ubicacion?' + q);
+            if (token !== serial) return;
+            if (!data.success) throw new Error('No se pudo cargar el catálogo.');
+            catalog = data;
+            options(inputs.scope_id, data.ambitos.map(x => [x.ambito_id, x.nombre]),
+              'Elegí un ámbito', savedScope);
+            const postal = data.codigos_postales.map(x => [x.id, x.codigoPostal]);
+            options(inputs.postal_id, postal, 'Elegí un código postal', savedPostal);
+            if (postal.length === 1) inputs.postal_id.value = String(postal[0][0]);
+            updateCategories(savedCategory);
+          } catch (e) {
+            if (token === serial) notify('No se pudo cargar la ubicación: ' + e.message);
+          } finally {
+            if (token === serial) setBusy(false);
+          }
+        };
+        const updateCategories = (saved = '') => {
+          const scope = Number(inputs.scope_id.value);
+          const matches = catalog && scope ? catalog.categorias.filter(x =>
+            (x.ambito_ids || []).map(Number).includes(scope)) : [];
+          options(inputs.category_id, matches.map(x => [x.categoria_id, x.nombre]),
+            'Elegí una categoría', saved);
+        };
+        const loadCountry = async (savedCity = '', savedScope = '',
+          savedCategory = '', savedPostal = '') => {
+          const token = ++serial;
+          cities = [];
+          options(inputs.city, [], 'Cargando ciudades…');
+          options(inputs.scope_id, [], 'Elegí un ámbito');
+          options(inputs.category_id, [], 'Elegí una categoría');
+          options(inputs.postal_id, [], 'Elegí un código postal');
+          if (!inputs.country.value) return;
+          setBusy(true);
+          try {
+            const data = await request('/api/catalogos/ciudades?pais=' +
+              encodeURIComponent(inputs.country.value));
+            if (token !== serial) return;
+            if (!data.success) throw new Error('No se pudieron cargar las ciudades.');
+            cities = data.ciudades;
+            options(inputs.city, cities.map(x => [x.nombre, x.nombre]),
+              'Elegí una ciudad', savedCity);
+            if (inputs.city.value) await loadCity(savedScope, savedCategory, savedPostal);
+          } catch (e) {
+            if (token === serial) notify('No se pudieron cargar las ciudades: ' + e.message);
+          } finally {
+            if (token === serial) setBusy(false);
+          }
+        };
+        options(inputs.country, schema.country.enum.map(x => [x, x]),
+          'Elegí un país', initial.country || 'Argentina');
+        options(inputs.language, schema.language.enum.map(x => [x, x]),
+          'Elegí un idioma', initial.language || 'es');
+        inputs.country.onchange = () => loadCountry();
+        inputs.city.onchange = () => loadCity();
+        inputs.scope_id.onchange = () => updateCategories();
+        inputs.language.onchange = () => loadCity();
+        loadCountry(initial.city, initial.scope_id, initial.category_id, initial.postal_id);
+      } else Object.entries(t.input_schema.properties).forEach(([key, schema]) => {
         const required = (t.input_schema.required || []).includes(key),
           input = field(host, labels[key] || key, t.id + ':' + key, schema.enum ? 'select' :
             schema.type === 'integer' ? 'number' : key === 'instructions' ? 'textarea' : 'text',
