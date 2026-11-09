@@ -718,6 +718,7 @@
       try {
         const selected = (await api('/agents/' + encodeURIComponent(agentSelect.value))).agent;
         if (selected.configuration_state !== 'ENABLED' ||
+            !Array.isArray(selected.capabilities) ||
             !selected.capabilities.includes('dpia.test.echo')) {
           throw new Error('El agente debe estar habilitado y tener la herramienta Prueba interna.');
         }
@@ -752,7 +753,12 @@
         do {
           const data = await api('/agents?limit=100' +
             (cursor ? '&after=' + encodeURIComponent(cursor) : ''));
-          data.items.filter(a => a.configuration_state === 'ENABLED' &&
+          const enabled = data.items.filter(a => a.configuration_state === 'ENABLED');
+          const details = await Promise.all(enabled.map(async a => {
+            const response = await api('/agents/' + encodeURIComponent(a.id));
+            return response.agent;
+          }));
+          details.filter(a => Array.isArray(a.capabilities) &&
             a.capabilities.includes('dpia.test.echo')).forEach(a => {
             const option = node('option', a.name);
             option.value = a.id;
