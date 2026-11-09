@@ -1,6 +1,9 @@
-name: Deploy ms-dpia-agents (manual)
+name: Deploy ms-dpia-agents
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
