@@ -72,3 +72,8 @@ notebooks/
 # Archivos temporales del sistema
 .DS_Store
 Thumbs.db
+!.github/
+.github/*
+!.github/workflows/
+.github/workflows/*
+!.github/workflows/aws.yml
