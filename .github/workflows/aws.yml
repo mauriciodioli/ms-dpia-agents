@@ -59,7 +59,7 @@ jobs:
             set -eu
             CONTAINER='${{ env.DEPLOYMENT_VERSION }}'
             IMAGE='docker.io/${{ env.IMAGE_NAMESPACE }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}'
-            test "$CONTAINER" = 'ms202612aGents'
+            test "$CONTAINER" = 'ms202612agents'
             test '${{ env.DOCKER_IMAGE_NAME }}' = 'ms202612agents'
             test '${{ env.HOST_PORT }}' = '8302'
             command -v python3 >/dev/null
