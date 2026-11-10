@@ -110,3 +110,6 @@ DPIA_SCRAPER_TIMEOUT_SECONDS = int(os.getenv('DPIA_SCRAPER_TIMEOUT_SECONDS', '12
 # Explicit model allowlist, not a claim of access. Enable also verifies /models/{id}.
 AGENTS_OPENAI_MODELS = tuple(filter(None, (x.strip() for x in os.getenv(
     'AGENTS_OPENAI_MODELS', OPENAI_MODEL).split(','))))
+
+# Dedicated server-to-server PWA provisioning credential; never exposed to the browser.
+PWA_ACTIVATION_SECRET = os.environ.get('PWA_ACTIVATION_SECRET', '')
