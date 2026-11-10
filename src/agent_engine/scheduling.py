@@ -16,6 +16,7 @@ def local_utc(local: datetime, zone: ZoneInfo) -> datetime:
 
 
 def next_occurrence(definition: dict, after: datetime) -> datetime:
+    # Convert the 'after' datetime to the local time in the specified timezone, ignoring DST issues for now.
     zone = ZoneInfo(definition['timezone'])
     local_after = after.replace(tzinfo=timezone.utc).astimezone(zone).replace(tzinfo=None)
     hour, minute = map(int, definition['execution_time'].split(':'))
