@@ -39,9 +39,9 @@ class ExecutionContext:
             raise EngineError('lease_lost', 409)
         self.box.heartbeat(self.lease)
 
-    def mark_submitting(self):
+    def mark_submitting(self, expected_integration_revision=None):
         self.heartbeat()
-        self.box.mark_submitting(self.lease)
+        self.box.mark_submitting(self.lease, expected_integration_revision)
 
     def mark_submitted(self, provider_job_id):
         self.box.mark_submitted(self.lease, provider_job_id)
@@ -111,7 +111,17 @@ class Worker:
                 raise EngineError('invalid_task_output')
             context.heartbeat()  # Fenced even if a handler returned after its deadline.
             self.box.complete(lease, output, require_provider=handler.requires_provider_grant)
-        except Exception:
+        except Exception as error:
+            if isinstance(error, EngineError) and error.code in ('integration_disabled', 'revision_conflict'):
+                try:
+                    self.box.defer_integration(lease)
+                    return 'DEFER'
+                except EngineError as deferred:
+                    if deferred.code == 'lease_lost':
+                        return 'LEASE_LOST'
+                    # A submitted task must retain the existing uncertain policy.
+                    if deferred.code != 'provider_already_submitted':
+                        raise
             try:
                 self.box.failed(lease)  # Safe retries only before external submission.
             except EngineError as error:

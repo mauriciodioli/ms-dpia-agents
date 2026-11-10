@@ -1081,3 +1081,19 @@ input, select, textarea { margin-top: 8px; }
 .manual-execution-form > button.primary { margin-top: 18px; }
 .review-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
 .review-actions button:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Provider cards keep enablement separate from the last connection diagnostic. */
+.integration-card p { overflow-wrap: anywhere; }
+.integration-toggle { display: flex; gap: 10px; align-items: center; margin: 12px 0; }
+.integration-toggle input { width: 38px; height: 22px; margin: 0; accent-color: #e6ae1e; }
+.integration-card .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.integration-card[aria-busy="true"] .integration-diagnostic::before {
+  content: ''; display: inline-block; width: 12px; height: 12px; margin-right: 8px;
+  border: 2px solid #ddd; border-top-color: #6951b7; border-radius: 50%; animation: integration-spin .8s linear infinite;
+}
+.integration-dialog { width: min(560px, calc(100vw - 32px)); max-height: 85vh; overflow-y: auto; }
+.integration-dialog label { margin: 12px 0; }
+.integration-dialog .actions { display: flex; gap: 10px; margin-top: 16px; }
+.integration-dialog input[type="checkbox"] { width: 22px; height: 22px; }
+@keyframes integration-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .integration-card[aria-busy="true"] .integration-diagnostic::before { animation: none; } }

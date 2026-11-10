@@ -39,7 +39,7 @@ class OutboxPublisher:
                     if spec.capability != row['capability']:
                         raise EngineError('invalid_task_capability')
                 except EngineError as error:
-                    if error.code != 'agent_paused':
+                    if error.code not in ('agent_paused', 'integration_disabled'):
                         self.box._fail(conn, job, error.code)
                         report['rejected'] += 1
                     continue

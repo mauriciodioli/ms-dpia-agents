@@ -417,7 +417,7 @@ def workspace_session(conn, principal, repo):
                        'input_schema': tool.input_schema,
                        'implementation_status': tool.implementation_status}
                       for tool in default_registry().tools.values()],
-            'availability': {'execution': False, 'integrations_management': False,
+            'availability': {'execution': False, 'integrations_management': principal.admin,
                              'users_management': False}}
 
 

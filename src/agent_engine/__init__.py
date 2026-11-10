@@ -3,6 +3,7 @@
 
 def init_app(app):
     from .api import api, admin
+    from . import integration_api  # Register routes before blueprint registration.
     app.register_blueprint(api)
     app.register_blueprint(admin)
     from .developer_portal import portal

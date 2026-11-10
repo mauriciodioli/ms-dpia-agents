@@ -100,3 +100,13 @@ REDIS_PASSWORD = os.environ.get('REDIS_PASSWORD', '')
 # Exact WSGI peer IPs only. Enable after verifying the Nginx header contract;
 # no default trust in loopback, Docker networks, or client-supplied headers.
 AGENTS_TRUSTED_PROXY_IPS = os.getenv('AGENTS_TRUSTED_PROXY_IPS', '').strip()
+
+# Shared across web and external workers; never store this master key in MySQL.
+AGENTS_INTEGRATION_MASTER_KEY = os.getenv('AGENTS_INTEGRATION_MASTER_KEY', '')
+DPIA_SCRAPER_BASE_URL = os.getenv('DPIA_SCRAPER_BASE_URL', 'https://api.dpia.site/api/scraper/v1')
+DPIA_SCRAPER_ALLOWED_HOSTS = tuple(filter(None, (x.strip().lower() for x in os.getenv(
+    'DPIA_SCRAPER_ALLOWED_HOSTS', 'api.dpia.site').split(','))))
+DPIA_SCRAPER_TIMEOUT_SECONDS = int(os.getenv('DPIA_SCRAPER_TIMEOUT_SECONDS', '120'))
+# Explicit model allowlist, not a claim of access. Enable also verifies /models/{id}.
+AGENTS_OPENAI_MODELS = tuple(filter(None, (x.strip() for x in os.getenv(
+    'AGENTS_OPENAI_MODELS', OPENAI_MODEL).split(','))))

@@ -118,6 +118,7 @@
       const e = new Error(errors[data.error] || (r.status === 403 ?
         'No tenés permisos para esta acción.' : 'No se pudo completar la solicitud. Reintentá.'));
       e.status = r.status;
+      e.data = data;
       throw e;
     }
     return data;
@@ -958,27 +959,222 @@
     }
   }
 
-  function integrationsPage() {
-    heading('Integraciones', 'Herramientas declaradas para tus agentes.');
-    root.append(banner(
-      'La conexión de proveedores y la ejecución de herramientas están pendientes. No se solicitan ni guardan claves API en esta interfaz.'
-      ));
+  const integrationErrors = {
+    integration_not_configured: 'Guardá una configuración válida antes de activar.',
+    integration_encryption_unavailable: 'Falta la clave maestra de cifrado o no permite abrir la credencial guardada.',
+    invalid_credential: 'Ingresá una credencial válida, sin espacios.',
+    credential_required: 'Ingresá la credencial del proveedor.',
+    wrong_credential_system: 'El token de clientes DPIA Agents no sirve como credencial de este proveedor.',
+    invalid_provider_url: 'La URL debe usar HTTPS y un host permitido por el servidor.',
+    invalid_model: 'El identificador del modelo no es válido.',
+    model_not_configured: 'El modelo debe estar autorizado en la configuración del servidor.',
+    invalid_credentials: 'Credenciales inválidas, vencidas o revocadas.',
+    insufficient_permissions: 'Permisos insuficientes para utilizar el proveedor.',
+    provider_resource_unavailable: 'El modelo o recurso no está disponible para esta cuenta.',
+    provider_invalid_response: 'El proveedor devolvió una respuesta que no cumple el contrato.',
+    provider_timeout: 'La conexión superó el tiempo de espera.',
+    provider_unavailable: 'No se pudo conectar con el proveedor.',
+    provider_rate_limited: 'El proveedor limitó las solicitudes. Reintentá más tarde.',
+    worker_unavailable: 'Worker no disponible. Revisá su proceso y su última señal.',
+    adapter_not_implemented: 'El adaptador requerido no está implementado.',
+    integration_disabled: 'La integración está desactivada.',
+    provider_not_authorized: 'Autorizá explícitamente este proveedor para el agente.',
+    tool_not_authorized: 'El agente no tiene esta herramienta.',
+    agent_budget_exceeded: 'Los límites del agente no alcanzan para esta prueba.',
+    cost_confirmation_required: 'La búsqueda requiere confirmación explícita del posible costo.',
+    revision_conflict: 'La configuración cambió. Actualizá los datos antes de repetir la acción.'
+  };
+  Object.assign(errors, integrationErrors);
+
+  async function integrationsPage() {
+    heading('Integraciones', 'Configuración, conexión y habilitación independiente de proveedores.');
     const dev = node('section', undefined, 'panel');
-    dev.append(node('h2', 'API / Desarrolladores'), node('p', 'Documentación de endpoints, clientes API, permisos y tokens para conectar microservicios.'), link('Abrir portal API', '/developers'));
+    dev.append(node('h2', 'API / Desarrolladores'), node('p', 'Endpoints, clientes API y permisos.'), link('Abrir portal API', '/developers'));
     root.append(dev);
+    if (!context.session.admin) {
+      root.append(banner('La administración de integraciones requiere una sesión de administrador.'));
+      return;
+    }
+    const data = await api('/integrations');
     const cards = node('div', undefined, 'cards');
-    context.tools.forEach(t => {
-      const c = node('article', undefined, 'agent-card'),
-        top = node('div', undefined, 'card-top');
-      top.append(icon('integration', 'agent-icon'), pending());
-      const b = btn('Conectar · pendiente', () => {});
-      b.disabled = true;
-      c.append(top, node('h3', names[t.id] || t.id), node('p', t.provider), node('p',
-        'Prepará los parámetros desde la configuración de un agente. El adaptador aún no está disponible.'
-        ), b);
-      cards.append(c);
-    });
     root.append(cards);
+    const operation = (id, action, body, method = 'POST', extraHeaders = {}) => api('/integrations/' + id + action, {
+      method, body: JSON.stringify(body), headers: {'X-DPIA-Action': 'manage-integrations', ...extraHeaders}
+    });
+    for (const initial of data.items) {
+      let state = initial, busy = false;
+      const card = node('article', undefined, 'agent-card integration-card');
+      card.dataset.provider = initial.id;
+      cards.append(card);
+      const title = initial.id === 'openai' ? 'OpenAI' : 'DPIA Scraper';
+      async function refresh() {
+        const latest = (await api('/integrations/' + initial.id + '/health')).integration;
+        if (latest.revision >= state.revision) state = latest;
+        draw();
+      }
+      async function act(action) {
+        if (busy) return;
+        busy = true; draw();
+        try {
+          const result = await operation(state.id, '/' + action, {expected_revision: state.revision});
+          state = result.integration;
+          if (result.error) notify(integrationErrors[result.error] || 'La verificación falló.');
+          else notify(action === 'disable' ? 'Integración desactivada. Las llamadas ya iniciadas podrán finalizar.' :
+            action === 'enable' ? 'Integración activada.' : 'Verificación completada sin ejecutar tareas.');
+        } catch (e) {
+          if (e.data?.integration) state = e.data.integration;
+          notify(e.message);
+        } finally {
+          busy = false; draw();
+        }
+      }
+      function draw() {
+        card.replaceChildren(); card.setAttribute('aria-busy', String(busy));
+        const top = node('div', undefined, 'card-top');
+        top.append(icon('integration', 'agent-icon'), badge(state.enabled ? 'ENABLED' : 'Desactivado'));
+        const diagnostic = !state.credential_present ? 'Sin configurar' : !state.checked_at ? 'Configurado' :
+          state.authenticated === false ? 'Credenciales inválidas' : state.last_error === 'insufficient_permissions' ?
+          'Permisos insuficientes' : state.healthy && state.authenticated && state.permissions_ok ? 'Conectado' : 'Error de conexión';
+        const label = node('label', undefined, 'integration-toggle'), toggle = node('input');
+        toggle.type = 'checkbox'; toggle.setAttribute('role', 'switch'); toggle.checked = state.enabled;
+        toggle.disabled = busy; toggle.setAttribute('aria-label', 'Activar / Desactivar API ' + title);
+        toggle.onchange = () => act(state.enabled ? 'disable' : 'enable');
+        label.append(toggle, node('span', 'Activar / Desactivar API'));
+        const buttons = node('div', undefined, 'actions');
+        const test = btn(busy ? 'Verificando…' : 'Probar conexión', () => act('test'));
+        const configure = btn('Configurar', () => configureModal());
+        test.disabled = configure.disabled = busy;
+        buttons.append(test, configure);
+        card.append(top, node('h3', title), node('p', state.provider, 'muted'), label,
+          node('p', diagnostic, 'integration-diagnostic'),
+          node('p', 'Worker ' + state.capability + ': ' + (state.worker_available ? 'Disponible' : 'Worker no disponible')),
+          node('p', 'Adaptador: ' + (state.adapter_implemented ? 'Implementado' : 'Pendiente')),
+          node('p', 'Última conexión exitosa: ' + (state.last_success_at ? date(state.last_success_at) : 'Sin registro')),
+          node('p', 'Última prueba: ' + (state.checked_at ? date(state.checked_at) : 'Sin registro')));
+        if (state.latency_ms !== null) card.append(node('p', 'Latencia: ' + state.latency_ms + ' ms'));
+        if (state.last_error) card.append(banner(integrationErrors[state.last_error] || 'Error de conexión.'));
+        card.append(buttons, node('small', initial.id === 'openai' ?
+          'El diagnóstico consulta el modelo; no genera contenido ni garantiza cuota o permisos de inferencia.' :
+          'El diagnóstico verifica API y permisos; no ejecuta scraping ni comprueba Apify.'));
+        if (state.id === 'dpia-scraper') {
+          const caps = node('details'); caps.append(node('summary', 'Ver capacidades'));
+          for (const marketplace of ['amazon', 'mercadolibre', 'ebay', 'aliexpress']) {
+            const present = Object.hasOwn(state.marketplaces, marketplace);
+            caps.append(node('p', marketplace + ': catálogo ' + (present ? 'disponible' : 'sin confirmar') +
+              '; adaptador ' + (marketplace === 'amazon' ? 'implementado' : 'pendiente') + '; búsqueda real no certificada por este diagnóstico.'));
+          }
+          const trial = btn('Ejecutar búsqueda de prueba', () => trialModal().catch(e => notify(e.message)));
+          trial.disabled = busy || !state.enabled || !state.worker_available;
+          card.append(caps, trial);
+        }
+      }
+      function modal(name) {
+        const dialog = node('dialog', undefined, 'integration-dialog');
+        dialog.id = state.id + '-dialog'; dialog.setAttribute('aria-label', name);
+        const heading = node('h2', name), message = node('p'); message.setAttribute('role', 'status');
+        dialog.append(heading, message); document.body.append(dialog);
+        dialog.addEventListener('close', () => { dialog.querySelectorAll('input[type=password]').forEach(x => x.value = ''); dialog.remove(); });
+        dialog.showModal();
+        return {dialog, message};
+      }
+      function inputField(form, text, type, value, options = {}) {
+        const label = node('label', text), input = node('input');
+        input.type = type; input.value = value ?? ''; Object.assign(input, options);
+        label.append(input); form.append(label); return input;
+      }
+      async function configureModal() {
+        const {dialog, message} = modal('Configurar ' + title), form = node('form');
+        form.autocomplete = 'off'; dialog.append(form);
+        let url, model, maxTokens, saving = false;
+        if (state.id === 'dpia-scraper') url = inputField(form, 'URL de la API', 'url', state.config.base_url, {required: true});
+        const credential = inputField(form, state.id === 'openai' ? 'API Key' : 'Token Bearer', 'password', '', {
+          required: !state.credential_present, maxLength: 4096, autocomplete: 'new-password',
+          placeholder: state.credential_present ? 'Dejar vacío para conservar la credencial' : ''});
+        const reveal = btn('Mostrar / Ocultar', () => credential.type = credential.type === 'password' ? 'text' : 'password', 'quiet');
+        form.append(reveal);
+        dialog.addEventListener('close', () => credential.value = '');
+        if (state.id === 'openai') {
+          const label = node('label', 'Modelo configurado'); model = node('select'); model.required = true;
+          model.append(new Option('Seleccioná un modelo', ''));
+          for (const id of state.available_models) model.append(new Option(id, id));
+          model.value = state.config.model; label.append(model); form.append(label);
+          maxTokens = inputField(form, 'Límite de tokens de salida por ejecución', 'number', state.config.max_output_tokens, {min: 16, max: 16000, required: true});
+        } else form.append(node('p', 'Permisos confirmados: ' + (state.permissions.join(', ') || 'Sin verificar')),
+          node('small', 'Se requieren scraper:read y scraper:write. La credencial debe proceder de DPIA Scraper.'));
+        const timeout = inputField(form, 'Timeout (segundos)', 'number', state.config.timeout_seconds,
+          {min: state.id === 'dpia-scraper' ? 90 : 5, max: 180, required: true});
+        form.append(node('p', 'Guardar desactiva la integración hasta verificar y activar la nueva configuración.'));
+        const actions = node('div', undefined, 'actions'), save = btn('Guardar', null, 'primary'), cancel = btn('Cancelar', () => dialog.close());
+        save.type = 'submit'; actions.append(save, cancel); form.append(actions);
+        form.onsubmit = async event => {
+          event.preventDefault(); if (saving) return; saving = true; save.disabled = cancel.disabled = true;
+          const config = state.id === 'openai' ? {model: model.value, timeout_seconds: Number(timeout.value), max_output_tokens: Number(maxTokens.value)} :
+            {base_url: url.value, timeout_seconds: Number(timeout.value)};
+          const body = {expected_revision: state.revision, config};
+          if (credential.value) body.credential = credential.value;
+          credential.value = ''; message.textContent = 'Guardando…';
+          try {
+            state = (await operation(state.id, '', body, 'PUT')).integration;
+            dialog.close(); draw(); notify('Configuración guardada. Activá la API cuando esté lista.');
+          } catch (e) { message.textContent = e.message; }
+          finally { delete body.credential; saving = false; save.disabled = cancel.disabled = false; }
+        };
+        const assignments = node('section'); assignments.append(node('h3', 'Autorizar mis agentes'));
+        dialog.append(assignments);
+        try {
+          const agents = (await api('/integrations/' + state.id + '/agents')).items;
+          if (!agents.length) assignments.append(node('p', 'No hay agentes propios con esta herramienta. Configurá uno desde Mis agentes.'));
+          for (const agent of agents) {
+            const label = node('label', undefined, 'integration-toggle'), checkbox = node('input');
+            checkbox.type = 'checkbox'; checkbox.checked = agent.authorized; checkbox.disabled = !state.credential_present;
+            checkbox.onchange = async () => {
+              checkbox.disabled = true;
+              try { await operation(state.id, '/agents/' + agent.id, {authorized: checkbox.checked, expected_revision: state.revision}, 'PUT'); }
+              catch (e) { checkbox.checked = !checkbox.checked; message.textContent = e.message; }
+              finally { checkbox.disabled = false; }
+            };
+            label.append(checkbox, node('span', agent.name)); assignments.append(label);
+          }
+        } catch (e) { assignments.append(node('p', e.message)); }
+      }
+      async function trialModal() {
+        const {dialog, message} = modal('Búsqueda de prueba · DPIA Scraper'), form = node('form');
+        dialog.append(form);
+        form.append(banner('Puede consumir créditos de Apify. Una consulta Amazon, una llamada y hasta 10 resultados del proveedor. No hay un tope monetario por solicitud documentado; configurá un presupuesto en el proveedor antes de continuar.'));
+        const agents = (await api('/integrations/dpia-scraper/agents')).items.filter(x => x.enabled && x.authorized);
+        const label = node('label', 'Agente autorizado'), select = node('select'); select.required = true;
+        select.append(new Option('Seleccioná un agente', ''));
+        agents.forEach(x => select.append(new Option(x.name, x.id))); label.append(select); form.append(label);
+        const countries = {'argentina':'Argentina','italia':'Italia','espana':'España','polonia':'Polonia','mexico':'México','uruguay':'Uruguay'};
+        const countryLabel = node('label', 'País'), country = node('select'); country.required = true;
+        for (const key of state.marketplaces.amazon || []) country.append(new Option(countries[key], countries[key]));
+        countryLabel.append(country); form.append(countryLabel);
+        const query = inputField(form, 'Consulta', 'text', '', {required: true, maxLength: 500});
+        const count = inputField(form, 'Máximo de productos conservados (no limita el costo externo)', 'number', 5, {required: true, min: 1, max: 10});
+        const confirm = inputField(form, 'Confirmo el posible costo y que revisé el presupuesto del proveedor', 'checkbox', '', {required: true});
+        const send = btn('Confirmar y ejecutar una búsqueda', null, 'primary'); send.type = 'submit';
+        form.append(send, btn('Cancelar', () => dialog.close()));
+        let sending = false;
+        const key = crypto.randomUUID();
+        form.onsubmit = async event => {
+          event.preventDefault(); if (sending) return; sending = true; send.disabled = true;
+          try {
+            const result = await operation(state.id, '/trial', {expected_revision: state.revision, agent_id: select.value,
+              query: query.value, country: country.value, max_products: Number(count.value), confirm_cost: confirm.checked},
+              'POST', {'Idempotency-Key': key});
+            form.remove(); message.textContent = 'Trabajo creado: ' + result.job.id + '. Estado: ' + (states[result.job.state] || result.job.state);
+            dialog.append(node('p', 'Al recibir los datos pasará a revisión. La entrega requiere las reglas de aprobación existentes.'),
+              link('Ver ejecuciones', '/executions'), btn('Cerrar', () => dialog.close()));
+          } catch (e) { message.textContent = e.message; sending = false; send.disabled = false; }
+        };
+      }
+      draw();
+      const timer = setInterval(() => {
+        if (!card.isConnected) { clearInterval(timer); return; }
+        if (!busy && !document.querySelector('.integration-dialog')) refresh().catch(() => {});
+      }, 15000);
+      abort.signal.addEventListener('abort', () => clearInterval(timer), {once: true});
+    }
   }
   async function administrationPage() {
     if (!context.session.admin) {
@@ -1100,6 +1296,7 @@
     abort?.abort();
     abort = new AbortController();
     context = null;
+    document.querySelectorAll('.integration-dialog').forEach(d => d.close());
     document.querySelector('#result-dialog').close();
     document.querySelector('#result-content').replaceChildren();
     root.replaceChildren(node('p', 'Cargando tu espacio…', 'loading'));
@@ -1128,7 +1325,7 @@
       else if (/^\/agents\/[a-f0-9-]+\/edit$/.test(path)) await editor(path.split('/')[2]);
       else if (path === '/schedules') await schedulesPage();
       else if (path === '/executions') await executionsPage();
-      else if (path === '/integrations') integrationsPage();
+      else if (path === '/integrations') await integrationsPage();
       else if (['/administration', '/admin/agents'].includes(path)) await administrationPage();
       else heading('Página no encontrada', 'Volvé a Mis agentes para continuar.', link('Mis agentes',
         '/agents'));
@@ -1173,6 +1370,7 @@
     abort?.abort();
     ++version;
     root.replaceChildren(node('p', 'Cerrando sesión…', 'loading'));
+    document.querySelectorAll('.integration-dialog').forEach(d => d.close());
     document.querySelector('#result-dialog').close();
     document.querySelector('#result-content').replaceChildren();
     try {

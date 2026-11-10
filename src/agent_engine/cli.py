@@ -76,17 +76,23 @@ def recover_command(batch_size):
 
 
 @click.command('agent-worker')
+@click.option('--providers', is_flag=True, help='Install the real search/analysis adapters; requires persisted enablement.')
 @click.option('--local-test', is_flag=True, help='Explicitly enable the no-provider demo handler.')
 @click.option('--capability', multiple=True, required=True)
 @click.option('--watch', is_flag=True)
 @click.option('--interval', type=click.IntRange(1, 60), default=5)
 @with_appcontext
-def worker_command(capability, watch, interval, local_test):
+def worker_command(capability, watch, interval, local_test, providers):
     """Generic runner. Requires explicitly installed trusted Phase D handlers."""
     from .worker import Worker, HandlerRegistry
     from .task_box import TaskBox
     from .streams import RedisStreams
     handlers = current_app.extensions.get('agent_engine_handlers')
+    if providers:
+        if local_test or not set(capability).issubset({'search', 'analysis'}):
+            raise click.ClickException('invalid_provider_worker_capability')
+        from .provider_handlers import provider_handlers
+        handlers = provider_handlers(engine(), current_app.config)
     if local_test:
         if set(capability) != {'local-test'}:
             raise click.ClickException('local_test_requires_local_test_capability_only')

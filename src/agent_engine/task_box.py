@@ -68,7 +68,7 @@ class TaskBox:
             conn.execute(update(m.workers).where(m.workers.c.id == worker_id, predicate)
                 .values(reported_state='AVAILABLE', heartbeat_at=self.now(), current_task_id=None))
 
-    def authorized(self, conn, job, task, *, require_provider=True):
+    def authorized(self, conn, job, task, *, require_provider=True, check_integration=True):
         user = conn.execute(select(Usuario.id).where(Usuario.id == job['owner_id'],
             Usuario.activo.is_(True)).with_for_update()).first()
         if user is None:
@@ -89,13 +89,19 @@ class TaskBox:
         spec = self.registry.tools.get(task['tool_id'])
         if spec is None:
             raise EngineError('unknown_tool', 403)
+        if check_integration:
+            from .integrations import require_enabled
+            require_enabled(conn, spec.provider)
         if require_provider:
+            from .integrations import BY_PROVIDER
+            credential_filter = (m.connections.c.credential_ref == 'integration:' + BY_PROVIDER[spec.provider]
+                                 if spec.provider in BY_PROVIDER else True)
             permitted = conn.execute(select(m.connections.c.id).join(m.tool_grants, and_(
                 m.connections.c.owner_id == m.tool_grants.c.owner_id,
                 m.connections.c.id == m.tool_grants.c.connection_id)).where(
                     m.tool_grants.c.owner_id == job['owner_id'], m.tool_grants.c.agent_id == job['agent_id'],
                     m.tool_grants.c.tool_id == task['tool_id'], m.connections.c.enabled.is_(True),
-                    m.connections.c.provider_id == spec.provider).with_for_update()).first()
+                    m.connections.c.provider_id == spec.provider, credential_filter).with_for_update()).first()
             if permitted is None:
                 raise EngineError('provider_not_authorized', 403)
         return spec
@@ -171,7 +177,7 @@ class TaskBox:
             try:
                 spec = self.authorized(conn, job, task, require_provider=require_provider)
             except EngineError as error:
-                if error.code == 'agent_paused':
+                if error.code in ('agent_paused', 'integration_disabled'):
                     return 'DEFER', None
                 self._fail(conn, job, error.code)
                 return 'ACK', None
@@ -233,10 +239,18 @@ class TaskBox:
             conn.execute(update(m.workers).where(m.workers.c.id == lease.worker_id,
                 m.workers.c.current_task_id == lease.task_id).values(heartbeat_at=self.now(), reported_state='BUSY'))
 
-    def mark_submitting(self, lease):
+    def mark_submitting(self, lease, expected_integration_revision=None):
         """Persist BEFORE any externally billable action. Recovery then fails closed."""
         with self.engine.begin() as conn:
             job, task = self._owned(conn, lease)
+            spec = self.authorized(conn, job, task, require_provider=lease.tool_id != 'dpia.test.echo')
+            if expected_integration_revision is not None:
+                from .integrations import BY_PROVIDER
+                from .integration_models import integrations
+                current = conn.execute(select(integrations.c.revision).where(
+                    integrations.c.id == BY_PROVIDER.get(spec.provider)).with_for_update()).scalar()
+                if current != expected_integration_revision:
+                    raise EngineError('revision_conflict', 409)
             if task['provider_submission_state'] != 'NOT_SUBMITTED':
                 raise EngineError('provider_already_submitted', 409)
             conn.execute(update(m.tasks).where(m.tasks.c.owner_id == lease.owner_id,
@@ -264,7 +278,8 @@ class TaskBox:
         with self.engine.begin() as conn:
             job, task = self._owned(conn, lease)
             try:
-                self.authorized(conn, job, task, require_provider=require_provider)
+                self.authorized(conn, job, task, require_provider=require_provider,
+                    check_integration=task['provider_submission_state'] == 'NOT_SUBMITTED')
             except EngineError as error:
                 self._fail(conn, job, error.code)
                 return
@@ -317,6 +332,20 @@ class TaskBox:
         if not uncertain:
             self._rearm(conn, job, task, due)
         self._event(conn, job, 'TASK_UNCERTAIN' if uncertain else 'TASK_RECOVERED' if recovery else 'TASK_RETRY_SCHEDULED')
+
+    def defer_integration(self, lease):
+        with self.engine.begin() as conn:
+            job, task = self._owned(conn, lease)
+            if task['provider_submission_state'] != 'NOT_SUBMITTED':
+                raise EngineError('provider_already_submitted', 409)
+            conn.execute(update(m.tasks).where(m.tasks.c.id == lease.task_id,
+                m.tasks.c.owner_id == lease.owner_id).values(state='PENDING', lease_token=None,
+                    lease_until=None, lease_version=m.tasks.c.lease_version + 1))
+            conn.execute(update(m.attempts).where(m.attempts.c.id == lease.attempt_id,
+                m.attempts.c.owner_id == lease.owner_id).values(state='DEFERRED', finished_at=self.now()))
+            conn.execute(update(m.workers).where(m.workers.c.id == lease.worker_id,
+                m.workers.c.current_task_id == lease.task_id).values(current_task_id=None, reported_state='AVAILABLE'))
+            self._event(conn, job, 'TASK_INTEGRATION_DEFERRED')
 
     def failed(self, lease):
         with self.engine.begin() as conn:

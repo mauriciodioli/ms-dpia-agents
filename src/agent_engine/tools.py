@@ -55,13 +55,14 @@ def default_registry() -> ToolRegistry:
     ))
     registry.register(ToolSpec(
         id='dpia.amazon.search', provider='dpia.scraper', capability='search',
-        implementation_status='EXISTING_CONTRACT_ENGINE_ADAPTER_PENDING',
-        contract_reference='services.query_execution.dispatch_external; services.base44_images.Base44Images.job',
+        implementation_status='IMPLEMENTED',
+        contract_reference='agent_engine.provider_handlers; DPIA Scraper /base44/scraping',
         input_schema={
             'type': 'object', 'additionalProperties': False,
-            'required': ['query', 'country', 'city', 'postal_id', 'scope_id', 'category_id', 'language'],
+            'required': ['query', 'country'],
             'properties': {
                 'query': {'type': 'string', 'minLength': 1, 'maxLength': 500},
+                'max_products': {'type': 'integer', 'minimum': 1, 'maximum': 10},
                 'country': {'enum': ['Argentina', 'Italia', 'España', 'Polonia', 'México', 'Uruguay']},
                 'city': {'type': 'string', 'minLength': 1, 'maxLength': 100},
                 'postal_id': {'type': 'integer', 'minimum': 1},
@@ -73,8 +74,8 @@ def default_registry() -> ToolRegistry:
     ))
     registry.register(ToolSpec(
         id='openai.analysis', provider='openai.responses', capability='analysis',
-        implementation_status='ENGINE_ADAPTER_PENDING',
-        contract_reference='services.result_generation.generate (existing transport, different output schema)',
+        implementation_status='IMPLEMENTED',
+        contract_reference='agent_engine.provider_handlers; OpenAI /responses',
         input_schema={'type': 'object', 'additionalProperties': False,
                       'properties': {'instructions': {'type': 'string', 'maxLength': 8000}}},
     ))
