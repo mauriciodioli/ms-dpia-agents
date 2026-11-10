@@ -92,25 +92,35 @@ class ReadRepository:
         approved_review = select(m.reviews.c.id).where(
             m.reviews.c.owner_id == m.results.c.owner_id, m.reviews.c.job_id == m.results.c.job_id,
             m.reviews.c.result_id == m.results.c.id, m.reviews.c.decision == 'APPROVED').exists()
+        from sqlalchemy import or_
+        from .informational_delivery import REASON, eligible_result
+        informational_event = select(m.events.c.id).where(m.events.c.owner_id == self.principal.owner_id,
+            m.events.c.job_id == job_id, m.events.c.sequence == job['revision'],
+            m.events.c.type == 'DELIVERED', m.events.c.actor_type == 'SYSTEM',
+            m.events.c.actor_id == 'dispatcher', m.events.c.reason_code == REASON).exists()
+        delivery_policy = or_(
+            and_(m.results.c.approved_at.is_not(None), m.results.c.approved_at <= now_utc(),
+                 m.deliveries.c.authorized_at >= m.results.c.approved_at, approved_review),
+            and_(m.results.c.approved_at.is_(None), m.results.c.evidence_status == 'UNVERIFIED',
+                 m.deliveries.c.authorized_at >= m.results.c.created_at, informational_event))
         query = select(m.results).join(m.deliveries, and_(
             m.deliveries.c.owner_id == m.results.c.owner_id,
             m.deliveries.c.job_id == m.results.c.job_id,
             m.deliveries.c.result_id == m.results.c.id)).where(
                 m.results.c.owner_id == self.principal.owner_id, m.results.c.job_id == job_id,
-                m.results.c.approved_at.is_not(None), m.results.c.approved_at <= now_utc(),
                 m.deliveries.c.state == 'DELIVERED', m.deliveries.c.delivered_at.is_not(None),
                 m.deliveries.c.delivered_at <= now_utc(), m.deliveries.c.authorized_at <= now_utc(),
-                m.deliveries.c.authorized_at >= m.results.c.approved_at,
                 m.deliveries.c.delivered_at >= m.deliveries.c.available_at,
-                m.deliveries.c.available_at <= now_utc(), approved_review).order_by(m.results.c.version.desc()).limit(1)
+                m.deliveries.c.available_at <= now_utc(), delivery_policy).order_by(m.results.c.version.desc()).limit(1)
         row = self.conn.execute(query).mappings().first()
-        if row is None:
+        if row is None or (row['approved_at'] is None and eligible_result(self.conn, job, row) is None):
             raise EngineError('result_not_delivered', 409)
         try:
             validate(RESULT, row['payload'])
         except EngineError:
             raise EngineError('stored_result_unavailable', 503) from None
         return {'job_id': job_id, 'version': row['version'], 'evidence_status': row['evidence_status'],
+                'delivery_kind': 'INFORMATIONAL' if row['approved_at'] is None else 'APPROVED',
                 'result': row['payload']}
 
     def events(self, job_id: str, after_sequence: int, limit: int):

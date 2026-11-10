@@ -240,6 +240,7 @@ class Dispatcher:
                 self._fail(row, error.code)
                 report['failed'].append(row['id'])
         self._authorize_deliveries(report, batch_size)
+        self._deliver_informational(report, batch_size)
         return report
 
     def _run_schedule(self, row, report):
@@ -269,6 +270,26 @@ class Dispatcher:
             if changed:
                 audit_agent(self.conn, principal, agent, 'SCHEDULE_PAUSED',
                     {'schedule_id': row['id'], 'reason_code': error.code}, self.now)
+
+    def _deliver_informational(self, report, limit):
+        from .informational_delivery import REASON, eligible_result
+        report['informational_delivered'] = []
+        rows = self.conn.execute(select(m.jobs).join(Usuario.__table__, Usuario.id == m.jobs.c.owner_id)
+            .where(m.jobs.c.state == 'REVIEWING', Usuario.activo.is_(True),
+                (m.jobs.c.deliver_not_before.is_(None) | (m.jobs.c.deliver_not_before <= self.now)),
+                select(m.tasks.c.id).where(m.tasks.c.owner_id == m.jobs.c.owner_id,
+                    m.tasks.c.job_id == m.jobs.c.id, m.tasks.c.tool_id == 'dpia.amazon.search').exists())
+            .order_by(m.jobs.c.priority.desc(), m.jobs.c.id).limit(limit)
+            .with_for_update(skip_locked=True)).mappings().all()
+        for job in rows:
+            result = eligible_result(self.conn, job)
+            if result is None:
+                continue
+            self._transition(job, 'DELIVERED', reason=REASON)
+            self.conn.execute(insert(m.deliveries).values(id=str(uuid4()), owner_id=job['owner_id'],
+                job_id=job['id'], result_id=result['id'], state='DELIVERED', authorized_at=self.now,
+                available_at=self.now, delivered_at=self.now))
+            report['informational_delivered'].append(job['id'])
 
     def _authorize_deliveries(self, report, limit):
         approved = self.conn.execute(select(m.jobs).join(Usuario.__table__, Usuario.id == m.jobs.c.owner_id)

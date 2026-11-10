@@ -46,7 +46,9 @@ TRANSITIONS = {
 }
 
 
-def require_transition(previous: str, following: str) -> None:
+def require_transition(previous: str, following: str, *, informational: bool = False) -> None:
+    if informational and previous == JobState.REVIEWING and following == JobState.DELIVERED:
+        return
     try:
         permitted = JobState(following) in TRANSITIONS[JobState(previous)]
     except (ValueError, KeyError):

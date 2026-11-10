@@ -254,7 +254,7 @@
         'Historial de tu cuenta'
       ],
       ['En ejecución', counts.RUNNING || 0, 'Estado informado por el motor'],
-      ['Resultados entregados', counts.DELIVERED || 0, 'Aprobados y disponibles']
+      ['Resultados entregados', counts.DELIVERED || 0, 'Disponibles para consulta']
     ].forEach(([t, v, h]) => {
       const d = node('div', undefined, 'stat');
       d.append(node('dt', t), node('dd', String(v)), node('small', h));
@@ -939,6 +939,8 @@
     try {
       const data = await api((admin ? '/admin' : '') + '/jobs/' + id + '/result');
       host.replaceChildren(node('p', data.result.summary));
+      if (data.evidence_status === 'UNVERIFIED') host.prepend(banner(
+        'Resultado informativo no verificado. No implica aprobación ni autorización de publicación.'));
       const list = node('ul');
       data.result.findings.forEach(f => list.append(node('li', f.text)));
       host.append(list, node('h3', 'Fuentes'));
@@ -1205,7 +1207,7 @@
               query: query.value, country: country.value, max_products: Number(count.value), confirm_cost: confirm.checked},
               'POST', {'Idempotency-Key': key});
             form.remove(); message.textContent = 'Trabajo creado: ' + result.job.id + '. Estado: ' + (states[result.job.state] || result.job.state);
-            dialog.append(node('p', 'Al recibir los datos pasará a revisión. La entrega requiere las reglas de aprobación existentes.'),
+            dialog.append(node('p', 'Los resultados de búsqueda con estructura válida se entregan como información no verificada, sin aprobación ni publicación.'),
               link('Ver ejecuciones', '/executions'), btn('Cerrar', () => dialog.close()));
           } catch (e) { message.textContent = e.message; sending = false; updateSelection(); }
         };

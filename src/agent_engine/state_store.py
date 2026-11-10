@@ -23,8 +23,15 @@ def transition_job(conn, *, owner_id: int, job_id: str, expected_revision: int,
             raise EngineError('job_not_found', 404)
         if row['revision'] != expected_revision:
             raise EngineError('revision_conflict', 409)
-        require_transition(row['state'], target)
         now = now or now_utc()
+        informational = row['state'] == 'REVIEWING' and target == 'DELIVERED'
+        if informational:
+            from .informational_delivery import REASON, eligible_result
+            if (actor_type != 'SYSTEM' or actor_id != 'dispatcher' or reason_code != REASON or
+                    (row['deliver_not_before'] is not None and row['deliver_not_before'] > now) or
+                    eligible_result(conn, row) is None):
+                raise EngineError('invalid_transition', 409)
+        require_transition(row['state'], target, informational=informational)
         changes = dict(state=target, revision=expected_revision+1, updated_at=now)
         if target == 'RUNNING' and row['started_at'] is None:
             changes['started_at'] = now
