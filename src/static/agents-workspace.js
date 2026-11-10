@@ -989,7 +989,9 @@
   async function integrationsPage() {
     heading('Integraciones', 'Configuración, conexión y habilitación independiente de proveedores.');
     const dev = node('section', undefined, 'panel');
-    dev.append(node('h2', 'API / Desarrolladores'), node('p', 'Endpoints, clientes API y permisos.'), link('Abrir portal API', '/developers'));
+    const portalLink = link('Abrir portal API', '/developers');
+    delete portalLink.dataset.nav; // Standalone Flask page, outside the workspace router.
+    dev.append(node('h2', 'API / Desarrolladores'), node('p', 'Endpoints, clientes API y permisos.'), portalLink);
     root.append(dev);
     if (!context.session.admin) {
       root.append(banner('La administración de integraciones requiere una sesión de administrador.'));
