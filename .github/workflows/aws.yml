@@ -135,6 +135,7 @@ jobs:
 
             if start_container "$IMAGE" "$@" && check_container; then
               echo 'SUCCESS: ms-dpia-agents listening on port 8302'
+              # Workers are deployed in the next independent step, after the web health check.
               exit 0
             fi
 
@@ -154,3 +155,57 @@ jobs:
               echo 'No previous container image available for rollback.'
             fi
             exit 1
+
+      - name: Deploy isolated DPIA engine processes (local-test only)
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ env.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -eu
+            IMAGE='docker.io/${{ env.IMAGE_NAMESPACE }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}'
+            WEB='ms202612agents'
+            test "$(docker inspect --format '{{ index .Config.Labels "com.dpia.service" }}' "$WEB")" = 'ms-dpia-agents'
+            test "$(docker inspect --format '{{.Config.Image}}' "$WEB")" = "$IMAGE"
+            docker network inspect red_app >/dev/null
+            test -r /home/ubuntu/.env
+
+            # Use the exact same read-only configuration mounts as the web container.
+            set -- --mount type=bind,src=/home/ubuntu/.env,dst=/src/.env,readonly
+            for file in client_secrets.json credentials_module.json upload_to_gcs.json pruebasheetpython.json google_oauth_credentials.json; do
+              if test -f "/home/ubuntu/$file"; then
+                test -r "/home/ubuntu/$file"
+                set -- "$@" --mount "type=bind,src=/home/ubuntu/$file,dst=/src/utils/$file,readonly"
+              fi
+            done
+
+            # These names are exclusive to DPIA Agents. Never stop or remove any other container.
+            deploy_process() {
+              name="$1"
+              shift
+              if docker container inspect "$name" >/dev/null 2>&1; then
+                test "$(docker inspect --format '{{ index .Config.Labels "com.dpia.service" }}' "$name")" = 'ms-dpia-agents'
+                docker rm -f "$name"
+              fi
+              docker run -d --name "$name" \
+                --label com.dpia.service=ms-dpia-agents \
+                --network red_app --restart unless-stopped \
+                -e HOST=0.0.0.0 -e PORT=8302 -e FLASK_ENV=production \
+                -e AGENTS_TRUSTED_PROXY_IPS=172.18.0.1 \
+                "$@" "$IMAGE" flask --app app "$COMMAND" --watch --interval 5 $EXTRA
+            }
+
+            COMMAND=agent-dispatch EXTRA=''
+            deploy_process ms202612agents-dispatcher "$@"
+            COMMAND=agent-outbox EXTRA=''
+            deploy_process ms202612agents-outbox "$@"
+            COMMAND=agent-worker EXTRA='--local-test --capability local-test'
+            deploy_process ms202612agents-worker-local "$@"
+
+            sleep 8
+            for name in ms202612agents-dispatcher ms202612agents-outbox ms202612agents-worker-local; do
+              test "$(docker inspect --format '{{.State.Running}}' "$name")" = true
+              test "$(docker inspect --format '{{.RestartCount}}' "$name")" = 0
+              echo "RUNNING: $name"
+            done
