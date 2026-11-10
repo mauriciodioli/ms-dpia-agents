@@ -963,6 +963,9 @@
     root.append(banner(
       'La conexión de proveedores y la ejecución de herramientas están pendientes. No se solicitan ni guardan claves API en esta interfaz.'
       ));
+    const dev = node('section', undefined, 'panel');
+    dev.append(node('h2', 'API / Desarrolladores'), node('p', 'Documentación de endpoints, clientes API, permisos y tokens para conectar microservicios.'), link('Abrir portal API', '/developers'));
+    root.append(dev);
     const cards = node('div', undefined, 'cards');
     context.tools.forEach(t => {
       const c = node('article', undefined, 'agent-card'),

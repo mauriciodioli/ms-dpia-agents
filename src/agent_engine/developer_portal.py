@@ -1,17 +1,17 @@
 """First-party developer portal, isolated from execution processes."""
-from flask import Blueprint, jsonify, render_template
-from sqlalchemy.exc import SQLAlchemyError
-from .api import engine, endpoint, arguments
-from .errors import EngineError
-from .contracts import API_VERSION, iso
-from .auth import now_utc
+from flask import Blueprint, render_template, make_response
+from .api import endpoint, arguments
 
 portal = Blueprint('agent_developer_portal', __name__)
 
 @portal.get('/developers')
 def developers_page():
     # Page is only a shell. Every API action checks authenticated session.
-    return render_template('agents_developers.html')
+    response = make_response(render_template('agents_developers.html'))
+    response.headers['Cache-Control'] = 'no-store'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    return response
 
 @portal.get('/api/agents/v1/client-connection')
 @endpoint()
