@@ -62,11 +62,11 @@ def integration_agents(conn, principal, repo, provider):
     spec = provider_spec(provider)
     # Assignment stays tenant-scoped: a global administrator does not silently
     # grant another owner's agents access to a shared paid credential.
-    rows = conn.execute(select(m.agents).join(m.agent_capabilities, and_(
-        m.agent_capabilities.c.owner_id == m.agents.c.owner_id,
-        m.agent_capabilities.c.agent_id == m.agents.c.id)).where(
-            m.agents.c.owner_id == principal.owner_id,
-            m.agent_capabilities.c.tool_id == spec['tool']).order_by(m.agents.c.name).limit(100)).mappings().all()
+    rows = conn.execute(select(m.agents).where(m.agents.c.owner_id == principal.owner_id)
+        .order_by(m.agents.c.name).limit(100)).mappings().all()
+    capable = set(conn.execute(select(m.agent_capabilities.c.agent_id).where(
+        m.agent_capabilities.c.owner_id == principal.owner_id,
+        m.agent_capabilities.c.tool_id == spec['tool'])).scalars())
     grants = set(conn.execute(select(m.tool_grants.c.agent_id).join(m.connections, and_(
         m.connections.c.owner_id == m.tool_grants.c.owner_id,
         m.connections.c.id == m.tool_grants.c.connection_id)).where(
@@ -74,7 +74,7 @@ def integration_agents(conn, principal, repo, provider):
             m.connections.c.credential_ref == 'integration:' + provider,
             m.connections.c.enabled.is_(True))).scalars())
     return {'items': [{'id': r['id'], 'name': r['name'], 'enabled': r['configuration_state'] == 'ENABLED',
-                       'authorized': r['id'] in grants} for r in rows]}
+                       'has_capability': r['id'] in capable, 'authorized': r['id'] in grants} for r in rows]}
 
 
 @api.put('/integrations/<provider>/agents/<agent_id>')

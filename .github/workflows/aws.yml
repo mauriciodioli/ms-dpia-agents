@@ -156,7 +156,7 @@ jobs:
             fi
             exit 1
 
-      - name: Deploy isolated DPIA engine processes (local-test only)
+      - name: Deploy isolated DPIA engine processes
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ env.EC2_HOST }}
@@ -202,9 +202,11 @@ jobs:
             deploy_process ms202612agents-outbox "$@"
             COMMAND=agent-worker EXTRA='--local-test --capability local-test'
             deploy_process ms202612agents-worker-local "$@"
+            COMMAND=agent-worker EXTRA='--providers --capability search'
+            deploy_process ms202612agents-worker-scraper "$@"
 
             sleep 8
-            for name in ms202612agents-dispatcher ms202612agents-outbox ms202612agents-worker-local; do
+            for name in ms202612agents-dispatcher ms202612agents-outbox ms202612agents-worker-local ms202612agents-worker-scraper; do
               test "$(docker inspect --format '{{.State.Running}}' "$name")" = true
               test "$(docker inspect --format '{{.RestartCount}}' "$name")" = 0
               echo "RUNNING: $name"

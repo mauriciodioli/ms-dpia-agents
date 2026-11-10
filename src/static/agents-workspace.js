@@ -372,7 +372,7 @@
     form.append(general);
     const toolPanel = node('fieldset', undefined, 'panel');
     toolPanel.append(node('legend', '02 · Herramientas y parámetros'), node('p',
-      'Podés configurar una prueba local gratuita. Los adaptadores de OpenAI y scraping siguen pendientes.', 'help'));
+      'Seleccioná las herramientas del agente. Para usar APIs, autorizá el agente en Integraciones.', 'help'));
     const selected = [];
     context.tools.forEach(t => {
       const label = node('label', undefined, 'tool-choice'),
@@ -382,7 +382,8 @@
       check.value = t.id;
       check.checked = a ? a.capabilities.includes(t.id) : t.id === 'openai.analysis';
       label.append(check, node('span', names[t.id] || t.id),
-        t.id === 'dpia.test.echo' ? node('span', 'Local', 'badge active') : pending());
+        t.id === 'dpia.test.echo' ? node('span', 'Local', 'badge active') :
+        t.implementation_status === 'IMPLEMENTED' ? node('span', 'Disponible', 'badge active') : pending());
       toolPanel.append(label);
       const host = node('div', undefined, 'tool-fields');
       host.hidden = !check.checked;
@@ -404,10 +405,11 @@
         const initial = params;
         const inputs = {};
         const add = (key, label, type = 'select') => {
+          const required = (t.input_schema.required || []).includes(key);
           inputs[key] = field(host, label, t.id + ':' + key, type, initial[key] ?? '', {
-            required: check.checked, disabled: !check.checked
+            required: check.checked && required, disabled: !check.checked
           });
-          controls.push({key, input: inputs[key], required: true, schema: schema[key]});
+          controls.push({key, input: inputs[key], required, schema: schema[key]});
           return inputs[key];
         };
         const options = (input, items, placeholder, saved) => {
@@ -571,7 +573,7 @@
     message.setAttribute('role', 'alert');
     message.tabIndex = -1;
     form.append(message, banner(a ?
-      'Guardar conserva el estado actual del agente. La ejecución sigue pendiente.' :
+      'Guardar conserva el estado actual. Las APIs requieren autorización en Integraciones.' :
       'El agente se creará deshabilitado. Guardar no ejecuta herramientas ni programa tareas.'));
     const actions = node('div', undefined, 'form-actions'),
       save = node('button', a ? 'Guardar cambios' : 'Crear agente', 'primary');
@@ -1125,17 +1127,28 @@
         dialog.append(assignments);
         try {
           const agents = (await api('/integrations/' + state.id + '/agents')).items;
-          if (!agents.length) assignments.append(node('p', 'No hay agentes propios con esta herramienta. Configurá uno desde Mis agentes.'));
+          if (!agents.length) assignments.append(node('p', 'No hay agentes propios. Creá uno desde Mis agentes.'));
+          if (!state.credential_present) assignments.append(node('p', 'Guardá primero la credencial para autorizar agentes.'));
           for (const agent of agents) {
-            const label = node('label', undefined, 'integration-toggle'), checkbox = node('input');
-            checkbox.type = 'checkbox'; checkbox.checked = agent.authorized; checkbox.disabled = !state.credential_present;
-            checkbox.onchange = async () => {
-              checkbox.disabled = true;
-              try { await operation(state.id, '/agents/' + agent.id, {authorized: checkbox.checked, expected_revision: state.revision}, 'PUT'); }
-              catch (e) { checkbox.checked = !checkbox.checked; message.textContent = e.message; }
-              finally { checkbox.disabled = false; }
-            };
-            label.append(checkbox, node('span', agent.name)); assignments.append(label);
+            const row = node('div'), description = node('p');
+            const updateDescription = () => description.textContent = agent.name + ': ' + (!agent.has_capability ?
+              'falta la herramienta del proveedor.' : agent.authorized ? 'autorizado.' : 'sin autorización.');
+            updateDescription(); row.append(description);
+            if (!agent.has_capability) {
+              row.append(link('Asignar herramienta', '/agents/' + agent.id + '/edit', 'secondary'));
+            } else {
+              const authorize = btn(agent.authorized ? 'Quitar autorización' : 'Autorizar agente', async () => {
+                authorize.disabled = true;
+                try {
+                  await operation(state.id, '/agents/' + agent.id, {authorized: !agent.authorized, expected_revision: state.revision}, 'PUT');
+                  agent.authorized = !agent.authorized; updateDescription();
+                  authorize.textContent = agent.authorized ? 'Quitar autorización' : 'Autorizar agente';
+                } catch (e) { message.textContent = e.message; }
+                finally { authorize.disabled = !state.credential_present; }
+              });
+              authorize.disabled = !state.credential_present; row.append(authorize);
+            }
+            assignments.append(row);
           }
         } catch (e) { assignments.append(node('p', e.message)); }
       }
@@ -1143,10 +1156,10 @@
         const {dialog, message} = modal('Búsqueda de prueba · DPIA Scraper'), form = node('form');
         dialog.append(form);
         form.append(banner('Puede consumir créditos de Apify. Una consulta Amazon, una llamada y hasta 10 resultados del proveedor. No hay un tope monetario por solicitud documentado; configurá un presupuesto en el proveedor antes de continuar.'));
-        const agents = (await api('/integrations/dpia-scraper/agents')).items.filter(x => x.enabled && x.authorized);
+        const agents = (await api('/integrations/dpia-scraper/agents')).items;
         const label = node('label', 'Agente autorizado'), select = node('select'); select.required = true;
         select.append(new Option('Seleccioná un agente', ''));
-        agents.forEach(x => select.append(new Option(x.name, x.id))); label.append(select); form.append(label);
+        agents.forEach(x => select.append(new Option(x.name + (!x.has_capability ? ' · falta dpia.amazon.search' : !x.authorized ? ' · sin autorización' : !x.enabled ? ' · deshabilitado' : ''), x.id))); label.append(select); form.append(label);
         const countries = {'argentina':'Argentina','italia':'Italia','espana':'España','polonia':'Polonia','mexico':'México','uruguay':'Uruguay'};
         const countryLabel = node('label', 'País'), country = node('select'); country.required = true;
         for (const key of state.marketplaces.amazon || []) country.append(new Option(countries[key], countries[key]));
@@ -1157,9 +1170,36 @@
         const send = btn('Confirmar y ejecutar una búsqueda', null, 'primary'); send.type = 'submit';
         form.append(send, btn('Cancelar', () => dialog.close()));
         let sending = false;
+        const selectionMessage = node('p'), editAgent = link('Configurar agente', '/agents', 'secondary');
+        const authorizeAgent = btn('Autorizar agente', async () => {
+          const agent = agents.find(x => x.id === select.value);
+          if (!agent || !agent.has_capability) return;
+          authorizeAgent.disabled = true; select.disabled = true;
+          try {
+            await operation(state.id, '/agents/' + agent.id, {authorized: true, expected_revision: state.revision}, 'PUT');
+            agent.authorized = true;
+            select.selectedOptions[0].textContent = agent.name + (agent.enabled ? '' : ' · deshabilitado');
+            message.textContent = 'Agente autorizado.';
+          } catch (e) { message.textContent = e.message; }
+          finally { authorizeAgent.disabled = false; select.disabled = false; updateSelection(); }
+        });
+        const updateSelection = () => {
+          const agent = agents.find(x => x.id === select.value);
+          selectionMessage.textContent = !agents.length ? 'No hay agentes propios. Creá uno con dpia.amazon.search.' :
+            !agent ? 'Seleccioná un agente.' : !agent.has_capability ? 'Asigná dpia.amazon.search desde la configuración del agente.' :
+            !agent.authorized ? 'Este agente necesita autorización explícita para acceder a DPIA Scraper.' :
+            !agent.enabled ? 'Habilitá el agente desde Mis agentes.' : 'Agente habilitado y autorizado.';
+          authorizeAgent.hidden = !agent || !agent.has_capability || agent.authorized;
+          editAgent.hidden = !agent || (agent.has_capability && agent.enabled);
+          if (agent) editAgent.href = '/agents/' + agent.id + '/edit';
+          send.disabled = sending || !agent || !agent.has_capability || !agent.authorized || !agent.enabled;
+        };
+        select.onchange = updateSelection;
+        form.insertBefore(selectionMessage, send); form.insertBefore(authorizeAgent, send); form.insertBefore(editAgent, send);
+        updateSelection();
         const key = crypto.randomUUID();
         form.onsubmit = async event => {
-          event.preventDefault(); if (sending) return; sending = true; send.disabled = true;
+          event.preventDefault(); if (sending || send.disabled) return; sending = true; send.disabled = true;
           try {
             const result = await operation(state.id, '/trial', {expected_revision: state.revision, agent_id: select.value,
               query: query.value, country: country.value, max_products: Number(count.value), confirm_cost: confirm.checked},
@@ -1167,7 +1207,7 @@
             form.remove(); message.textContent = 'Trabajo creado: ' + result.job.id + '. Estado: ' + (states[result.job.state] || result.job.state);
             dialog.append(node('p', 'Al recibir los datos pasará a revisión. La entrega requiere las reglas de aprobación existentes.'),
               link('Ver ejecuciones', '/executions'), btn('Cerrar', () => dialog.close()));
-          } catch (e) { message.textContent = e.message; sending = false; send.disabled = false; }
+          } catch (e) { message.textContent = e.message; sending = false; updateSelection(); }
         };
       }
       draw();
