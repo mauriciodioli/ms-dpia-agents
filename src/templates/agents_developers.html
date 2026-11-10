@@ -10,7 +10,7 @@
 </main><script>
 (()=>{'use strict';const base='/api/agents/v1', $=s=>document.querySelector(s);let agentRows=[];const allowedScopes=['agents:read','agents:write','jobs:create','jobs:read','results:read','metrics:read'];
 const status=(s,err=false)=>{const el=$('#status');el.textContent=s;el.style.color=err?'#a12525':'#276047'};
-async function api(path,opts={}){const res=await fetch(base+path,{credentials:'same-origin',cache:'no-store',...opts,headers:{...(opts.body?{'Content-Type':'application/json','X-DPIA-Action':'manage-api-clients'}:{}),...(opts.headers||{})}});const data=await res.json().catch(()=>({}));if(!res.ok)throw Error(data.error||`HTTP ${res.status}`);return data}
+async function api(path,opts={}){const res=await fetch(base+path,{credentials:'same-origin',cache:'no-store',...opts,headers:{...(opts.body?{'Content-Type':'application/json','X-DPIA-Action':'manage-api-clients'}:{}),...(opts.headers||{})}});const data=await res.json().catch(()=>({}));if(!res.ok){const error=Error(data.error||`HTTP ${res.status}`);error.status=res.status;throw error;}return data}
 function show(tab){$('#docs').classList.toggle('hidden',tab!=='docs');$('#clients').classList.toggle('hidden',tab!=='clients');$('#tab-docs').setAttribute('aria-selected',String(tab==='docs'));$('#tab-clients').setAttribute('aria-selected',String(tab==='clients'));if(tab==='clients')loadClients()}
 $('#tab-docs').onclick=()=>show('docs');$('#tab-clients').onclick=()=>show('clients');
 const limits={max_tool_calls:3,max_output_tokens:2000,max_duration_seconds:300,max_corrections:1};
@@ -18,12 +18,50 @@ const examples=[['GET','/client-connection','Verificar credenciales',null],['GET
 const container=$('#endpoints');examples.forEach(([method,path,title,body])=>{const details=document.createElement('details'),summary=document.createElement('summary'),methodEl=document.createElement('span');methodEl.className='method';methodEl.textContent=method;summary.append(methodEl,document.createTextNode(path+' · '+title));details.append(summary);const p=document.createElement('p');p.className='muted';p.textContent='Reemplazá los identificadores entre llaves. Para crear clientes se requiere sesión de usuario; para otros recursos, Bearer con los scopes adecuados.';details.append(p);const clientRoute=path.startsWith('/clients');const cmd=['curl -X '+method, "'https://agents.dpia.site"+base+path+"'", clientRoute?"-H 'Cookie: session=<SESSION_COOKIE>'":"-H 'Authorization: Bearer <TOKEN>'"];if(method==='POST'){cmd.push("-H 'Content-Type: application/json'");if(clientRoute)cmd.push("-H 'X-DPIA-Action: manage-api-clients'");if(path.endsWith('/requests')||path.endsWith('/schedules'))cmd.push("-H 'Idempotency-Key: <UUID_UNICO>'");cmd.push("-d '"+JSON.stringify(body)+"'")};const pre=document.createElement('pre');pre.textContent=cmd.join(' \\\n  ');details.append(pre);const b=document.createElement('button');b.textContent='Copiar ejemplo';b.onclick=()=>navigator.clipboard.writeText(pre.textContent).then(()=>status('Ejemplo copiado')).catch(()=>status('No se pudo copiar',true));details.append(b);container.append(details)});
 $('#check').onclick=async()=>{try{const r=await api('/client-connection');$('#check-result').textContent=JSON.stringify(r.connection,null,2);status('Conexión autenticada')}catch(e){status('Conexión fallida: '+e.message,true)}};
 const scopes=$('#scopes');allowedScopes.forEach(s=>{const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.value=s;input.checked=['agents:read','jobs:create','jobs:read','results:read'].includes(s);label.append(input,document.createTextNode(s));scopes.append(label)});
-const dt=new Date(Date.now()+90*86400000);const local=new Date(dt.getTime()-dt.getTimezoneOffset()*60000);$('#expiry').value=local.toISOString().slice(0,16);
+const dt=new Date(Date.now()+90*86400000);$('#expiry').value=dt.toISOString().slice(0,16);
 function hideToken(){$('#token').textContent='';$('#secret').classList.add('hidden')};$('#hide-token').onclick=hideToken;$('#copy-token').onclick=()=>navigator.clipboard.writeText($('#token').textContent).then(()=>status('Token copiado')).catch(()=>status('No se pudo copiar',true));
 async function loadAgents(){try{const data=await api('/agents?limit=100');agentRows=data.items||[];const target=$('#agents-list');target.replaceChildren();if(!agentRows.length){target.textContent='No hay agentes disponibles';return}agentRows.forEach(a=>{const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.value=a.id;label.append(input,document.createTextNode(a.name||a.id));target.append(label)})}catch(e){status('No se pudieron cargar los agentes: '+e.message,true)}}
 $('#grant').onchange=()=>{$('#agents-list').classList.toggle('hidden',$('#grant').value==='all')};
-async function loadClients(){await loadAgents();try{const data=await api('/clients');const target=$('#client-list');target.replaceChildren();if(!data.items?.length){target.textContent='Todavía no hay clientes API';return}const table=document.createElement('table'),thead=document.createElement('tr');['Nombre','Permisos','Vence','Estado','Acciones'].forEach(t=>{const th=document.createElement('th');th.textContent=t;thead.append(th)});table.append(thead);data.items.forEach(c=>{const tr=document.createElement('tr');[c.name,c.scopes.join(', '),c.expires_at,c.revoked_at?'Revocado':'Activo'].forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.append(td)});const td=document.createElement('td');if(!c.revoked_at){for(const action of ['rotate','revoke']){const b=document.createElement('button');b.textContent=action==='rotate'?'Rotar':'Revocar';b.onclick=async()=>{if(!confirm(action==='rotate'?'El token anterior dejará de funcionar. ¿Continuar?':'¿Revocar acceso a este cliente?'))return;try{const r=await api('/clients/'+c.id+'/'+action,{method:'POST',body:'{}'});if(r.token){$('#token').textContent=r.token;$('#secret').classList.remove('hidden');status('Token rotado. Guardalo ahora')}else status('Cliente revocado');await loadAgents();if(!r.token)await loadClients()}catch(e){status(e.message,true)}};td.append(b,document.createTextNode(' '))}}tr.append(td);table.append(tr)});target.append(table)}catch(e){status('No se pudieron listar clientes: '+e.message,true)}}
-$('#refresh').onclick=loadClients;
-$('#create').onsubmit=async ev=>{ev.preventDefault();const scopes=[...$('#scopes input:checked')].map(e=>e.value),all=$('#grant').value==='all',ids=all?[]:[...$('#agents-list input:checked')].map(e=>e.value);if(!scopes.length||(!all&&!ids.length)){status('Seleccioná permisos y al menos un agente, o habilitá acceso global explícitamente',true);return}const exp=new Date($('#expiry').value);if(!Number.isFinite(exp.getTime())){status('Vencimiento inválido',true);return}try{const r=await api('/clients',{method:'POST',body:JSON.stringify({name:$('#name').value,scopes,all_agents:all,agent_ids:ids,expires_at:exp.toISOString()})});$('#token').textContent=r.token;$('#secret').classList.remove('hidden');status('Cliente creado. Copiá el token ahora.');}catch(e){status('No se pudo crear el cliente: '+e.message,true)}};
+async function loadClients(refreshAgents=true){if(refreshAgents)await loadAgents();try{const data=await api('/clients');const target=$('#client-list');target.replaceChildren();if(!data.items?.length){target.textContent='Todavía no hay clientes API';return}const table=document.createElement('table'),thead=document.createElement('tr');['Nombre','Permisos','Vence','Estado','Acciones'].forEach(t=>{const th=document.createElement('th');th.textContent=t;thead.append(th)});table.append(thead);data.items.forEach(c=>{const tr=document.createElement('tr');[c.name,c.scopes.join(', '),c.expires_at,c.revoked_at?'Revocado':'Activo'].forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.append(td)});const td=document.createElement('td');if(!c.revoked_at){for(const action of ['rotate','revoke']){const b=document.createElement('button');b.textContent=action==='rotate'?'Rotar':'Revocar';b.onclick=async()=>{if(!confirm(action==='rotate'?'El token anterior dejará de funcionar. ¿Continuar?':'¿Revocar acceso a este cliente?'))return;try{const r=await api('/clients/'+c.id+'/'+action,{method:'POST',body:'{}'});if(r.token){$('#token').textContent=r.token;$('#secret').classList.remove('hidden');status('Token rotado. Guardalo ahora')}else status('Cliente revocado');await loadAgents();if(!r.token)await loadClients()}catch(e){status(e.message,true)}};td.append(b,document.createTextNode(' '))}}tr.append(td);table.append(tr)});target.append(table)}catch(e){status('No se pudieron listar clientes: '+e.message,true)}}
+$('#refresh').onclick=()=>loadClients();
+const creationErrors={
+  400:'Revisá el nombre, los permisos, los agentes y el vencimiento.',
+  401:'La sesión venció o no está autenticada. Iniciá sesión nuevamente.',
+  403:'La sesión no está autorizada para esta acción. Revisá la sesión y el origen de la solicitud.',
+  404:'Uno de los agentes ya no está disponible o no pertenece a tu usuario. Actualizá el listado.',
+  409:'La solicitud entró en conflicto con el estado actual. Actualizá el listado antes de reintentar.',
+  422:'Los datos enviados no son válidos. Revisá el formulario.',
+  500:'El servidor no pudo completar la solicitud. Comprobá el listado antes de reintentar.',
+  503:'El almacenamiento no está disponible. Comprobá el listado antes de reintentar.'
+};
+let creating=false;
+$('#create').onsubmit=async ev=>{
+  ev.preventDefault();
+  if(creating)return;
+  const name=$('#name').value.trim();
+  const scopes=Array.from(document.querySelectorAll('#scopes input:checked'),e=>e.value);
+  const all=$('#grant').value==='all';
+  const ids=all?[]:Array.from(document.querySelectorAll('#agents-list input:checked'),e=>e.value);
+  if(!name||name.length>120){status('Ingresá un nombre de hasta 120 caracteres.',true);return}
+  if(!scopes.length||scopes.some(s=>!allowedScopes.includes(s))){status('Seleccioná al menos un permiso válido.',true);return}
+  if(!all&&!ids.length){status('Seleccioná al menos un agente, o habilitá acceso global explícitamente.',true);return}
+  const exp=new Date($('#expiry').value+'Z'),now=Date.now();
+  if(!Number.isFinite(exp.getTime())||exp.getTime()<=now||exp.getTime()-now>366*86400000){status('El vencimiento UTC debe ser futuro y no superar 366 días.',true);return}
+  const button=$('#create button[type="submit"]');
+  creating=true;button.disabled=true;button.textContent='Generando token…';$('#create').setAttribute('aria-busy','true');
+  hideToken();status('Generando token…');
+  try{
+    const r=await api('/clients',{method:'POST',body:JSON.stringify({name,scopes,all_agents:all,agent_ids:ids,expires_at:exp.toISOString()})});
+    if(typeof r.token!=='string'||!r.token){status('El servidor no devolvió un token válido. Comprobá el listado antes de reintentar.',true);await loadClients(false);return}
+    $('#token').textContent=r.token;$('#secret').classList.remove('hidden');
+    status('Cliente creado. Copiá el token ahora.');
+    await loadClients(false);
+  }catch(e){
+    const message=e.message==='invalid_expiration'?'El vencimiento UTC debe ser futuro y no superar 366 días.':creationErrors[e.status]||'No se pudo confirmar la creación. Comprobá la conexión y el listado antes de reintentar.';
+    status('No se pudo crear el cliente: '+message,true);
+  }finally{
+    creating=false;button.disabled=false;button.textContent='Generar token';$('#create').setAttribute('aria-busy','false');
+  }
+};
 })();
 </script></body></html>
