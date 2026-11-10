@@ -99,3 +99,17 @@ def worker_command(capability, watch, interval, local_test):
     except EngineError as error:
         raise click.ClickException(error.code) from None
     _repeat_queue_operation(worker.work_once, watch, interval)
+
+
+@click.command('agent-inbox')
+@click.option('--watch', is_flag=True)
+@click.option('--interval', type=click.IntRange(1, 60), default=5)
+@click.option('--batch-size', type=click.IntRange(1, 100), default=50)
+@with_appcontext
+def inbox_command(watch, interval, batch_size):
+    """Opt-in DB inbox polling. Requires manual migration 0003."""
+    from .inbox import tick
+    def cycle():
+        with engine().begin() as conn:
+            return tick(conn, batch_size)
+    _repeat_queue_operation(cycle, watch, interval)

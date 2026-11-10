@@ -419,3 +419,20 @@ def workspace_session(conn, principal, repo):
                       for tool in default_registry().tools.values()],
             'availability': {'execution': False, 'integrations_management': False,
                              'users_management': False}}
+
+
+@api.get('/inbox/<inbox_id>')
+@endpoint('jobs:read')
+def inbox_status(conn, principal, repo, inbox_id):
+    """Read status of a DB-submitted request without exposing its payload."""
+    from .inbox import inbox
+    arguments()
+    row = conn.execute(select(inbox).where(
+        inbox.c.id == identifier(inbox_id),
+        inbox.c.owner_id == principal.owner_id)).mappings().first()
+    if row is None or (principal.kind == 'API_CLIENT' and row['client_id'] != principal.actor_id):
+        raise EngineError('inbox_request_not_found', 404)
+    return {'inbox': {'id': row['id'], 'state': row['state'],
+        'job_id': row['job_id'], 'error_code': row['error_code'],
+        'created_at': iso(row['created_at']),
+        'processed_at': iso(row['processed_at']) if row['processed_at'] else None}}
