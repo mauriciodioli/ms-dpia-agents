@@ -42,7 +42,7 @@ def activate_pwa():
     validate(AGENT_CREATE, body['agent'])
     validate(SCHEDULE_CREATE, body['schedule'])
     # This integration only supports product discovery, never silently substitutes monitoring tools.
-    if body['agent']['capabilities'] != ['dpia.amazon.search']:
+    if body['agent']['capabilities'] not in (['dpia.amazon.search'], ['dpia.amazon.search', 'openai.analysis']):
         raise EngineError('unsupported_pwa_capabilities', 422)
     default_registry().validate_agent(body['agent'])
     prefs = body['preferences']
