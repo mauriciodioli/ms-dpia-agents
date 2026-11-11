@@ -233,12 +233,36 @@
     return button;
   }
 
+  const deleteOperations=new Map();
+  function deleteButton(a,administrative=false){
+    return btn('Eliminar agente',()=>{
+      const dialog=document.createElement('dialog'),message=node('p'),actions=node('div',undefined,'agent-actions');
+      dialog.append(node('h2','Eliminar agente'),node('p','¿Eliminar «'+a.name+'»? Se conservará el historial y se cancelarán los trabajos no iniciados.'),message,actions);
+      let busy=false;
+      const cancel=btn('Cancelar',()=>dialog.close(),'secondary');
+      const confirm=btn('Eliminar agente',async()=>{
+        busy=true;confirm.disabled=true;cancel.disabled=true;message.textContent='Eliminando…';
+        const body=deleteOperations.get(a.id)||{confirm:true,expected_revision:a.revision,operation_id:pauseOperationId()};deleteOperations.set(a.id,body);
+        try{
+          await api((administrative?'/admin':'')+'/agents/'+encodeURIComponent(a.id),{method:'DELETE',body:JSON.stringify(body)});
+          deleteOperations.delete(a.id);dialog.close();await render();notify('Agente eliminado.');
+        }catch(e){
+          if([400,401,403,404,409].includes(e.status))deleteOperations.delete(a.id);
+          message.textContent=e.data?.error==='agent_has_active_jobs'?'No se puede eliminar mientras haya trabajos iniciados.':e.message||'No se confirmó la eliminación. Reintentá.';
+          busy=false;confirm.disabled=false;cancel.disabled=false;
+        }
+      },'agent-delete');
+      actions.append(cancel,confirm);dialog.addEventListener('cancel',e=>{if(busy)e.preventDefault();});
+      dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();
+    },'agent-delete');
+  }
+
   function adminPauseCell(a) {
     const cell=node('div'),flags=a.pause||{};
     const states=[];
     if(flags.user_paused)states.push('Pausa del usuario');
     if(flags.admin_paused)states.push('Pausa administrativa');
-    cell.append(node('small',states.join(' · ')||'Sin pausa'),pauseButton(a,true));
+    cell.append(node('small',states.join(' · ')||'Sin pausa'),pauseButton(a,true),deleteButton(a,true));
     return cell;
   }
 
@@ -256,7 +280,7 @@
     actions.append(btn(enabled ? 'Deshabilitar' : 'Habilitar',
       function () { return toggleAgent(a, this); },
       enabled ? 'secondary' : 'primary'));
-    actions.append(pauseButton(a));
+    actions.append(pauseButton(a),deleteButton(a));
     actions.append(link('Configurar →', '/agents/' + a.id + '/edit', 'quiet'));
     bottom.append(node('span', 'Revisión ' + a.revision, 'muted'), actions);
     c.append(top, node('h3', a.name), node('p', a.description || 'Sin descripción'), meta, bottom);

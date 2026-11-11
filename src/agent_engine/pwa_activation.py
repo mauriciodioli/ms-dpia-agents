@@ -57,6 +57,10 @@ def activate_pwa():
         # Read ownership without reacquiring that lock across the HTTP boundary.
         # Existing agent locks and unique legacy_agent_id protect concurrent retries.
         active_user(conn, owner)
+        deleted=conn.execute(select(m.agent_deletions.c.snapshot).where(
+            m.agent_deletions.c.owner_id==owner,m.agent_deletions.c.legacy_agent_id==body['source_agent_id'])).scalars().all()
+        if any(body['source_revision']<=entry.get('source_revision',0) for entry in deleted):
+            raise EngineError('source_agent_deleted',409)
         principal = Principal(owner, 'PWA_SERVICE', 'ms202611sb2b', frozenset({'agents:write', 'agents:read'}), True, frozenset())
         row = conn.execute(select(m.agents).where(m.agents.c.legacy_agent_id == body['source_agent_id']).with_for_update()).mappings().first()
         if row:

@@ -198,6 +198,16 @@ workers = Table('ae_workers', metadata,
     Column('current_task_id', String(36), ForeignKey('ae_tasks.id')),
     CheckConstraint("reported_state IN ('AVAILABLE','BUSY')", name='worker_state'))
 
+# Independent deletion audit; no FK to agents, users or clients that could later be removed.
+agent_deletions = Table('ae_agent_deletions', metadata,
+    Column('agent_id', String(36), primary_key=True), Column('owner_id', Integer, nullable=False),
+    Column('legacy_agent_id', BigInteger), Column('operation_id', String(36), nullable=False),
+    Column('actor_type', String(32), nullable=False), Column('actor_id', String(120), nullable=False),
+    Column('interface', String(24), nullable=False), Column('deleted_at', DateTime, nullable=False),
+    Column('snapshot', JSON, nullable=False),
+    UniqueConstraint('owner_id', 'operation_id', name='uq_ae_deletion_owner_operation'),
+    Index('ix_ae_deletion_owner_legacy', 'owner_id', 'legacy_agent_id'))
+
 # Match the manually installed official DDL. This sets metadata only; no SQL runs.
 for _table in metadata.tables.values():
     _table.dialect_options['mysql'].update(engine='InnoDB', charset='utf8mb4', collate='utf8mb4_0900_ai_ci')

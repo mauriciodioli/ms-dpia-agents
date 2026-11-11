@@ -24,7 +24,8 @@ class ReadRepository:
         self.principal = principal
 
     def agent_filter(self):
-        return and_(m.agents.c.owner_id == self.principal.owner_id, agent_access(self.principal))
+        return and_(m.agents.c.owner_id == self.principal.owner_id, agent_access(self.principal),
+            ~select(m.agent_deletions.c.agent_id).where(m.agent_deletions.c.agent_id==m.agents.c.id).exists())
 
     def job_filter(self):
         return and_(m.jobs.c.owner_id == self.principal.owner_id,
@@ -163,7 +164,7 @@ class ReadRepository:
     def admin_overview(self):
         if not self.principal.admin or self.principal.kind != 'SESSION':
             raise EngineError('administrator_session_required', 403)
-        agent_rows = self.conn.execute(select(m.agents).order_by(m.agents.c.updated_at.desc(), m.agents.c.id).limit(100)).mappings().all()
+        agent_rows = self.conn.execute(select(m.agents).where(~select(m.agent_deletions.c.agent_id).where(m.agent_deletions.c.agent_id==m.agents.c.id).exists()).order_by(m.agents.c.updated_at.desc(), m.agents.c.id).limit(100)).mappings().all()
         job_rows = self.conn.execute(select(m.jobs).order_by(m.jobs.c.updated_at.desc(), m.jobs.c.id).limit(100)).mappings().all()
         worker_rows = self.conn.execute(select(m.workers).order_by(m.workers.c.id).limit(100)).mappings().all()
         now = now_utc()

@@ -11,7 +11,8 @@ from .tools import default_registry
 
 def locked_agent(conn, principal, agent_id):
     row = conn.execute(select(m.agents).where(m.agents.c.owner_id == principal.owner_id,
-        m.agents.c.id == agent_id, agent_access(principal)).with_for_update()).mappings().first()
+        m.agents.c.id == agent_id, agent_access(principal),
+        ~select(m.agent_deletions.c.agent_id).where(m.agent_deletions.c.agent_id==m.agents.c.id).exists()).with_for_update()).mappings().first()
     if row is None:
         raise EngineError('agent_not_found', 404)
     return row
@@ -80,3 +81,7 @@ class AgentManager:
             row = locked_agent(self.conn, self.principal, agent_id)
             audit_agent(self.conn, self.principal, row, 'AGENT_'+state, {})
         return ReadRepository(self.conn, self.principal).public_agent(row, configuration=True)
+
+    def delete_agent(self,agent_id,body,**options):
+        from .agent_deletion import delete_agent
+        return delete_agent(self.conn,self.principal,agent_id,body,**options)

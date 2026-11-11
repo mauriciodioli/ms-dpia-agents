@@ -1097,3 +1097,6 @@ input, select, textarea { margin-top: 8px; }
 .integration-dialog input[type="checkbox"] { width: 22px; height: 22px; }
 @keyframes integration-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .integration-card[aria-busy="true"] .integration-diagnostic::before { animation: none; } }
+
+button.agent-delete { color:#a71930; background:transparent; border:1px solid #a71930; }
+button.agent-delete:hover { background:#fce8ec; }

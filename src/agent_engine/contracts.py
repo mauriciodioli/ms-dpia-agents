@@ -5,7 +5,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 from .errors import EngineError
 
 API_VERSION = 'agents.v1'
-SCOPES = frozenset({'agents:read', 'agents:write', 'jobs:create', 'jobs:read',
+SCOPES = frozenset({'agents:read', 'agents:write', 'agents:delete', 'jobs:create', 'jobs:read',
                     'results:read', 'metrics:read'})
 UUID = {'type': 'string', 'format': 'uuid'}
 TOOL_ID = {'type': 'string', 'pattern': r'^[a-z][a-z0-9_.-]{2,79}$'}

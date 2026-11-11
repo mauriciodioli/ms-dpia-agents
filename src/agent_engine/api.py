@@ -33,6 +33,7 @@ def endpoint(scope=None, *, admin_only=False, write=False, html=False):
             if html:
                 return result
             body, status = result if isinstance(result, tuple) else (result, 200)
+            if status == 204:return '',204
             return jsonify(api_version=API_VERSION, snapshot_at=iso(now_utc()), **body), status
         return wrapped
     return decorate
