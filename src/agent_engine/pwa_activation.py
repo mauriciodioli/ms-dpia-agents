@@ -13,7 +13,6 @@ from .management import AgentManager, audit_agent, locked_agent
 from .repository import ReadRepository
 from .tools import default_registry
 from . import models as m
-from model.usuario import Usuario
 
 PATH = '/api/agents/v1/internal/pwa-activations'
 
@@ -50,8 +49,9 @@ def activate_pwa():
     fingerprint = hashlib.sha256(json.dumps(body, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     owner = body['owner_id']
     with engine().begin() as conn:
-        # Same lock serializes first provisioning and retries for an owner.
-        conn.execute(select(Usuario.id).where(Usuario.id == owner).with_for_update()).first()
+        # B2B holds the shared usuario row lock while awaiting this response.
+        # Read ownership without reacquiring that lock across the HTTP boundary.
+        # Existing agent locks and unique legacy_agent_id protect concurrent retries.
         active_user(conn, owner)
         principal = Principal(owner, 'PWA_SERVICE', 'ms202611sb2b', frozenset({'agents:write', 'agents:read'}), True, frozenset())
         row = conn.execute(select(m.agents).where(m.agents.c.legacy_agent_id == body['source_agent_id']).with_for_update()).mappings().first()
