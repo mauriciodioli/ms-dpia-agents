@@ -1100,3 +1100,5 @@ input, select, textarea { margin-top: 8px; }
 
 button.agent-delete { color:#a71930; background:transparent; border:1px solid #a71930; }
 button.agent-delete:hover { background:#fce8ec; }
+
+.agent-point-summary{display:flex;gap:6px;flex-direction:column;margin:12px 0;font-size:13px}.agent-point-status{display:inline-flex;align-items:center;gap:7px}.agent-point-dot{width:9px;height:9px;border-radius:50%;background:#87909c}.agent-point-dot[data-color="green"]{background:#159b61}.agent-point-dot[data-color="yellow"]{background:#d69a00}.agent-point-dot[data-color="red"]{background:#d14444}.agent-point-summary small{opacity:.75}

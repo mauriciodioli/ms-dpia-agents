@@ -20,8 +20,9 @@ def period_window(period,zone,now):
 
 def context(row):
     value=row.get('contexto_json')
-    try:return json.loads(value) if isinstance(value,str) else value or {}
+    try:value=json.loads(value) if isinstance(value,str) else value
     except (ValueError,TypeError):return {}
+    return value if isinstance(value,dict) else {}
 
 
 def cost(row):
@@ -39,7 +40,8 @@ def point_status(conn,owner,agent_id,limit,period,zone,now):
     window=period_window(period,zone,now);total,rows=locked_balance(conn,owner)
     available=max(0,total-sum(cost(row) for row in rows))
     used=sum(cost(row) for row in rows if agent_id and context(row).get('agent_id')==agent_id and context(row).get('period')==window['key'])
+    consumed=sum(cost(row) for row in rows if row['estado']=='consumed' and agent_id and context(row).get('agent_id')==agent_id and context(row).get('period')==window['key'])
     remaining=max(0,limit-used);effective=min(remaining,available)
-    return dict(budget=limit,budget_used=used,budget_remaining=remaining,user_available=available,effective_remaining=effective,
+    return dict(budget=limit,budget_used=used,budget_consumed=consumed,budget_reserved=used-consumed,budget_remaining=remaining,user_available=available,effective_remaining=effective,
         period=window['key'],period_start=window['start'].isoformat()+'Z',period_end=window['end'].isoformat()+'Z',
         color='red' if effective==0 else 'green' if effective*4>limit else 'yellow')

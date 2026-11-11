@@ -54,6 +54,16 @@ class ReadRepository:
     def public_agent(self, row, *, configuration=False):
         from .pause_control import pause_state
         data = {key: row[key] for key in ('id', 'name', 'description', 'configuration_state', 'revision', 'timezone')}
+        if row['legacy_agent_id'] is not None:
+            from .owner_identity import owner_email
+            data['name']=owner_email(self.conn,row['owner_id'])
+            from services.agent_point_status import point_status
+            from services.agent_configuration import agentes
+            from sqlalchemy.exc import SQLAlchemyError
+            try:
+                source=self.conn.execute(select(agentes).where(agentes.c.id==row['legacy_agent_id'],agentes.c.usuario_id==row['owner_id'])).mappings().first()
+                data['points']=point_status(self.conn,row['owner_id'],row['id'],source['presupuesto_puntos_periodo'],source['periodo_presupuesto'],source['zona_horaria'],now_utc()) if source else None
+            except (SQLAlchemyError,ValueError,TypeError):data['points']=None
         data.update(pause=pause_state(self.conn, row), activity_state=self.activity(row['id'], row['owner_id']),
                     created_at=iso(row['created_at']), updated_at=iso(row['updated_at']))
         if configuration:

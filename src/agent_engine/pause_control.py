@@ -42,6 +42,8 @@ def change_pause(conn, principal, agent_id, body, *, administrative=False, inter
         if owner is None:raise EngineError('agent_not_found', 404)
         scoped = replace(principal, owner_id=owner, all_agents=True, agent_ids=frozenset())
     row = locked_agent(conn, scoped, agent_id)
+    from .owner_identity import persist_linked_name
+    row=persist_linked_name(conn,row)
     identity = dict(paused=body['paused'], expected_revision=body['expected_revision'], administrative=administrative,
                     actor_id=principal.actor_id, actor_type=principal.kind, interface=interface)
     previous = conn.execute(select(m.agent_events.c.details).where(

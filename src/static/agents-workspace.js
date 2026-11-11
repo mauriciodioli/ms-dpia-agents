@@ -283,7 +283,13 @@
     actions.append(pauseButton(a),deleteButton(a));
     actions.append(link('Configurar →', '/agents/' + a.id + '/edit', 'quiet'));
     bottom.append(node('span', 'Revisión ' + a.revision, 'muted'), actions);
-    c.append(top, node('h3', a.name), node('p', a.description || 'Sin descripción'), meta, bottom);
+    c.append(top, node('h3', a.name), node('p', a.description || 'Sin descripción'), meta);
+    if(a.points){
+      const p=a.points,summary=node('div',undefined,'agent-point-summary'),status=node('span',undefined,'agent-point-status'),dot=node('span',undefined,'agent-point-dot');
+      dot.dataset.color=p.color;dot.setAttribute('aria-hidden','true');status.append(dot,node('span',p.effective_remaining+' puntos restantes'));
+      summary.append(status,node('small','Asignados: '+p.budget+' · Gastados: '+p.budget_consumed+' · Reservados: '+p.budget_reserved));c.append(summary);
+    }
+    c.append(bottom);
     return c;
   }
 

@@ -37,6 +37,10 @@ class AgentManager:
         now = now_utc()
         if agent_id:
             previous = locked_agent(self.conn, self.principal, agent_id)
+            if previous['legacy_agent_id'] is not None:
+                from .owner_identity import owner_email
+                body={**body,'name':owner_email(self.conn,self.principal.owner_id)}
+                definition['name']=body['name']
             if previous['revision'] != body['expected_revision']:
                 raise EngineError('revision_conflict', 409)
         else:
@@ -69,6 +73,8 @@ class AgentManager:
         self.principal.require('agents:write')
         validate(REVISION, body)
         row = locked_agent(self.conn, self.principal, agent_id)
+        from .owner_identity import persist_linked_name
+        row=persist_linked_name(self.conn,row)
         if row['revision'] != body['expected_revision']:
             raise EngineError('revision_conflict', 409)
         state = 'ENABLED' if enabled else 'DISABLED'

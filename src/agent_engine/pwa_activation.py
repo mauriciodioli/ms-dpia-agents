@@ -48,7 +48,7 @@ def activate_pwa():
     prefs = body['preferences']
     if (not isinstance(prefs, dict) or set(prefs) != {'points', 'period', 'notifications'}
             or type(prefs['points']) is not int or not 0 <= prefs['points'] <= 1000000
-            or prefs['period'] not in ('week', 'month') or prefs['notifications'] is not False):
+            or prefs['period'] not in ('week', 'month') or type(prefs['notifications']) is not bool):
         raise EngineError('unsupported_pwa_preferences', 422)
     fingerprint = hashlib.sha256(json.dumps(body, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     owner = body['owner_id']
@@ -57,6 +57,8 @@ def activate_pwa():
         # Read ownership without reacquiring that lock across the HTTP boundary.
         # Existing agent locks and unique legacy_agent_id protect concurrent retries.
         active_user(conn, owner)
+        from .owner_identity import owner_email
+        verified_name=owner_email(conn,owner)
         deleted=conn.execute(select(m.agent_deletions.c.snapshot).where(
             m.agent_deletions.c.owner_id==owner,m.agent_deletions.c.legacy_agent_id==body['source_agent_id'])).scalars().all()
         if any(body['source_revision']<=entry.get('source_revision',0) for entry in deleted):
@@ -80,7 +82,7 @@ def activate_pwa():
                     raise EngineError('source_configuration_conflict',409)
         else:
             manager = AgentManager(conn, principal)
-            created = manager.save(body['agent'])
+            created = manager.save({**body['agent'],'name':verified_name})
             conn.execute(update(m.agents).where(m.agents.c.id == created['id']).values(legacy_agent_id=body['source_agent_id']))
             manager.set_enabled(created['id'], {'expected_revision': created['revision']}, True)
             row = locked_agent(conn, principal, created['id'])
@@ -88,6 +90,9 @@ def activate_pwa():
             audit_agent(conn, principal, row, 'PWA_ACTIVATED', {'fingerprint': fingerprint,
                 'engine_revision': row['revision'], 'source_revision': body['source_revision'],
                 'schedule': body['schedule'], 'preferences': prefs, 'execution_enabled': False})
+        if row['name']!=verified_name:
+            conn.execute(update(m.agents).where(m.agents.c.id==row['id'],m.agents.c.owner_id==owner).values(name=verified_name))
+            row={**row,'name':verified_name}
         agent = ReadRepository(conn, principal).public_agent(row, configuration=True)
     return {'api_version': 'agents.v1', 'agent': agent, 'owner_id': owner,
             'source_agent_id': body['source_agent_id'], 'source_revision': body['source_revision'],
