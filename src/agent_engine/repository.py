@@ -95,8 +95,8 @@ class ReadRepository:
         return {'items': [public_job(row) for row in rows[:limit]],
                 'next_cursor': rows[limit - 1]['id'] if len(rows) > limit else None}
 
-    def result(self, job_id: str):
-        job = self.job(job_id)
+    def _delivered_result_query(self, job):
+        job_id = job['id']
         if job['state'] != 'DELIVERED':
             raise EngineError('result_not_delivered', 409)
         if job['deliver_not_before'] is not None and job['deliver_not_before'] > now_utc():
@@ -105,7 +105,7 @@ class ReadRepository:
             m.reviews.c.owner_id == m.results.c.owner_id, m.reviews.c.job_id == m.results.c.job_id,
             m.reviews.c.result_id == m.results.c.id, m.reviews.c.decision == 'APPROVED').exists()
         from sqlalchemy import or_
-        from .informational_delivery import REASON, eligible_result
+        from .informational_delivery import REASON
         informational_event = select(m.events.c.id).where(m.events.c.owner_id == self.principal.owner_id,
             m.events.c.job_id == job_id, m.events.c.sequence == job['revision'],
             m.events.c.type == 'DELIVERED', m.events.c.actor_type == 'SYSTEM',
@@ -124,6 +124,11 @@ class ReadRepository:
                 m.deliveries.c.delivered_at <= now_utc(), m.deliveries.c.authorized_at <= now_utc(),
                 m.deliveries.c.delivered_at >= m.deliveries.c.available_at,
                 m.deliveries.c.available_at <= now_utc(), delivery_policy).order_by(m.results.c.version.desc()).limit(1)
+        return job, query
+
+    def result(self, job_id: str):
+        from .informational_delivery import eligible_result
+        job, query = self._delivered_result_query(self.job(job_id))
         row = self.conn.execute(query).mappings().first()
         if row is None or (row['approved_at'] is None and eligible_result(self.conn, job, row) is None):
             raise EngineError('result_not_delivered', 409)

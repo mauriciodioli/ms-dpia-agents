@@ -3,6 +3,7 @@
 
 def init_app(app):
     from .api import api, admin
+    from . import pwa_history
     from . import pwa_activation
     from . import pause_control
     from . import deletion_api
