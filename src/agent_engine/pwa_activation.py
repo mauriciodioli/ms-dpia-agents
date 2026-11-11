@@ -4,7 +4,7 @@ import hmac
 import json
 import time
 from flask import current_app, request
-from sqlalchemy import select, update
+from sqlalchemy import select, update, insert
 from .api import api, engine, json_body, arguments
 from .auth import active_user, Principal
 from .contracts import AGENT_CREATE, SCHEDULE_CREATE, validate
@@ -90,6 +90,16 @@ def activate_pwa():
             audit_agent(conn, principal, row, 'PWA_ACTIVATED', {'fingerprint': fingerprint,
                 'engine_revision': row['revision'], 'source_revision': body['source_revision'],
                 'schedule': body['schedule'], 'preferences': prefs, 'execution_enabled': False})
+        # Stable ID plus the locked agent makes retries/backfill atomic and unique.
+        from uuid import uuid5, NAMESPACE_URL
+        from .auth import now_utc
+        schedule_id = str(uuid5(NAMESPACE_URL, 'pwa-schedule:' + row['id']))
+        if not conn.execute(select(m.schedules.c.id).where(m.schedules.c.id == schedule_id)).scalar_one_or_none():
+            conn.execute(insert(m.schedules).values(id=schedule_id, owner_id=owner, agent_id=row['id'],
+                timezone=body['schedule']['timezone'], definition=body['schedule'], enabled=False,
+                revision=1, next_run_at=None, created_at=now_utc()))
+            audit_agent(conn, principal, row, 'SCHEDULE_CREATED',
+                {'schedule_id': schedule_id, 'enabled': False, 'source': 'PWA'})
         if row['name']!=verified_name:
             conn.execute(update(m.agents).where(m.agents.c.id==row['id'],m.agents.c.owner_id==owner).values(name=verified_name))
             row={**row,'name':verified_name}

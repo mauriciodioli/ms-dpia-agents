@@ -437,3 +437,81 @@ def inbox_status(conn, principal, repo, inbox_id):
         'job_id': row['job_id'], 'error_code': row['error_code'],
         'created_at': iso(row['created_at']),
         'processed_at': iso(row['processed_at']) if row['processed_at'] else None}}
+
+
+# Read-only cross-owner visibility never broadens the management/write endpoints.
+def schedule_view_access(conn, principal):
+    from .auth import active_user
+    if principal.kind != 'SESSION':
+        return False
+    role = str(active_user(conn, principal.owner_id)['roll']).strip().casefold()
+    return role in {'admin', 'administrador', 'moderador', 'moderator', 'avanzado', 'advanced'}
+
+
+def schedule_view_rows(conn, agent):
+    from . import models as m
+    from .dispatcher import public_schedule
+    rows = conn.execute(select(m.schedules).where(m.schedules.c.owner_id == agent['owner_id'],
+        m.schedules.c.agent_id == agent['id']).order_by(m.schedules.c.created_at.desc()).limit(100)).mappings()
+    items = [public_schedule(row) for row in rows]
+    # Legacy activations stored the preference in audit, without creating a schedule.
+    if not items:
+        event = conn.execute(select(m.agent_events.c.details).where(
+            m.agent_events.c.owner_id == agent['owner_id'], m.agent_events.c.agent_id == agent['id'],
+            m.agent_events.c.action == 'PWA_ACTIVATED').order_by(m.agent_events.c.created_at.desc()).limit(1)).scalar_one_or_none()
+        if event and event.get('schedule'):
+            items.append(dict(id=None, agent_id=agent['id'], enabled=False, revision=0,
+                timezone=event['schedule']['timezone'], next_run_at=None, configuration=event['schedule'],
+                preference_only=True))
+    return items
+
+
+@api.get('/schedule-view')
+@endpoint('agents:read')
+def schedule_view(conn, principal, repo):
+    from . import models as m
+    from .contracts import iso
+    arguments(('after',))
+    query = select(m.agents).where(~select(m.agent_deletions.c.agent_id).where(
+        m.agent_deletions.c.agent_id == m.agents.c.id).exists())
+    if not schedule_view_access(conn, principal):
+        query = query.where(repo.agent_filter())
+    after = request.args.get('after')
+    if after:
+        query = query.where(m.agents.c.id > identifier(after))
+    rows = conn.execute(query.order_by(m.agents.c.id).limit(101)).mappings().all()
+    items = []
+    for row in rows[:100]:
+        schedules = schedule_view_rows(conn, row)
+        upcoming = sorted((s['next_run_at'] for s in schedules if s['enabled'] and s['next_run_at']))
+        from .owner_identity import owner_email
+        items.append(dict(id=row['id'], owner_id=row['owner_id'],
+            name=owner_email(conn,row['owner_id']) if row['legacy_agent_id'] is not None else row['name'],
+            configuration_state=row['configuration_state'], schedules=schedules,
+            next_run_at=upcoming[0] if upcoming else None))
+    return dict(items=items, next_cursor=rows[99]['id'] if len(rows)>100 else None)
+
+
+@api.get('/schedule-view/<agent_id>')
+@endpoint('jobs:read')
+def schedule_view_detail(conn, principal, repo, agent_id):
+    from . import models as m
+    from .repository import public_job
+    arguments()
+    identifier(agent_id)
+    if schedule_view_access(conn, principal):
+        agent = conn.execute(select(m.agents).where(m.agents.c.id==agent_id,
+            ~select(m.agent_deletions.c.agent_id).where(m.agent_deletions.c.agent_id==m.agents.c.id).exists())).mappings().first()
+        if agent is None:
+            raise EngineError('agent_not_found',404)
+    else:
+        agent = repo.agent(agent_id)
+    jobs = conn.execute(select(m.jobs).where(m.jobs.c.agent_id==agent_id,
+        m.jobs.c.owner_id==agent['owner_id']).order_by(m.jobs.c.created_at.desc()).limit(100)).mappings()
+    events = conn.execute(select(m.agent_events).where(m.agent_events.c.agent_id==agent_id,
+        m.agent_events.c.owner_id==agent['owner_id'],
+        m.agent_events.c.action.in_(['SCHEDULE_CREATED','SCHEDULE_DISABLED','SCHEDULE_PAUSED','PWA_ACTIVATED']))
+        .order_by(m.agent_events.c.created_at.desc()).limit(100)).mappings()
+    return dict(schedules=schedule_view_rows(conn,agent), jobs=[public_job(job) for job in jobs],
+        events=[dict(action=e['action'], actor_id=e['actor_id'], actor_type=e['actor_type'],
+            created_at=iso(e['created_at'])) for e in events], list_limit=100)

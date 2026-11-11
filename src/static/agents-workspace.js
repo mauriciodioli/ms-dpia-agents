@@ -709,68 +709,48 @@
     root.append(form);
   }
   async function schedulesPage() {
-    heading('Programaciones', 'Consultá las programaciones de cada agente.');
-    root.append(banner(
-      'La creación y ejecución de nuevas programaciones está pendiente en esta interfaz hasta completar los adaptadores.'
-      ));
-    const panel = node('section', undefined, 'panel'),
-      select = field(panel, 'Agente', 'agent', 'select', ''),
-      out = node('div');
-    const first = node('option', 'Elegí un agente');
-    first.value = '';
-    select.append(first);
-    panel.append(out);
-    root.append(panel);
-    let cursor = null,
-      sequence = 0;
-    const more = btn('Cargar más agentes', loadAgents);
-    panel.append(more);
-    async function loadAgents() {
-      more.disabled = true;
-      try {
-        const data = await api('/agents?limit=100' + (cursor ? '&after=' + encodeURIComponent(cursor) :
-          ''));
-        data.items.forEach(a => {
-          const o = node('option', a.name);
-          o.value = a.id;
-          select.append(o);
-        });
-        cursor = data.next_cursor;
-        more.hidden = !cursor;
-        if (select.options.length === 1) empty(out, 'No hay agentes para programar',
-          'Primero creá la configuración de un agente.', link('Crear agente', '/agents/new'));
-      } catch (e) {
-        showError(e, out);
-      } finally {
-        more.disabled = false;
-      }
+    heading('Programaciones', 'Abrí un agente para consultar sus horarios e historial.');
+    const list=node('div',undefined,'schedule-agent-list');root.append(list);
+    let cursor=null;
+    const more=btn('Cargar más agentes',load);root.append(more);
+    function scheduleText(s){
+      const c=s.configuration||{},days=(c.weekdays||[]).map(d=>['','lunes','martes','miércoles','jueves','viernes','sábado','domingo'][d]).join(', ');
+      return (c.frequency==='DAILY'?'Diaria':'Semanal')+' · '+days+' · '+(c.execution_time||'')+' · '+s.timezone;
     }
-    select.onchange = async () => {
-      const run = ++sequence;
-      out.replaceChildren();
-      if (!select.value) return;
-      out.append(node('p', 'Consultando programaciones…', 'muted'));
-      try {
-        const data = await api('/agents/' + select.value + '/schedules');
-        if (run !== sequence) return;
-        out.replaceChildren();
-        if (!data.items.length) empty(out, 'Sin programaciones',
-          'Este agente no tiene programaciones registradas.');
-        else {
-          table(out, ['Frecuencia', 'Zona horaria', 'Próxima ejecución', 'Estado'], data.items.map(
-            s => [({
-                DAILY: 'Diaria',
-                WEEKLY: 'Semanal'
-              } [s.configuration?.frequency] || s.configuration?.frequency || 'No disponible'), s
-              .timezone, date(s.next_run_at), s.enabled ? 'Habilitada' : 'Deshabilitada'
-            ]));
-          out.append(node('p', 'Se muestran hasta ' + data.list_limit + ' programaciones.', 'help'));
+    async function load(){
+      more.disabled=true;
+      try{
+        const data=await api('/schedule-view'+(cursor?'?after='+encodeURIComponent(cursor):''));
+        if(!data.items.length&&!cursor)empty(list,'Sin agentes','No hay agentes disponibles para tu cuenta.');
+        for(const agent of data.items){
+          const card=node('details',undefined,'panel schedule-agent-card'),summary=node('summary');
+          summary.append(node('strong',agent.name),node('p','Propietario #'+agent.owner_id,'muted'));
+          summary.append(node('p',agent.next_run_at?'Próxima corrida: '+date(agent.next_run_at):'Sin corrida habilitada','help'));
+          agent.schedules.forEach(s=>summary.append(node('p','Horario previsto: '+scheduleText(s)+(s.enabled?'':' · Deshabilitada'),'help')));
+          if(!agent.schedules.length)summary.append(node('p','Sin programaciones','help'));
+          card.append(summary);const content=node('div');card.append(content);list.append(card);
+          let loaded=false;
+          card.addEventListener('toggle',async()=>{
+            if(!card.open||loaded)return;loaded=true;content.replaceChildren(node('p','Cargando historial…','muted'));
+            try{
+              const detail=await api('/schedule-view/'+agent.id);content.replaceChildren();
+              content.append(node('h3','Programaciones'));
+              if(detail.schedules.length)table(content,['Horario','Estado','Próxima corrida'],detail.schedules.map(s=>[scheduleText(s),s.enabled?'Habilitada':s.preference_only?'Preferencia guardada; ejecución deshabilitada':'Deshabilitada',date(s.next_run_at)]));
+              else content.append(node('p','Sin programaciones registradas.'));
+              content.append(node('h3','Historial de ejecuciones'));
+              if(detail.jobs.length)table(content,['Creada','Estado','Inicio','Finalización'],detail.jobs.map(j=>[date(j.created_at),j.state,date(j.started_at),date(j.finished_at)]));
+              else content.append(node('p','Sin ejecuciones.'));
+              content.append(node('h3','Historial de programación'));
+              if(detail.events.length)table(content,['Fecha','Acción','Actor'],detail.events.map(e=>[date(e.created_at),e.action,e.actor_type+' · '+e.actor_id]));
+              else content.append(node('p','Sin eventos registrados.'));
+              content.append(node('p','Hasta '+detail.list_limit+' registros recientes por historial.','help'));
+            }catch(e){loaded=false;content.replaceChildren();showError(e,content);}
+          });
         }
-      } catch (e) {
-        if (run === sequence) showError(e, out);
-      }
-    };
-    await loadAgents();
+        cursor=data.next_cursor;more.hidden=!cursor;
+      }catch(e){showError(e,list);}finally{more.disabled=false;}
+    }
+    await load();
   }
   async function executionsPage() {
     heading('Ejecuciones', 'Historial real de los trabajos de tu cuenta.');
