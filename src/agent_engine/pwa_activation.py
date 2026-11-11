@@ -17,8 +17,7 @@ from . import models as m
 PATH = '/api/agents/v1/internal/pwa-activations'
 
 
-@api.post('/internal/pwa-activations')
-def activate_pwa():
+def verify_hmac(path):
     # Separate, narrowly scoped credential. Cookies and API-client tokens cannot impersonate owners.
     key = current_app.config.get('PWA_ACTIVATION_SECRET', '')
     stamp = request.headers.get('X-DPIA-Timestamp', '')
@@ -27,9 +26,14 @@ def activate_pwa():
         fresh = abs(time.time() - int(stamp)) <= 60
     except ValueError:
         fresh = False
-    signature = hmac.new(key.encode(), stamp.encode()+b'\n'+PATH.encode()+b'\n'+raw, hashlib.sha256).hexdigest()
+    signature = hmac.new(key.encode(), stamp.encode()+b'\n'+path.encode()+b'\n'+raw, hashlib.sha256).hexdigest()
     if not key or not fresh or not hmac.compare_digest(signature, request.headers.get('X-DPIA-Signature', '')):
         raise EngineError('invalid_service_credentials', 401)
+
+
+@api.post('/internal/pwa-activations')
+def activate_pwa():
+    verify_hmac(PATH)
     arguments()
     body = json_body()
     if (set(body) != {'owner_id', 'source_agent_id', 'source_revision', 'agent', 'schedule', 'preferences'}
@@ -64,7 +68,12 @@ def activate_pwa():
                 raise EngineError('source_configuration_conflict', 409)
             # Do not reactivate an independently edited agent on a stale replay.
             if event.get('engine_revision') != row['revision']:
-                raise EngineError('source_configuration_conflict', 409)
+                changes=conn.execute(select(m.agent_events.c.action,m.agent_events.c.revision).where(
+                    m.agent_events.c.owner_id==owner,m.agent_events.c.agent_id==row['id'],
+                    m.agent_events.c.revision>event['engine_revision'])).all()
+                if (len(changes)!=row['revision']-event['engine_revision'] or
+                        any(change.action!='AGENT_PAUSE_CHANGED' for change in changes)):
+                    raise EngineError('source_configuration_conflict',409)
         else:
             manager = AgentManager(conn, principal)
             created = manager.save(body['agent'])

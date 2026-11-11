@@ -79,6 +79,8 @@ class TaskBox:
                 'actor_id': job['client_id'] or str(job['owner_id'])}}})
         from .management import locked_agent
         agent = locked_agent(conn, principal, job['agent_id'])
+        from .pause_control import require_unpaused
+        require_unpaused(conn,agent)
         if agent['configuration_state'] != 'ENABLED':
             raise EngineError('agent_paused', 409)
         capability = conn.execute(select(m.agent_capabilities.c.tool_id).where(

@@ -38,6 +38,8 @@ class Dispatcher:
         self.registry = registry or default_registry()
 
     def _prepare(self, agent, body):
+        from .pause_control import require_unpaused
+        require_unpaused(self.conn, agent)
         validate(REQUEST_CREATE, body)
         allowed = set(self.conn.execute(select(m.agent_capabilities.c.tool_id).where(
             m.agent_capabilities.c.owner_id == agent['owner_id'],
@@ -233,7 +235,9 @@ class Dispatcher:
                 principal = self._scheduled_author({'owner_id': row['owner_id'], 'definition': {
                     'author': {'kind': 'API_CLIENT' if row['client_id'] else 'SESSION',
                                'actor_id': row['client_id'] or str(row['owner_id'])}}})
-                locked_agent(self.conn, principal, row['agent_id'])
+                agent=locked_agent(self.conn, principal, row['agent_id'])
+                from .pause_control import pause_state
+                if any(pause_state(self.conn,agent).values()):continue
                 self._queue(row)
                 report['queued'].append(row['id'])
             except EngineError as error:
@@ -247,6 +251,9 @@ class Dispatcher:
         try:
             with self.conn.begin_nested():
                 principal = self._scheduled_author(row)
+                agent=locked_agent(self.conn,principal,row['agent_id'])
+                from .pause_control import pause_state
+                if any(pause_state(self.conn,agent).values()):return
                 following = next_occurrence(row['definition'], self.now)
                 changed = self.conn.execute(update(m.schedules).where(m.schedules.c.id == row['id'],
                     m.schedules.c.owner_id == row['owner_id'], m.schedules.c.revision == row['revision'])

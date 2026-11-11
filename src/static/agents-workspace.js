@@ -205,18 +205,58 @@
     }
   }
 
+ function pauseOperationId(){
+  if(typeof crypto.randomUUID==='function')return crypto.randomUUID();
+  const bytes=crypto.getRandomValues(new Uint8Array(16));bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;
+  const hex=[...bytes].map(b=>b.toString(16).padStart(2,'0')).join('');
+  return [hex.slice(0,8),hex.slice(8,12),hex.slice(12,16),hex.slice(16,20),hex.slice(20)].join('-');
+ }
+  const pauseOperations = new Map();
+  function pauseButton(a, administrative = false) {
+    const flags=a.pause||{user_paused:false,admin_paused:false};
+    const paused=administrative?flags.admin_paused:flags.user_paused;
+    const button=btn(paused?'Reanudar agente':'Pausar agente',async function(){
+      this.disabled=true;
+      const key=(administrative?'admin:':'owner:')+a.id;
+      const body=pauseOperations.get(key)||{paused:!paused,expected_revision:a.revision,operation_id:pauseOperationId()};
+      pauseOperations.set(key,body);
+      try{
+        await api((administrative?'/admin':'')+'/agents/'+encodeURIComponent(a.id)+'/pause',{method:'POST',body:JSON.stringify(body)});
+        pauseOperations.delete(key);await render();
+      }catch(e){
+        this.disabled=false;
+        if([401,403,409].includes(e.status)){pauseOperations.delete(key);await render();}
+        notify(e.message||'No se confirmó la pausa. Reintentá.');
+      }
+    },'secondary');
+    if(!administrative&&flags.admin_paused&&flags.user_paused)button.disabled=true;
+    return button;
+  }
+
+  function adminPauseCell(a) {
+    const cell=node('div'),flags=a.pause||{};
+    const states=[];
+    if(flags.user_paused)states.push('Pausa del usuario');
+    if(flags.admin_paused)states.push('Pausa administrativa');
+    cell.append(node('small',states.join(' · ')||'Sin pausa'),pauseButton(a,true));
+    return cell;
+  }
+
   function card(a) {
     const c = node('article', undefined, 'agent-card'),
       top = node('div', undefined, 'card-top');
     top.append(icon('agent', 'agent-icon'), badge(a.configuration_state));
     const meta = node('div', undefined, 'meta');
     meta.append(badge(a.activity_state), node('span', a.timezone));
+    if(a.pause?.admin_paused)meta.append(node('span','Pausa administrativa'));
+    if(a.pause?.user_paused)meta.append(node('span','Pausa del usuario'));
     const bottom = node('div', undefined, 'card-bottom');
     const actions = node('div', undefined, 'agent-actions');
     const enabled = a.configuration_state === 'ENABLED';
     actions.append(btn(enabled ? 'Deshabilitar' : 'Habilitar',
       function () { return toggleAgent(a, this); },
       enabled ? 'secondary' : 'primary'));
+    actions.append(pauseButton(a));
     actions.append(link('Configurar →', '/agents/' + a.id + '/edit', 'quiet'));
     bottom.append(node('span', 'Revisión ' + a.revision, 'muted'), actions);
     c.append(top, node('h3', a.name), node('p', a.description || 'Sin descripción'), meta, bottom);
@@ -1226,13 +1266,13 @@
       return;
     }
     const data = await api('/admin/overview');
-    heading('Administración', 'Supervisión global de agentes, trabajos y workers.');
+    heading('Administración', 'Supervisión global de agentes, trabajos y workers.',btn('Actualizar estado',render,'secondary'));
     root.append(banner(
       'La gestión de usuarios y roles está pendiente: todavía no existe una API de administración de usuarios.'
       ));
     for (const [title, headers, items, rows] of [
-        ['Agentes', ['Agente', 'Propietario', 'Configuración', 'Actividad'], data.agents, data.agents.map(
-            a => [a.name, 'Usuario ' + a.owner_id, badge(a.configuration_state), badge(a.activity_state)]
+        ['Agentes', ['Agente', 'Propietario', 'Configuración', 'Actividad', 'Pausa'], data.agents, data.agents.map(
+            a => [a.name, 'Usuario ' + a.owner_id, badge(a.configuration_state), badge(a.activity_state), adminPauseCell(a)]
             )],
         ['Trabajos', ['Trabajo', 'Propietario', 'Estado', 'Resultado'], data.jobs, data.jobs.map(j => [j
           .id, 'Usuario ' + j.owner_id, badge(j.state), j.state === 'DELIVERED' ? btn('Ver resultado',

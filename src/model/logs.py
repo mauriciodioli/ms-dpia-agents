@@ -120,7 +120,7 @@ def base_values():
 
 def write_log(values):
     # Central guard applies to both HTTP requests and browser activity events.
-    if values.get('ip') == '127.0.0.1':
+    if values.get('ip') in ('127.0.0.1', '172.18.0.1'):
         return True
     try:
         # Independent transaction: never commits or rolls back business data.

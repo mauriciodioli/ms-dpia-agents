@@ -51,8 +51,9 @@ class ReadRepository:
         return 'WAITING' if states else 'IDLE'
 
     def public_agent(self, row, *, configuration=False):
+        from .pause_control import pause_state
         data = {key: row[key] for key in ('id', 'name', 'description', 'configuration_state', 'revision', 'timezone')}
-        data.update(activity_state=self.activity(row['id'], row['owner_id']),
+        data.update(pause=pause_state(self.conn, row), activity_state=self.activity(row['id'], row['owner_id']),
                     created_at=iso(row['created_at']), updated_at=iso(row['updated_at']))
         if configuration:
             data.update(instructions=row['instructions'], limits=row['limits'],

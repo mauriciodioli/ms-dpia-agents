@@ -4,6 +4,7 @@
 def init_app(app):
     from .api import api, admin
     from . import pwa_activation
+    from . import pause_control
     from . import integration_api  # Register routes before blueprint registration.
     app.register_blueprint(api)
     app.register_blueprint(admin)
