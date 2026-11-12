@@ -78,7 +78,11 @@ def authenticate(conn, *, admin_only: bool = False, now: datetime | None = None)
     is_admin = str(user['roll']).strip().casefold() in ADMIN_ROLES
     if admin_only and not is_admin:
         raise EngineError('administrator_session_required', 403)
-    return Principal(user['id'], 'SESSION', str(user['id']), SCOPES, True, frozenset(), is_admin)
+    role=str(user['roll']).strip().casefold()
+    scopes=SCOPES
+    if role not in ADMIN_ROLES | {'avanzado','advanced'}:scopes=scopes-{'mcp:read','mcp:write','mcp:approve'}
+    elif role not in ADMIN_ROLES:scopes=scopes-{'mcp:approve'}
+    return Principal(user['id'], 'SESSION', str(user['id']), scopes, True, frozenset(), is_admin)
 
 
 def require_session_write(principal: Principal, action: str = 'manage-api-clients') -> None:
@@ -117,6 +121,11 @@ def record_security_event(conn, principal, client_id, action):
 def issue_client(conn, principal: Principal, body: dict, *, now: datetime | None = None) -> dict:
     require_session_write(principal)
     validate(CLIENT_CREATE, body)
+    if not set(body['scopes']).issubset(principal.scopes):
+        raise EngineError('insufficient_scope',403)
+    from .mcp_service import access
+    for scope in set(body['scopes']) & {'mcp:read','mcp:write','mcp:approve'}:
+        access(conn,principal,scope)
     now = now or now_utc()
     expires = utc(body['expires_at'])
     if expires <= now or expires - now > timedelta(days=366):

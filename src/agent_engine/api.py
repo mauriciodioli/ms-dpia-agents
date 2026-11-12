@@ -413,11 +413,11 @@ def workspace_session(conn, principal, repo):
     arguments()
     if principal.kind != 'SESSION':
         raise EngineError('session_required', 403)
-    return {'session': {'admin': principal.admin, 'scopes': sorted(principal.scopes)},
+    return {'session': {'admin': principal.admin, 'mcp_manage': 'mcp:write' in principal.scopes, 'owner_id':principal.owner_id, 'scopes': sorted(principal.scopes)},
             'tools': [{'id': tool.id, 'provider': tool.provider,
                        'input_schema': tool.input_schema,
                        'implementation_status': tool.implementation_status}
-                      for tool in default_registry().tools.values()],
+                      for tool in default_registry(conn=conn,owner=principal.owner_id).tools.values()],
             'availability': {'execution': False, 'integrations_management': principal.admin,
                              'users_management': False}}
 

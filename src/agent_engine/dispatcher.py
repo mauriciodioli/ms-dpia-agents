@@ -35,7 +35,7 @@ class Dispatcher:
     def __init__(self, conn, *, now=None, registry=None):
         self.conn = conn
         self.now = now or now_utc()
-        self.registry = registry or default_registry()
+        self.registry = registry or default_registry(conn=conn)
 
     def _prepare(self, agent, body):
         from .pause_control import require_unpaused
@@ -53,6 +53,9 @@ class Dispatcher:
         for step in body['pipeline']:
             effective = {'tool': step['tool'], 'parameters': {
                 **agent['search_parameters'].get(step['tool'], {}), **step['parameters']}}
+            if step['tool'].startswith('mcp.'):
+                from .mcp_catalog import require_tool
+                require_tool(self.conn,agent['owner_id'],agent['id'],step['tool'])
             self.registry.validate_step(effective, allowed)
             pipeline.append(effective)
         return {**body, 'pipeline': pipeline}, allowed
@@ -95,6 +98,7 @@ class Dispatcher:
             return previous, False
         if agent['configuration_state'] != 'ENABLED':
             raise EngineError('agent_disabled', 409)
+        if any(step['tool'].startswith('mcp.') for step in body['pipeline']):principal.require('mcp:execute')
         prepared, allowed = self._prepare(agent, body)
         execution = utc(body['execute_at']) if 'execute_at' in body else self.now
         if schedule_id is None and 'execute_at' in body and execution < self.now:
@@ -103,13 +107,18 @@ class Dispatcher:
         if deadline <= execution:
             raise EngineError('invalid_deadline')
         job_id = str(uuid4())
+        mcp_versions={}
+        for step in prepared['pipeline']:
+            if step['tool'].startswith('mcp.'):
+                from .mcp_catalog import require_tool
+                mcp_versions[step['tool']]=require_tool(self.conn,agent['owner_id'],agent['id'],step['tool'])[2]
         values = dict(id=job_id, owner_id=principal.owner_id, agent_id=agent_id,
             client_id=principal.actor_id if principal.kind == 'API_CLIENT' else None,
             schedule_id=schedule_id, schedule_slot=slot, idempotency_key=key, request_hash=fingerprint,
             correlation_id=str(uuid4()), state='CREATED', revision=1, agent_revision=agent['revision'],
             request_snapshot=prepared, configuration_snapshot={
                 'name': agent['name'], 'instructions': agent['instructions'], 'limits': agent['limits'],
-                'capabilities': sorted(allowed), 'revision': agent['revision']},
+                'capabilities': sorted(allowed), 'revision': agent['revision'], 'mcp_tools':mcp_versions},
             priority=body.get('priority', 0), progress=None, execute_at=execution,
             deliver_not_before=utc(body['deliver_not_before']) if 'deliver_not_before' in body else execution,
             deadline_at=deadline, created_at=self.now, updated_at=self.now)
@@ -147,6 +156,7 @@ class Dispatcher:
         template = body['request']
         if any(name in template for name in ('execute_at', 'deadline_at', 'deliver_not_before')):
             raise EngineError('recurrence_requires_relative_times')
+        if any(step['tool'].startswith('mcp.') for step in template['pipeline']):principal.require('mcp:execute')
         self._prepare(agent, template)
         definition = {key: value for key, value in body.items() if key != 'request'}
         due = next_occurrence(definition, self.now)

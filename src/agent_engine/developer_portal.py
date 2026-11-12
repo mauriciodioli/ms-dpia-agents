@@ -7,7 +7,8 @@ portal = Blueprint('agent_developer_portal', __name__)
 @portal.get('/developers')
 def developers_page():
     # Page is only a shell. Every API action checks authenticated session.
-    response = make_response(render_template('agents_developers.html'))
+    from .mcp_documentation import operations
+    response = make_response(render_template('agents_developers.html',mcp_operations=operations()))
     response.headers['Cache-Control'] = 'no-store'
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'

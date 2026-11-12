@@ -17,6 +17,7 @@ class Handler:
 class HandlerRegistry:
     def __init__(self):
         self.handlers = {}
+        self.mcp_handler = None
 
     def register(self, tool_id, handler):
         if tool_id in self.handlers or not callable(handler.run):
@@ -60,6 +61,7 @@ class Worker:
             return
         supported = {self.box.registry.tools[name].capability for name in self.handlers.handlers
                      if name in self.box.registry.tools}
+        if self.handlers.mcp_handler is not None:supported.add('mcp')
         if not self.capabilities or not set(self.capabilities).issubset(supported):
             raise EngineError('worker_handlers_not_configured', 503)
         for capability in self.capabilities:
@@ -89,6 +91,8 @@ class Worker:
             tool_id = conn.execute(select(tasks.c.tool_id).where(tasks.c.owner_id == message.owner_id,
                 tasks.c.id == message.task_id, tasks.c.job_id == message.job_id)).scalar_one_or_none()
         handler = self.handlers.handlers.get(tool_id)
+        if handler is None and tool_id and tool_id.startswith('mcp.'):
+            handler=self.handlers.mcp_handler
         if tool_id is None:
             self.streams.ack(capability, message_id)
             return 'INVALID'

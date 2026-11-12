@@ -39,6 +39,13 @@
     'dpia.test.echo': 'Prueba interna (sin APIs)'
   };
   const errors = {
+    mcp_server_not_found:'El servidor MCP no existe o no tenés acceso.',
+    mcp_not_ready:'Probá la conexión y descubrí herramientas antes de activar el MCP.',
+    mcp_approval_required:'La herramienta requiere aprobación explícita de un administrador.',
+    mcp_role_required:'Esta operación MCP requiere un rol autorizado.',
+    mcp_catalog_changed:'Cambió la versión del catálogo MCP. Creá una nueva ejecución.',
+    mcp_ssrf_blocked:'La URL MCP resuelve a una dirección privada o reservada.',
+    mcp_invalid_url:'Ingresá una URL HTTPS pública válida, sin credenciales ni parámetros.',
     revision_conflict: 'La configuración cambió en otra sesión. Recargá el agente antes de guardar.',
     invalid_contract: 'Revisá los campos y los límites de la configuración.',
     invalid_timezone: 'Ingresá una zona horaria IANA válida.',
@@ -491,7 +498,10 @@
         category_id: 'ID de categoría',
         language: 'Idioma'
       };
-      if (t.id === 'dpia.amazon.search') {
+      if(t.provider==='mcp'){
+        const input=field(host,'Parámetros JSON de '+t.id,t.id+':json','textarea',JSON.stringify(params,null,2),{disabled:!check.checked,maxLength:65536});
+        controls.push({key:'$json',input,rawJSON:true,schema:{}});
+      }else if (t.id === 'dpia.amazon.search') {
         const schema = t.input_schema.properties;
         const initial = params;
         const inputs = {};
@@ -697,18 +707,21 @@
           tool_parameters: {}
         };
       Object.keys(limits).forEach(k => body.limits[k] = Number(values.get(k)));
+      let parameterError=false;
       chosen.forEach(t => {
         const params = {};
         t.controls.forEach(({
           key,
           input,
-          schema
+          schema,rawJSON
         }) => {
+          if(rawJSON){try{const value=JSON.parse(input.value);if(!value||Array.isArray(value)||typeof value!=='object')throw Error();Object.assign(params,value);}catch(_){parameterError=true;}return;}
           if (input.value !== '') params[key] = schema.type === 'integer' ? Number(input
             .value) : input.value;
         });
         body.tool_parameters[t.check.value] = params;
       });
+      if(parameterError){message.textContent='Revisá los parámetros JSON de las herramientas MCP.';message.hidden=false;message.focus();return;}
       if (a) body.expected_revision = a.revision;
       save.disabled = true;
       try {
@@ -1066,6 +1079,43 @@
   };
   Object.assign(errors, integrationErrors);
 
+  async function mcpSection(){
+    const section=node('section',undefined,'panel'),list=node('div'),formHost=node('div'),status=node('p',undefined,'help');
+    status.setAttribute('role','status');section.id='mcp-servers';
+    section.append(node('h2','Servidores MCP'),node('p','Conexiones seguras y herramientas autorizadas por agente. Descubrir no ejecuta herramientas.','help'),btn('Agregar servidor MCP',()=>edit()),status,formHost,list);root.append(section);
+    const action=(path,method,body)=>api('/mcp'+path,{method,body:JSON.stringify(body),headers:{'X-DPIA-Action':'manage-mcp'}});
+    let cursor=null,busy=false;
+    const more=btn('Cargar más servidores',()=>load(false));section.append(more);
+    async function run(fn){if(busy)return;busy=true;section.setAttribute('aria-busy','true');section.querySelectorAll('button').forEach(b=>b.disabled=true);status.textContent='Procesando…';try{await fn();status.textContent='Cambio confirmado.';await load();}catch(e){status.textContent=e.message;status.className='error';}finally{busy=false;section.removeAttribute('aria-busy');section.querySelectorAll('button').forEach(b=>b.disabled=false);}}
+    async function load(reset=true){if(reset){list.replaceChildren();cursor=null;}const data=await api('/mcp/servers?limit=25'+(cursor?'&after='+encodeURIComponent(cursor):''));
+      if(!data.items.length&&!cursor)list.append(node('p','No hay servidores MCP registrados.','help'));
+      for(const server of data.items){const card=node('article',undefined,'mcp-server agent-card'),actions=node('div',undefined,'agent-actions');card.dataset.mcpServer=server.id;
+        card.append(node('h3',server.name),node('p',server.description||'Sin descripción'),node('p',server.endpoint_url,'help'),node('p',(server.enabled?'Activo':'Pausado')+' · '+server.last_health_status+' · '+(server.last_error_code||'Sin errores')+' · Revisión '+server.revision));
+        card.append(node('p','Última comprobación: '+date(server.last_checked_at),'help'));
+        actions.append(btn('Editar configuración',()=>edit(server)),btn('Probar conexión',()=>run(()=>action('/servers/'+server.id+'/test','POST',{expected_revision:server.revision}))),btn('Descubrir herramientas',()=>run(()=>action('/servers/'+server.id+'/discover','POST',{expected_revision:server.revision}))),btn(server.enabled?'Pausar MCP':'Activar MCP',()=>run(()=>action('/servers/'+server.id+'/status','PATCH',{expected_revision:server.revision,enabled:!server.enabled}))),btn('Eliminar MCP',()=>{if(window.confirm('¿Eliminar este servidor MCP? Se revocarán sus herramientas y se conservará el historial.'))run(()=>action('/servers/'+server.id,'DELETE',{expected_revision:server.revision,confirm:true}));},'agent-delete'));
+        card.append(actions);const details=node('details'),summary=node('summary','Herramientas y permisos'),host=node('div');details.append(summary,host);card.append(details);list.append(card);
+        details.addEventListener('toggle',async()=>{if(!details.open)return;host.replaceChildren(node('p','Cargando herramientas…'));try{const data=await api('/mcp/servers/'+server.id+'/tools');host.replaceChildren();
+          for(const tool of data.items){const row=node('section',undefined,'panel'),risk=document.createElement('select');['LOW','MEDIUM','HIGH','CRITICAL'].forEach(value=>{const option=node('option',value);option.value=value;risk.append(option);});risk.value=tool.risk_level;risk.setAttribute('aria-label','Nivel de riesgo de '+tool.tool_name);risk.disabled=!context.session.scopes.includes('mcp:approve');
+            row.append(node('h4',tool.tool_name),node('p',tool.description||'Sin descripción'),node('code',tool.catalog_id),risk,btn(tool.enabled?'Deshabilitar herramienta':'Habilitar herramienta',()=>{if(tool.risk_level==='HIGH'||tool.risk_level==='CRITICAL'){if(!confirm('Esta herramienta tiene riesgo alto. ¿Confirmás habilitarla? Todavía necesitará autorización por agente.'))return;}run(()=>action('/tools/'+tool.id,'PATCH',{expected_revision:data.catalog_version,enabled:!tool.enabled,risk_level:risk.value}));}));
+            const grant=node('form'),agentInput=field(grant,'ID de agente','agent','text','',{required:true,maxLength:36}),ownerInput=field(grant,'ID de propietario','owner','number',context.session.owner_id,{required:true,min:1});ownerInput.readOnly=!context.session.admin;
+            const authorize=node('button','Autorizar agente','secondary');authorize.type='submit';grant.append(authorize,btn('Revocar agente',()=>run(()=>action('/tools/'+tool.id+'/grants/'+encodeURIComponent(agentInput.value),'PUT',{expected_revision:data.catalog_version,enabled:false,owner_id:Number(ownerInput.value),approved:false}))));
+            grant.onsubmit=event=>{event.preventDefault();const sensitive=['HIGH','CRITICAL'].includes(risk.value);if(sensitive&&!confirm('¿Aprobás explícitamente esta herramienta sensible para el agente indicado?'))return;run(()=>action('/tools/'+tool.id+'/grants/'+encodeURIComponent(agentInput.value),'PUT',{expected_revision:data.catalog_version,enabled:true,owner_id:Number(ownerInput.value),approved:sensitive}));};row.append(grant);host.append(row);
+          }
+          if(!data.items.length)host.append(node('p','No hay herramientas descubiertas.'));
+        }catch(e){host.replaceChildren(node('p',e.message,'error'));}});
+      }cursor=data.next_cursor;more.hidden=!cursor;
+    }
+    function edit(server=null){
+      const form=node('form',undefined,'panel'),grid=node('div',undefined,'form-grid');form.append(node('h3',server?'Editar servidor MCP':'Agregar servidor MCP'),grid);
+      const name=field(grid,'Nombre MCP','mcp-name','text',server?.name,{required:true,maxLength:150}),description=field(grid,'Descripción MCP','mcp-description','textarea',server?.description,{maxLength:4000}),url=field(grid,'URL HTTPS del MCP','mcp-url','url',server?.endpoint_url,{required:true,maxLength:2048}),auth=field(grid,'Autenticación MCP','mcp-auth','select',server?.auth_type||'none',{values:['none','bearer','header']}),credential=field(grid,'Credencial MCP (vacía conserva la actual)','mcp-credential','password','',{maxLength:8192,autocomplete:'new-password'}),timeout=field(grid,'Timeout MCP (segundos)','mcp-timeout','number',server?.timeout_seconds||15,{min:1,max:120,required:true}),priority=field(grid,'Prioridad MCP','mcp-priority','number',server?.priority??100,{min:-32768,max:32767,required:true});
+      form.append(node('p','Se guarda pausado. El registro prueba la conexión y descubre herramientas, sin invocarlas. Autenticación header utiliza X-API-Key.','help'));const save=node('button','Guardar MCP','primary');save.type='submit';form.append(save,btn('Cancelar',()=>formHost.replaceChildren()));
+      form.onsubmit=event=>{event.preventDefault();const body={name:name.value,description:description.value,endpoint_url:url.value,transport:'streamable_http',auth_type:auth.value,enabled:false,timeout_seconds:Number(timeout.value),priority:Number(priority.value)};
+        if(credential.value)body.credential=auth.value==='header'?{name:'X-API-Key',value:credential.value}:credential.value;
+        if(server)body.expected_revision=server.revision;
+        run(async()=>{await action('/servers'+(server?'/'+server.id:''),server?'PATCH':'POST',body);credential.value='';formHost.replaceChildren();});};formHost.replaceChildren(form);name.focus();
+    }
+    await load();
+  }
   async function integrationsPage() {
     heading('Integraciones', 'Configuración, conexión y habilitación independiente de proveedores.');
     const dev = node('section', undefined, 'panel');
@@ -1073,6 +1123,7 @@
     delete portalLink.dataset.nav; // Standalone Flask page, outside the workspace router.
     dev.append(node('h2', 'API / Desarrolladores'), node('p', 'Endpoints, clientes API y permisos.'), portalLink);
     root.append(dev);
+    if(context.session.mcp_manage)await mcpSection();
     if (!context.session.admin) {
       root.append(banner('La administración de integraciones requiere una sesión de administrador.'));
       return;

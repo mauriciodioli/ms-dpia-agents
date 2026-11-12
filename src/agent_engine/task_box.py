@@ -44,7 +44,7 @@ class Lease:
 class TaskBox:
     def __init__(self, engine, *, registry=None, policy=None, clock=now_utc):
         self.engine = engine
-        self.registry = registry or default_registry()
+        self.registry = registry or default_registry(engine=engine)
         self.policy = policy or QueuePolicy()
         self.clock = clock
 
@@ -54,7 +54,7 @@ class TaskBox:
 
     def register_worker(self, worker_id, capabilities):
         if not worker_id or len(worker_id) > 120 or not capabilities or not set(capabilities).issubset(
-                {tool.capability for tool in self.registry.tools.values()}):
+                ({tool.capability for tool in self.registry.tools.values()} | {'mcp'})):
             raise EngineError('invalid_worker')
         with self.engine.begin() as conn:
             if conn.execute(select(m.workers.c.id).where(m.workers.c.id == worker_id).with_for_update()).first():
@@ -88,9 +88,17 @@ class TaskBox:
             m.agent_capabilities.c.tool_id == task['tool_id']).with_for_update()).first()
         if capability is None or task['tool_id'] not in job['configuration_snapshot'].get('capabilities', []):
             raise EngineError('tool_authorization_revoked', 403)
-        spec = self.registry.tools.get(task['tool_id'])
+        registry=self.registry.using(conn) if hasattr(self.registry,'using') else self.registry
+        spec = registry.tools.get(task['tool_id'])
         if spec is None:
             raise EngineError('unknown_tool', 403)
+        if task['tool_id'].startswith('mcp.'):
+            principal.require('mcp:execute')
+            from .mcp_catalog import require_tool
+            expected=job['configuration_snapshot'].get('mcp_tools',{}).get(task['tool_id'])
+            if expected is None:raise EngineError('mcp_catalog_changed',409)
+            require_tool(conn,job['owner_id'],job['agent_id'],task['tool_id'],expected)
+            return spec
         if check_integration:
             from .integrations import require_enabled
             require_enabled(conn, spec.provider)
@@ -154,7 +162,7 @@ class TaskBox:
                 m.outbox.c.owner_id == job['owner_id']).values(**values))
         else:
             conn.execute(insert(m.outbox).values(id=str(uuid4()), owner_id=job['owner_id'], job_id=job['id'],
-                task_id=task['id'], event_key=key, capability=self.registry.tools[task['tool_id']].capability, **values))
+                task_id=task['id'], event_key=key, capability=(self.registry.using(conn) if hasattr(self.registry,'using') else self.registry).tools[task['tool_id']].capability, **values))
 
     def claim(self, worker_id, capability, message, *, require_provider=True):
         """Return (LEASE|DEFER|ACK, lease). Redis supplies references, never input."""

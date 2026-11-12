@@ -89,7 +89,7 @@ def worker_command(capability, watch, interval, local_test, providers):
     from .streams import RedisStreams
     handlers = current_app.extensions.get('agent_engine_handlers')
     if providers:
-        if local_test or not set(capability).issubset({'search', 'analysis'}):
+        if local_test or not set(capability).issubset({'search', 'analysis', 'mcp'}):
             raise click.ClickException('invalid_provider_worker_capability')
         from .provider_handlers import provider_handlers
         handlers = provider_handlers(engine(), current_app.config)

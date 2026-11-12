@@ -51,6 +51,16 @@ class ReadRepository:
             return 'WORKING'
         return 'WAITING' if states else 'IDLE'
 
+    def local_source_results(self, agent_id, after):
+        return self.conn.execute(select(m.results).join(m.jobs, and_(m.jobs.c.owner_id==m.results.c.owner_id,
+            m.jobs.c.id==m.results.c.job_id)).where(self.job_filter(),m.jobs.c.agent_id==agent_id,
+            m.jobs.c.state=='DELIVERED',m.results.c.created_at>after)
+            .order_by(m.results.c.created_at.desc()).limit(20)).mappings().all()
+
+    def capabilities(self, agent_id):
+        return set(self.conn.execute(select(m.agent_capabilities.c.tool_id).where(
+            m.agent_capabilities.c.owner_id==self.principal.owner_id,m.agent_capabilities.c.agent_id==agent_id)).scalars())
+
     def public_agent(self, row, *, configuration=False):
         from .pause_control import pause_state
         data = {key: row[key] for key in ('id', 'name', 'description', 'configuration_state', 'revision', 'timezone')}

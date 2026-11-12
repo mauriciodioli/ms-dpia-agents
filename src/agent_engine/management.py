@@ -27,7 +27,7 @@ def audit_agent(conn, principal, row, action, details, now=None):
 class AgentManager:
     def __init__(self, conn, principal, registry=None):
         self.conn, self.principal = conn, principal
-        self.registry = registry or default_registry()
+        self.registry = registry or default_registry(conn=conn,owner=principal.owner_id)
 
     def save(self, body, agent_id=None):
         self.principal.require('agents:write')

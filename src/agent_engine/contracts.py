@@ -6,7 +6,7 @@ from .errors import EngineError
 
 API_VERSION = 'agents.v1'
 SCOPES = frozenset({'agents:read', 'agents:write', 'agents:delete', 'jobs:create', 'jobs:read',
-                    'results:read', 'metrics:read'})
+                    'results:read', 'metrics:read','mcp:read','mcp:write','mcp:execute','mcp:approve'})
 UUID = {'type': 'string', 'format': 'uuid'}
 TOOL_ID = {'type': 'string', 'pattern': r'^[a-z][a-z0-9_.-]{2,79}$'}
 LIMITS = {

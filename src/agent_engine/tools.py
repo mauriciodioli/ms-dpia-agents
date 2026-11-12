@@ -44,7 +44,7 @@ class ToolRegistry:
             self.validate_step({'tool': tool_id, 'parameters': parameters}, allowed)
 
 
-def default_registry() -> ToolRegistry:
+def default_registry(*, conn=None, engine=None, owner=None) -> ToolRegistry:
     registry = ToolRegistry()
     registry.register(ToolSpec(
         id='dpia.test.echo', provider='local.test', capability='local-test',
@@ -79,4 +79,7 @@ def default_registry() -> ToolRegistry:
         input_schema={'type': 'object', 'additionalProperties': False,
                       'properties': {'instructions': {'type': 'string', 'maxLength': 8000}}},
     ))
+    if conn is not None or engine is not None:
+        from .mcp_catalog import LiveRegistry
+        return LiveRegistry(registry,conn,engine,owner)
     return registry

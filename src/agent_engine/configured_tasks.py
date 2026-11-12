@@ -34,7 +34,7 @@ class ConfiguredTaskManager:
     def __init__(self, conn, principal, registry=None):
         self.conn, self.principal = conn, principal
         self.repository = ConfiguredTaskRepository(conn)
-        self.registry = registry or default_registry()
+        self.registry = registry or default_registry(conn=conn,owner=principal.owner_id)
 
     def access(self, agent_id, administrative=False):
         return scoped_agent(self.conn, self.principal, agent_id, administrative)

@@ -65,6 +65,8 @@ def openapi_document():
         'responses': {'200': {'description': 'Owner-scoped schedules'}}}
     for path in ('/session', '/clients', '/admin/overview', '/admin/jobs/{job_id}/result'):
         paths[path]['get']['security'] = [{'session': []}]
+    from .mcp_documentation import add_openapi
+    add_openapi(paths)
     return {
         'openapi': '3.1.0', 'info': {'title': 'DPIA Agent Engine', 'version': '1.0.0'},
         'servers': [{'url': '/api/agents/v1'}], 'security': [{'bearer': []}, {'session': []}],

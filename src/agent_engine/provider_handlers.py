@@ -198,4 +198,6 @@ def provider_handlers(engine, config, *, http=None):
     registry = HandlerRegistry()
     registry.register('dpia.amazon.search', Handler(implementations.scraper, RESULT))
     registry.register('openai.analysis', Handler(implementations.analysis, RESULT))
+    from .mcp_runtime import MCPHandler
+    registry.mcp_handler=Handler(MCPHandler(engine,config),RESULT,requires_provider_grant=False)
     return registry

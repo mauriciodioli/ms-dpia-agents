@@ -8,6 +8,7 @@ def init_app(app):
     from . import pause_control
     from . import deletion_api
     from . import configured_task_api
+    from . import mcp_api
     from . import integration_api  # Register routes before blueprint registration.
     app.register_blueprint(api)
     app.register_blueprint(admin)
