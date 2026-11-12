@@ -211,3 +211,37 @@ agent_deletions = Table('ae_agent_deletions', metadata,
 # Match the manually installed official DDL. This sets metadata only; no SQL runs.
 for _table in metadata.tables.values():
     _table.dialect_options['mysql'].update(engine='InnoDB', charset='utf8mb4', collate='utf8mb4_0900_ai_ci')
+
+
+schedule_current = Table('ae_schedule_current', metadata,
+    Column('owner_id', Integer, primary_key=True),
+    Column('schedule_id', String(36), primary_key=True),
+    Column('agent_id', String(36), nullable=False),
+    Column('first_job_id', String(36), nullable=False),
+    Column('latest_job_id', String(36), nullable=False),
+    Column('latest_result_id', String(36), nullable=False),
+    Column('payload', JSON, nullable=False),
+    Column('version', Integer, nullable=False),
+    Column('first_seen_at', DateTime, nullable=False),
+    Column('last_checked_at', DateTime, nullable=False),
+    Column('last_changed_at', DateTime, nullable=False),
+    tenant_ref('schedule_id', 'ae_schedules'),
+    tenant_ref('agent_id', 'ae_agents'),
+    ForeignKeyConstraint(['owner_id', 'first_job_id'], ['ae_jobs.owner_id', 'ae_jobs.id'], name='fk_schedule_current_first_job'),
+    ForeignKeyConstraint(['owner_id', 'latest_job_id'], ['ae_jobs.owner_id', 'ae_jobs.id'], name='fk_schedule_current_latest_job'),
+    tenant_ref('latest_result_id', 'ae_results'))
+
+schedule_updates = Table('ae_schedule_updates', metadata, *identity(),
+    Column('schedule_id', String(36), nullable=False),
+    Column('job_id', String(36), nullable=False),
+    Column('result_id', String(36), nullable=False),
+    Column('version', Integer, nullable=False),
+    Column('changed', Boolean, nullable=False),
+    Column('message', Text, nullable=False),
+    Column('checked_at', DateTime, nullable=False),
+    Column('payload', JSON, nullable=False),
+    tenant_ref('schedule_id', 'ae_schedules'),
+    tenant_ref('job_id', 'ae_jobs'),
+    tenant_ref('result_id', 'ae_results'),
+    UniqueConstraint('owner_id', 'job_id', name='uq_ae_schedule_updates_job'),
+    Index('ix_ae_schedule_updates_schedule', 'owner_id', 'schedule_id', 'checked_at'))

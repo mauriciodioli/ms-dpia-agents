@@ -320,9 +320,12 @@ class TaskBox:
             else:
                 version = (conn.execute(select(func.max(m.results.c.version)).where(
                     m.results.c.owner_id == lease.owner_id, m.results.c.job_id == lease.job_id)).scalar() or 0)+1
-                conn.execute(insert(m.results).values(id=str(uuid4()), owner_id=lease.owner_id,
+                result_id = str(uuid4())
+                conn.execute(insert(m.results).values(id=result_id, owner_id=lease.owner_id,
                     job_id=lease.job_id, version=version, schema_version='agents.task-output.v1', payload=output,
                     evidence_status='UNVERIFIED', created_at=self.now(), approved_at=None))
+                from .recurring_results import record_success
+                record_success(conn, job, result_id, output, self.now())
                 revision = transition_job(conn, owner_id=lease.owner_id, job_id=lease.job_id,
                     expected_revision=job['revision'], target='REVIEWING', actor_id=lease.worker_id, now=self.now())
                 conn.execute(update(m.jobs).where(m.jobs.c.owner_id == lease.owner_id,

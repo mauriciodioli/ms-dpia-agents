@@ -3,8 +3,7 @@
 Never invokes an MCP, scraper or analysis tool. Credentials stay server-side.
 """
 import json
-from uuid import uuid4
-from sqlalchemy import select, insert
+from sqlalchemy import select
 from .errors import EngineError
 from .integrations import IntegrationService
 from .integration_models import integrations
@@ -26,6 +25,7 @@ def _response_text(response):
 class Planner:
     def __init__(self, conn, *, service, registry):
         self.conn, self.service, self.registry = conn, service, registry
+        self.usage_record = None
 
     def capabilities(self, agent):
         """Only tools that are currently enabled, implemented and executable."""
@@ -86,22 +86,12 @@ class Planner:
                                   'strict':True,'schema':schema}}}
         if body['max_output_tokens'] < 250:
             raise EngineError('planner_insufficient_token_budget', 409)
-        # Retry logic with exponential backoff for transient failures
-        last_error = None
-        for attempt in range(3):
-            try:
-                response = self.service.http.request('POST',OPENAI_BASE+'/responses',secret,
-                    timeout=config['config']['timeout_seconds'],body=body)
-                if response.get('status') != 'completed':
-                    raise EngineError('planner_incomplete_response',502)
-                break
-            except EngineError as e:
-                last_error = e
-                if attempt < 2 and e.code in ('planner_incomplete_response',):
-                    import time
-                    time.sleep(min(2 ** attempt, 4))
-                    continue
-                raise
+        # A single POST avoids duplicate model charges when a request's outcome
+        # is uncertain. Callers may retry with a new explicit request.
+        response = self.service.http.request('POST', OPENAI_BASE + '/responses', secret,
+            timeout=config['config']['timeout_seconds'], body=body)
+        if response.get('status') != 'completed':
+            raise EngineError('planner_incomplete_response', 502)
         try:
             parsed = json.loads(_response_text(response))
             from .contracts import validate
@@ -120,15 +110,15 @@ class Planner:
             normalized = {'tool':step['tool'], 'parameters':parameters}
             self.registry.validate_step(normalized,{t['id'] for t in tools})
             validated.append(normalized)
-        # Record planner token usage if job_id provided. Response usage is available in response['usage'].
-        if job_id and isinstance(response.get('usage'), dict):
-            usage = response['usage']
-            input_tokens = usage.get('input_tokens')
-            output_tokens = usage.get('output_tokens')
-            if isinstance(input_tokens, int) and isinstance(output_tokens, int) and input_tokens >= 0 and output_tokens >= 0:
-                from .auth import now_utc
-                self.conn.execute(insert(m.usage).values(id=str(uuid4()), owner_id=agent['owner_id'],
-                    job_id=job_id, provider_id='openai.responses', provider_record_id=response.get('id'),
-                    verified=True, evidence_source='PLANNER_RESPONSE', calls=1,
-                    input_tokens=input_tokens, output_tokens=output_tokens, created_at=now_utc()))
+        # Defer usage persistence until Dispatcher has inserted ae_jobs.
+        # ae_usage has a mandatory foreign key to ae_jobs.
+        usage = response.get('usage')
+        if isinstance(usage, dict):
+            input_tokens, output_tokens = usage.get('input_tokens'), usage.get('output_tokens')
+            if (type(input_tokens) is int and type(output_tokens) is int and
+                    input_tokens >= 0 and output_tokens >= 0):
+                self.usage_record = dict(provider_id='openai.responses',
+                    provider_record_id=response.get('id'), verified=True,
+                    evidence_source='PLANNER_RESPONSE', calls=1,
+                    input_tokens=input_tokens, output_tokens=output_tokens)
         return validated

@@ -105,7 +105,8 @@ class Dispatcher:
         from .execution_manager import ExecutionManager
         # Generate job_id early for planner token tracking
         job_id = str(uuid4())
-        effective_body = ExecutionManager(self.conn, self.registry).prepare(agent, body, job_id=job_id)
+        manager = ExecutionManager(self.conn, self.registry)
+        effective_body = manager.prepare(agent, body, job_id=job_id)
         if any(step['tool'].startswith('mcp.') for step in effective_body['pipeline']):principal.require('mcp:execute')
         prepared, allowed = self._prepare(agent, effective_body)
         execution = utc(body['execute_at']) if 'execute_at' in body else self.now
@@ -130,6 +131,10 @@ class Dispatcher:
             deliver_not_before=utc(body['deliver_not_before']) if 'deliver_not_before' in body else execution,
             deadline_at=deadline, created_at=self.now, updated_at=self.now)
         self.conn.execute(insert(m.jobs).values(**values))
+        if manager.planner_usage:
+            self.conn.execute(insert(m.usage).values(id=str(uuid4()),
+                owner_id=principal.owner_id, job_id=job_id,
+                created_at=self.now, **manager.planner_usage))
         self.conn.execute(insert(m.events).values(id=str(uuid4()), owner_id=principal.owner_id,
             job_id=job_id, sequence=1, type='CREATED', actor_type=principal.kind,
             actor_id=principal.actor_id, correlation_id=values['correlation_id'], created_at=self.now))
@@ -226,7 +231,16 @@ class Dispatcher:
     def tick(self, batch_size=100):
         if type(batch_size) is not int or not 1 <= batch_size <= 1000:
             raise EngineError('invalid_batch_size')
-        report = {'queued': [], 'failed': [], 'scheduled': [], 'ready_for_delivery': []}
+        report = {'queued': [], 'failed': [], 'scheduled': [], 'ready_for_delivery': [], 'expired_pending': []}
+        # Close stale execution attempts, not the schedule or its latest good result.
+        stale_before = self.now - timedelta(hours=48)
+        stale = self.conn.execute(select(m.jobs).where(
+            m.jobs.c.state.in_(['CREATED', 'SCHEDULED', 'QUEUED']),
+            m.jobs.c.created_at <= stale_before).order_by(m.jobs.c.created_at, m.jobs.c.id)
+            .limit(batch_size).with_for_update(skip_locked=True)).mappings().all()
+        for old_job in stale:
+            self._fail(old_job, 'PENDING_EXPIRED_48H')
+            report['expired_pending'].append(old_job['id'])
         expired = self.conn.execute(select(m.jobs).where(m.jobs.c.state.in_(['CREATED', 'SCHEDULED', 'QUEUED']),
             m.jobs.c.deadline_at <= self.now).order_by(m.jobs.c.deadline_at, m.jobs.c.id)
             .limit(batch_size).with_for_update(skip_locked=True)).mappings().all()
@@ -290,11 +304,14 @@ class Dispatcher:
         except EngineError as error:
             principal = Principal(row['owner_id'], 'SYSTEM', 'dispatcher', SCOPES, True, frozenset())
             agent = locked_agent(self.conn, principal, row['agent_id'])
+            # Advance the slot after a transient failure; never disable the recurring definition.
+            # Keep a bounded error audit and try again at the next normal occurrence.
+            following = next_occurrence(row['definition'], self.now)
             changed = self.conn.execute(update(m.schedules).where(m.schedules.c.id == row['id'],
                 m.schedules.c.owner_id == row['owner_id'], m.schedules.c.revision == row['revision'])
-                .values(enabled=False, next_run_at=None, revision=row['revision']+1)).rowcount
+                .values(next_run_at=following, revision=row['revision']+1)).rowcount
             if changed:
-                audit_agent(self.conn, principal, agent, 'SCHEDULE_PAUSED',
+                audit_agent(self.conn, principal, agent, 'SCHEDULE_RUN_FAILED',
                     {'schedule_id': row['id'], 'reason_code': error.code}, self.now)
 
     def _deliver_informational(self, report, limit):
