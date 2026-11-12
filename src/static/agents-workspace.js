@@ -478,7 +478,7 @@
       check.type = 'checkbox';
       check.name = 'capability';
       check.value = t.id;
-      check.checked = a ? a.capabilities.includes(t.id) : t.id === 'openai.analysis';
+      check.checked = t.provider === 'mcp' ? true : (a ? a.capabilities.includes(t.id) : t.id === 'openai.analysis');
       label.append(check, node('span', names[t.id] || t.id),
         t.id === 'dpia.test.echo' ? node('span', 'Local', 'badge active') :
         t.implementation_status === 'IMPLEMENTED' ? node('span', 'Disponible', 'badge active') : pending());
@@ -486,7 +486,8 @@
       const host = node('div', undefined, 'tool-fields');
       host.hidden = !check.checked;
       toolPanel.append(host);
-      const params = a?.search_parameters?.[t.id] || {},
+      const savedParams = a?.search_parameters?.[t.id];
+      const params = t.provider === 'mcp' && (!savedParams || !Object.keys(savedParams).length) ? (t.parameter_template || {}) : (savedParams || {}),
         controls = [];
       const labels = {
         instructions: 'Instrucciones adicionales',
@@ -1106,9 +1107,13 @@
     function edit(server=null){
       const form=node('form',undefined,'panel'),grid=node('div',undefined,'form-grid');form.append(node('h3',server?'Editar servidor MCP':'Agregar servidor MCP'),grid);
       const name=field(grid,'Nombre MCP','mcp-name','text',server?.name,{required:true,maxLength:150}),description=field(grid,'Descripción MCP','mcp-description','textarea',server?.description,{maxLength:4000}),url=field(grid,'URL HTTPS del MCP','mcp-url','url',server?.endpoint_url,{required:true,maxLength:2048}),auth=field(grid,'Autenticación MCP','mcp-auth','select',server?.auth_type||'none',{values:['none','bearer','header']}),credential=field(grid,'Credencial MCP (vacía conserva la actual)','mcp-credential','password','',{maxLength:8192,autocomplete:'new-password'}),timeout=field(grid,'Timeout MCP (segundos)','mcp-timeout','number',server?.timeout_seconds||15,{min:1,max:120,required:true}),priority=field(grid,'Prioridad MCP','mcp-priority','number',server?.priority??100,{min:-32768,max:32767,required:true});
+      const template=field(grid,'Plantillas JSON por herramienta (nombre MCP → argumentos)','mcp-template','textarea',JSON.stringify(server?.connection_template || {},null,2),{maxLength:65536});
+      template.parentElement.className='full';
       form.append(node('p','Se guarda pausado. El registro prueba la conexión y descubre herramientas, sin invocarlas. Autenticación header utiliza X-API-Key.','help'));const save=node('button','Guardar MCP','primary');save.type='submit';form.append(save,btn('Cancelar',()=>formHost.replaceChildren()));
       form.onsubmit=event=>{event.preventDefault();const body={name:name.value,description:description.value,endpoint_url:url.value,transport:'streamable_http',auth_type:auth.value,enabled:false,timeout_seconds:Number(timeout.value),priority:Number(priority.value)};
         if(credential.value)body.credential=auth.value==='header'?{name:'X-API-Key',value:credential.value}:credential.value;
+        try { body.connection_template=JSON.parse(template.value); if(!body.connection_template || Array.isArray(body.connection_template) || typeof body.connection_template!=='object' || Object.values(body.connection_template).some(v=>!v || Array.isArray(v) || typeof v!=='object')) throw Error(); }
+        catch (_) { status.textContent='La plantilla debe ser un objeto JSON que asocie nombres de herramientas con objetos de argumentos.'; status.className='error'; return; }
         if(server)body.expected_revision=server.revision;
         run(async()=>{await action('/servers'+(server?'/'+server.id:''),server?'PATCH':'POST',body);credential.value='';formHost.replaceChildren();});};formHost.replaceChildren(form);name.focus();
     }

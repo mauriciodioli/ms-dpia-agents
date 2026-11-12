@@ -28,7 +28,7 @@ def access(conn, principal, scope):
 
 def public_server(row):
     return {key:row[key] for key in ('id','name','description','endpoint_url','transport','auth_type','enabled','priority',
-        'timeout_seconds','revision','last_health_status','last_error_code')} | {
+        'timeout_seconds','revision','last_health_status','last_error_code','connection_template')} | {
         'has_credential':bool(row['credential_ciphertext']),
         **{key:iso(row[key]) for key in ('last_checked_at','last_discovered_at','created_at','updated_at','deleted_at')}}
 
@@ -106,7 +106,7 @@ class MCPService:
             return dict(server=public_server(repo.server(identifier,principal)),tools=[public_tool(t) for t in repo.tools(identifier)])
 
     def save(self, principal, body, identifier=None):
-        allowed={'name','description','endpoint_url','transport','auth_type','credential','enabled','timeout_seconds','priority'}
+        allowed={'name','description','endpoint_url','transport','auth_type','credential','enabled','timeout_seconds','priority','connection_template'}
         required={'name','endpoint_url','transport','auth_type','enabled','timeout_seconds','priority'}
         if identifier:allowed|={'expected_revision'};required|={'expected_revision'}
         if set(body)-allowed or required-set(body):raise EngineError('invalid_contract')
@@ -115,6 +115,10 @@ class MCPService:
             or body['transport']!='streamable_http' or body['auth_type'] not in ('none','bearer','header')
             or body['enabled'] is not False or type(body['priority']) is not int or not -32768<=body['priority']<=32767
             or type(body['timeout_seconds']) is not int or not 1<=body['timeout_seconds']<=120):raise EngineError('invalid_contract')
+        template=body.get('connection_template')
+        if template is not None:
+            if not isinstance(template,dict) or len(json.dumps(template))>65536 or any(not isinstance(k,str) or not isinstance(v,dict) for k,v in template.items()):
+                raise EngineError('invalid_contract',422)
         # Configuration changes are saved paused; a successful test/discovery precedes activation.
         url=validate_url(body['endpoint_url'])
         with self.engine.begin() as conn:
@@ -125,7 +129,9 @@ class MCPService:
             if 'credential' in body:credential=self.encrypt(body['auth_type'],body['credential'])
             elif body['auth_type']=='none':credential=None
             elif not previous or previous['auth_type']!=body['auth_type'] or not credential:raise EngineError('mcp_credential_required',422)
-            now=now_utc();values=dict(name=body['name'].strip(),description=body.get('description',''),endpoint_url=url,
+            if 'connection_template' not in body and previous:
+                template=previous['connection_template']
+            now=now_utc();values=dict(connection_template=template,name=body['name'].strip(),description=body.get('description',''),endpoint_url=url,
                 transport='streamable_http',auth_type=body['auth_type'],credential_ciphertext=credential,enabled=False,
                 timeout_seconds=body['timeout_seconds'],priority=body['priority'],last_health_status='UNKNOWN',last_error_code=None,
                 last_checked_at=None,last_discovered_at=None)

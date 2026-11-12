@@ -6,7 +6,7 @@ from .models import metadata as engine_metadata
 metadata = MetaData()
 servers = Table('ae_mcp_servers', metadata,
     Column('id', String(36), primary_key=True), Column('name', String(150), nullable=False),
-    Column('description', Text), Column('endpoint_url', String(2048), nullable=False),
+    Column('description', Text), Column('connection_template', JSON), Column('endpoint_url', String(2048), nullable=False),
     Column('transport', String(32), nullable=False), Column('auth_type', String(32), nullable=False),
     Column('credential_ciphertext', Text), Column('enabled', Boolean, nullable=False),
     Column('priority', SmallInteger, nullable=False), Column('timeout_seconds', SmallInteger, nullable=False),
