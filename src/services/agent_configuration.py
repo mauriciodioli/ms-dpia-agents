@@ -198,7 +198,12 @@ class AgentConfigurationStore:
                 if kind not in desired:conn.execute(update(tareas).where(tareas.c.id==row['id']).values(habilitada=False,actualizado_en=now))
             for kind in sorted(desired):
                 fields=dict(habilitada=True,parametros={'schema_version':1,'scope_ids':config['scopes'],'category_ids':config['categories']},actualizado_en=now)
-                if kind in current:conn.execute(update(tareas).where(tareas.c.id==current[kind]['id']).values(**fields))
+                if kind in current:
+                    # Keep independent task editor settings when saving agent defaults.
+                    previous_params=current[kind]['parametros'] or {}
+                    fields['parametros'].update({key:previous_params[key] for key in
+                        ('_agent_configuration','_configuration_revision') if key in previous_params})
+                    conn.execute(update(tareas).where(tareas.c.id==current[kind]['id']).values(**fields))
                 else:conn.execute(insert(tareas).values(agente_id=agent_id,tipo=kind,creado_en=now,**fields))
             schedule=conn.execute(select(programaciones.c.id).where(programaciones.c.agente_id==agent_id)).first()
             fields=dict(activa=False,frecuencia=FREQUENCIES[config['frequency']],

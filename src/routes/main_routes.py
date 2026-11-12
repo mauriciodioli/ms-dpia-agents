@@ -8,11 +8,13 @@ main_bp = Blueprint("main", __name__)
 @main_bp.get("/agents")
 @main_bp.get("/agents/new")
 @main_bp.get("/agents/<agent_id>/edit")
+@main_bp.get("/agents/<agent_id>/tasks/<int:task_id>/edit")
+@main_bp.get("/administration/agents/<agent_id>/tasks/<int:task_id>/edit")
 @main_bp.get("/schedules")
 @main_bp.get("/executions")
 @main_bp.get("/integrations")
 @main_bp.get("/administration")
-def index(agent_id=None):
+def index(agent_id=None, task_id=None):
     response = make_response(render_template("agents_workspace.html"))
     response.headers['Cache-Control'] = 'no-store'
     response.headers['X-Content-Type-Options'] = 'nosniff'

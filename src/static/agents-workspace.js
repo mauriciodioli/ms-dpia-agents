@@ -43,6 +43,9 @@
     invalid_contract: 'Revisá los campos y los límites de la configuración.',
     invalid_timezone: 'Ingresá una zona horaria IANA válida.',
     agent_not_found: 'El agente no existe o no tenés acceso.',
+    task_not_found: 'La tarea no existe o fue eliminada.',
+    task_agent_mismatch: 'Los vínculos de la tarea requieren revisión.',
+    administrator_session_required: 'Se requiere una sesión de administrador.',
     engine_storage_unavailable: 'El almacenamiento no está disponible. Reintentá en unos momentos.',
     result_not_delivered: 'El resultado todavía no está aprobado y entregado.'
   };
@@ -289,7 +292,17 @@
       dot.dataset.color=p.color;dot.setAttribute('aria-hidden','true');status.append(dot,node('span',p.effective_remaining+' puntos restantes'));
       summary.append(status,node('small','Asignados: '+p.budget+' · Gastados: '+p.budget_consumed+' · Reservados: '+p.budget_reserved));c.append(summary);
     }
-    c.append(bottom);
+    const tasks=node('details',undefined,'configured-task-list'),summary=node('summary','Tareas configuradas'),host=node('div');tasks.append(summary,host);
+    let loaded=false;
+    tasks.addEventListener('toggle',async()=>{
+      if(!tasks.open||loaded)return;loaded=true;host.replaceChildren(node('p','Cargando tareas…','help'));
+      try{const data=await api('/agents/'+a.id+'/configured-tasks');host.replaceChildren();
+        summary.textContent='Tareas configuradas ('+data.items.length+')';
+        if(!data.items.length)host.append(node('p','No hay tareas configuradas.','help'));
+        else table(host,['Tarea'],data.items.map(t=>[link(t.name,'/agents/'+a.id+'/tasks/'+t.id+'/edit','quiet')]));
+      }catch(e){loaded=false;showError(e,host);}
+    });
+    c.append(tasks,bottom);
     return c;
   }
 
@@ -411,11 +424,19 @@
     host.append(wrap);
     return input;
   }
-  async function editor(id) {
-    const a = id ? (await api('/agents/' + encodeURIComponent(id))).agent : null;
-    heading(a ? 'Configurar agente' : 'Crear un agente', a ? 'Guardá cambios sobre la revisión ' + a
-      .revision + '.' : 'Dale un propósito y ajustá sus límites.', link('Volver a mis agentes',
-        '/agents', 'secondary'));
+  async function editor(id, taskId=null, administrative=false) {
+    const taskPath=taskId?(administrative?'/admin':'')+'/agents/'+encodeURIComponent(id)+'/configured-tasks/'+taskId:null;
+    const task=taskPath?(await api(taskPath)).task:null;
+    const a=task?{...task.configuration,id,revision:task.revision,search_parameters:task.configuration.tool_parameters}:
+      id?(await api('/agents/'+encodeURIComponent(id))).agent:null;
+    const tasks=id&&!taskId?(await api('/agents/'+encodeURIComponent(id)+'/configured-tasks')).items:[];
+    const generalOnly=!!a&&!taskId&&tasks.length>0;
+    const back=administrative?'/administration':'/agents';
+    heading(task ? 'Configurar tarea' : a ? 'Configurar agente' : 'Crear un agente', a ? 'Guardá cambios sobre la revisión ' + a
+      .revision + '.' : 'Dale un propósito y ajustá sus límites.', link(administrative?'Volver a Administración':'Volver a mis agentes',
+        back, 'secondary'));
+    if(task)root.append(banner('Configuración independiente de esta tarea. Guardar no ejecuta herramientas ni genera cargos.'));
+    if(tasks.length){const taskSection=node('section',undefined,'panel');taskSection.append(node('h2','Configuración de tareas'));table(taskSection,['Tarea'],tasks.map(t=>[link(t.name,'/agents/'+id+'/tasks/'+t.id+'/edit','quiet')]));root.append(taskSection);}
     const form = node('form');
     form.id = 'agent-form';
     const general = node('section', undefined, 'panel'),
@@ -434,7 +455,7 @@
     field(grid, 'Descripción', 'description', 'textarea', a?.description, {
       maxLength: 1000
     }).parentElement.className = 'full';
-    field(grid, 'Instrucciones del agente', 'instructions', 'textarea', a?.instructions, {
+    field(grid, task ? 'Instrucciones de la tarea' : 'Instrucciones del agente', 'instructions', 'textarea', a?.instructions, {
       required: true,
       maxLength: 8000
     }).parentElement.className = 'full';
@@ -444,7 +465,7 @@
     toolPanel.append(node('legend', '02 · Herramientas y parámetros'), node('p',
       'Seleccioná las herramientas del agente. Para usar APIs, autorizá el agente en Integraciones.', 'help'));
     const selected = [];
-    context.tools.forEach(t => {
+    (generalOnly?[]:context.tools).forEach(t => {
       const label = node('label', undefined, 'tool-choice'),
         check = node('input');
       check.type = 'checkbox';
@@ -618,6 +639,8 @@
         controls
       });
     });
+    toolPanel.hidden=generalOnly;
+    if(generalOnly)toolPanel.querySelectorAll('input,select,textarea').forEach(el=>el.disabled=true);
     form.append(toolPanel);
     const panel = node('section', undefined, 'panel'),
       limitsGrid = node('div', undefined, 'form-grid');
@@ -637,6 +660,8 @@
         step: 1
       }));
     panel.append(limitsGrid);
+    panel.hidden=generalOnly;
+    if(generalOnly)panel.querySelectorAll('input').forEach(el=>el.disabled=true);
     form.append(panel);
     const message = node('p', undefined, 'error');
     message.hidden = true;
@@ -648,14 +673,14 @@
     const actions = node('div', undefined, 'form-actions'),
       save = node('button', a ? 'Guardar cambios' : 'Crear agente', 'primary');
     save.type = 'submit';
-    actions.append(link('Cancelar', '/agents', 'secondary'), save);
+    actions.append(link('Cancelar', back, 'secondary'), save);
     form.append(actions);
     form.onsubmit = async event => {
       event.preventDefault();
       if (save.disabled) return;
       message.hidden = true;
       const chosen = selected.filter(t => t.check.checked);
-      if (!chosen.length) {
+      if (!generalOnly && !chosen.length) {
         message.textContent = 'Elegí al menos una herramienta.';
         message.hidden = false;
         message.focus();
@@ -687,12 +712,13 @@
       if (a) body.expected_revision = a.revision;
       save.disabled = true;
       try {
-        await api(a ? '/agents/' + a.id : '/agents', {
+        const payload=generalOnly?Object.fromEntries(['name','description','instructions','timezone','expected_revision'].map(k=>[k,body[k]])):body;
+        await api(taskPath || (generalOnly?'/agents/'+a.id+'/identity':a ? '/agents/' + a.id : '/agents'), {
           method: a ? 'PATCH' : 'POST',
-          body: JSON.stringify(body)
+          body: JSON.stringify(payload)
         });
         notify(a ? 'Configuración guardada.' : 'Agente creado y deshabilitado.');
-        navigate('/agents');
+        navigate(back);
       } catch (e) {
         if (e.status === 401) {
           render();
@@ -1298,6 +1324,19 @@
       else table(p, headers, rows);
       root.append(p);
     }
+    const taskSection=node('section',undefined,'panel'),taskHost=node('div');
+    taskSection.append(node('h2','Tareas configuradas'),taskHost);root.append(taskSection);
+    let taskCursor=null;
+    const more=btn('Cargar más tareas',loadTasks,'secondary');taskSection.append(more);
+    async function loadTasks(){more.disabled=true;try{
+      const tasks=await api('/admin/configured-tasks?limit=25'+(taskCursor?'&after='+taskCursor:''));
+      if(!tasks.items.length&&!taskCursor)empty(taskHost,'Sin tareas','No hay tareas configuradas.');
+      if(tasks.items.length)table(taskHost,['Tarea'],tasks.items.map(t=>{
+        const cell=node('div');cell.append(link(t.name,'/administration/agents/'+t.agent_id+'/tasks/'+t.id+'/edit','quiet'),node('p',t.agent_name+' · Usuario '+t.owner_id,'help'));return [cell];
+      }));
+      taskCursor=tasks.next_cursor;more.hidden=!taskCursor;
+    }catch(e){showError(e,taskHost);}finally{more.disabled=false;}}
+    await loadTasks();
     root.append(node('p', 'Cada listado muestra hasta ' + data.list_limit + ' registros.', 'help'));
   }
   let googleScript;
@@ -1397,7 +1436,7 @@
     root.setAttribute('aria-busy', 'true');
     document.querySelector('#admin-nav').hidden = true;
     const path = location.pathname,
-      active = path.startsWith('/agents') ? '/agents' : path === '/admin/agents' ? '/administration' :
+      active = path.startsWith('/administration') ? '/administration' : path.startsWith('/agents') ? '/agents' : path === '/admin/agents' ? '/administration' :
       path;
     document.querySelectorAll('nav [data-nav]').forEach(a => {
       if (a.pathname === active) a.setAttribute('aria-current', 'page');
@@ -1416,6 +1455,7 @@
       if (path === '/') await dashboard();
       else if (path === '/agents') await agentsPage();
       else if (path === '/agents/new') await editor();
+      else if (/^\/(administration\/)?agents\/[a-f0-9-]+\/tasks\/\d+\/edit$/.test(path)){const parts=path.split('/');const adminTask=parts[1]==='administration';await editor(parts[adminTask?3:2],parts[adminTask?5:4],adminTask);}
       else if (/^\/agents\/[a-f0-9-]+\/edit$/.test(path)) await editor(path.split('/')[2]);
       else if (path === '/schedules') await schedulesPage();
       else if (path === '/executions') await executionsPage();

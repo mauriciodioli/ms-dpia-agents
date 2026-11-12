@@ -77,3 +77,13 @@ Thumbs.db
 !.github/workflows/
 .github/workflows/*
 !.github/workflows/aws.yml
+
+# Regression tests for configured user task editors.
+!/tests/
+/tests/*
+!/tests/test_configured_tasks.py
+!/tests/test_configured_tasks_ui.py
+
+!/docs/
+/docs/*
+!/docs/configured-tasks.md

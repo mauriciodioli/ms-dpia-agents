@@ -69,6 +69,16 @@ class AgentManager:
         audit_agent(self.conn, self.principal, row, 'AGENT_UPDATED' if previous else 'AGENT_CREATED', definition)
         return ReadRepository(self.conn, self.principal).public_agent(row, configuration=True)
 
+    def save_identity(self, body, agent_id):
+        self.principal.require('agents:write')
+        if not isinstance(body, dict) or set(body) != {'name','description','instructions','timezone','expected_revision'}:
+            raise EngineError('invalid_contract')
+        row = locked_agent(self.conn, self.principal, agent_id)
+        # Reuse the existing validator and persistence/audit path while keeping defaults intact.
+        capabilities = ReadRepository(self.conn, self.principal).public_agent(row, configuration=True)['capabilities']
+        return self.save({**body, 'capabilities':capabilities, 'limits':row['limits'],
+                          'tool_parameters':row['search_parameters']}, agent_id)
+
     def set_enabled(self, agent_id, body, enabled):
         self.principal.require('agents:write')
         validate(REVISION, body)
