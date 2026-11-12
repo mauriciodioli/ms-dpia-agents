@@ -1082,7 +1082,7 @@
   async function mcpSection(){
     const section=node('section',undefined,'panel'),list=node('div'),formHost=node('div'),status=node('p',undefined,'help');
     status.setAttribute('role','status');section.id='mcp-servers';
-    section.append(node('h2','Servidores MCP'),node('p','Conexiones seguras y herramientas autorizadas por agente. Descubrir no ejecuta herramientas.','help'),btn('Agregar servidor MCP',()=>edit()),status,formHost,list);root.append(section);
+    section.append(node('h2','Servidores MCP'),node('p','Catálogo central de herramientas MCP. Los agentes utilizan las herramientas de bajo riesgo habilitadas según las políticas del motor. Descubrir no ejecuta herramientas.','help'),btn('Agregar servidor MCP',()=>edit()),status,formHost,list);root.append(section);
     const action=(path,method,body)=>api('/mcp'+path,{method,body:JSON.stringify(body),headers:{'X-DPIA-Action':'manage-mcp'}});
     let cursor=null,busy=false;
     const more=btn('Cargar más servidores',()=>load(false));section.append(more);
@@ -1096,10 +1096,8 @@
         card.append(actions);const details=node('details'),summary=node('summary','Herramientas y permisos'),host=node('div');details.append(summary,host);card.append(details);list.append(card);
         details.addEventListener('toggle',async()=>{if(!details.open)return;host.replaceChildren(node('p','Cargando herramientas…'));try{const data=await api('/mcp/servers/'+server.id+'/tools');host.replaceChildren();
           for(const tool of data.items){const row=node('section',undefined,'panel'),risk=document.createElement('select');['LOW','MEDIUM','HIGH','CRITICAL'].forEach(value=>{const option=node('option',value);option.value=value;risk.append(option);});risk.value=tool.risk_level;risk.setAttribute('aria-label','Nivel de riesgo de '+tool.tool_name);risk.disabled=!context.session.scopes.includes('mcp:approve');
-            row.append(node('h4',tool.tool_name),node('p',tool.description||'Sin descripción'),node('code',tool.catalog_id),risk,btn(tool.enabled?'Deshabilitar herramienta':'Habilitar herramienta',()=>{if(tool.risk_level==='HIGH'||tool.risk_level==='CRITICAL'){if(!confirm('Esta herramienta tiene riesgo alto. ¿Confirmás habilitarla? Todavía necesitará autorización por agente.'))return;}run(()=>action('/tools/'+tool.id,'PATCH',{expected_revision:data.catalog_version,enabled:!tool.enabled,risk_level:risk.value}));}));
-            const grant=node('form'),agentInput=field(grant,'ID de agente','agent','text','',{required:true,maxLength:36}),ownerInput=field(grant,'ID de propietario','owner','number',context.session.owner_id,{required:true,min:1});ownerInput.readOnly=!context.session.admin;
-            const authorize=node('button','Autorizar agente','secondary');authorize.type='submit';grant.append(authorize,btn('Revocar agente',()=>run(()=>action('/tools/'+tool.id+'/grants/'+encodeURIComponent(agentInput.value),'PUT',{expected_revision:data.catalog_version,enabled:false,owner_id:Number(ownerInput.value),approved:false}))));
-            grant.onsubmit=event=>{event.preventDefault();const sensitive=['HIGH','CRITICAL'].includes(risk.value);if(sensitive&&!confirm('¿Aprobás explícitamente esta herramienta sensible para el agente indicado?'))return;run(()=>action('/tools/'+tool.id+'/grants/'+encodeURIComponent(agentInput.value),'PUT',{expected_revision:data.catalog_version,enabled:true,owner_id:Number(ownerInput.value),approved:sensitive}));};row.append(grant);host.append(row);
+            row.append(node('h4',tool.tool_name),node('p',tool.description||'Sin descripción'),node('code',tool.catalog_id),risk,btn(tool.enabled?'Deshabilitar herramienta':'Habilitar herramienta',()=>{if(tool.risk_level==='HIGH'||tool.risk_level==='CRITICAL'){if(!confirm('Esta herramienta tiene riesgo alto. ¿Confirmás habilitarla? Se aplicarán las políticas de seguridad del motor.'))return;}run(()=>action('/tools/'+tool.id,'PATCH',{expected_revision:data.catalog_version,enabled:!tool.enabled,risk_level:risk.value}));}));
+            host.append(row);
           }
           if(!data.items.length)host.append(node('p','No hay herramientas descubiertas.'));
         }catch(e){host.replaceChildren(node('p',e.message,'error'));}});

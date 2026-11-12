@@ -51,9 +51,10 @@ CLIENT_CREATE = {
 }
 REQUEST_CREATE = {
     '$id': 'urn:dpia:agents:v1:request-create', 'type': 'object', 'additionalProperties': False,
-    'required': ['pipeline', 'instructions', 'limits'],
+    'required': ['limits'], 'anyOf': [{'required':['pipeline','instructions']}, {'required':['objective']}],
     'properties': {
         'instructions': {'type': 'string', 'maxLength': 8000},
+        'objective': {'type':'string','minLength':1,'maxLength':4000},
         'pipeline': {'type': 'array', 'minItems': 1, 'maxItems': 8, 'items': {
             'type': 'object', 'additionalProperties': False, 'required': ['tool', 'parameters'],
             'properties': {'tool': TOOL_ID, 'parameters': {'type': 'object'}},

@@ -1,4 +1,4 @@
-"""MCP persistence; global servers, explicit owner/agent/tool grants."""
+"""MCP persistence; centrally enabled LOW read-only tools, explicit grants for sensitive tools."""
 from uuid import uuid4
 from sqlalchemy import select, insert, update, and_
 from sqlalchemy import inspect
@@ -80,7 +80,8 @@ class MCPRepository:
         if not inspect(self.conn).has_table('ae_mcp_servers'):return []
         q=select(m.tools,m.servers.c.revision.label('server_revision'),m.servers.c.priority).join(m.servers).where(
             m.servers.c.deleted_at.is_(None),m.servers.c.enabled.is_(True),m.tools.c.enabled.is_(True))
-        if owner is not None:q=q.where(select(m.grants.c.tool_id).where(m.grants.c.owner_id==owner,
+        # Central LOW catalog is shared across agents; higher-risk tools still require explicit grants.
+        if owner is not None:q=q.where(((m.tools.c.risk_level=='LOW') & m.tools.c.tool_name.in_(['web_search_exa', 'web_fetch_exa'])) | select(m.grants.c.tool_id).where(m.grants.c.owner_id==owner,
             m.grants.c.tool_id==m.tools.c.id,m.grants.c.enabled.is_(True)).exists())
         return self.conn.execute(q.order_by(m.servers.c.priority,m.tools.c.tool_name)).mappings().all()
 
@@ -91,7 +92,8 @@ class MCPRepository:
         tool=self.tool(tool_uuid,lock=True)
         grant=self.conn.execute(select(m.grants).where(m.grants.c.owner_id==owner,m.grants.c.agent_id==agent_id,
             m.grants.c.tool_id==tool_uuid,m.grants.c.enabled.is_(True)).with_for_update()).mappings().first()
-        if not server['enabled'] or not tool['enabled'] or not grant:raise EngineError('mcp_tool_revoked',403)
+        if not server['enabled'] or not tool['enabled'] or (not (tool['risk_level']=='LOW' and tool['tool_name'] in ('web_search_exa','web_fetch_exa')) and not grant):
+            raise EngineError('mcp_tool_revoked',403)
         return server,tool
 
     def execution(self, identifier, **values):

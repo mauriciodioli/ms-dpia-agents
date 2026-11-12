@@ -44,6 +44,10 @@ class Dispatcher:
         allowed = set(self.conn.execute(select(m.agent_capabilities.c.tool_id).where(
             m.agent_capabilities.c.owner_id == agent['owner_id'],
             m.agent_capabilities.c.agent_id == agent['id'])).scalars())
+        # Centrally enabled LOW MCP tools do not require per-agent capability rows.
+        from .mcp_repository import MCPRepository, tool_id
+        allowed.update(tool_id(row['id']) for row in MCPRepository(self.conn).catalog(agent['owner_id'])
+                       if row['risk_level']=='LOW' and row['tool_name'] in ('web_search_exa','web_fetch_exa'))
         for name, value in body['limits'].items():
             if value > agent['limits'].get(name, 0):
                 raise EngineError('agent_budget_exceeded', 403)
@@ -98,15 +102,18 @@ class Dispatcher:
             return previous, False
         if agent['configuration_state'] != 'ENABLED':
             raise EngineError('agent_disabled', 409)
-        if any(step['tool'].startswith('mcp.') for step in body['pipeline']):principal.require('mcp:execute')
-        prepared, allowed = self._prepare(agent, body)
+        from .execution_manager import ExecutionManager
+        # Generate job_id early for planner token tracking
+        job_id = str(uuid4())
+        effective_body = ExecutionManager(self.conn, self.registry).prepare(agent, body, job_id=job_id)
+        if any(step['tool'].startswith('mcp.') for step in effective_body['pipeline']):principal.require('mcp:execute')
+        prepared, allowed = self._prepare(agent, effective_body)
         execution = utc(body['execute_at']) if 'execute_at' in body else self.now
         if schedule_id is None and 'execute_at' in body and execution < self.now:
             raise EngineError('execution_time_in_past')
         deadline = utc(body['deadline_at']) if 'deadline_at' in body else execution+timedelta(seconds=body['limits']['max_duration_seconds'])
         if deadline <= execution:
             raise EngineError('invalid_deadline')
-        job_id = str(uuid4())
         mcp_versions={}
         for step in prepared['pipeline']:
             if step['tool'].startswith('mcp.'):
@@ -156,8 +163,10 @@ class Dispatcher:
         template = body['request']
         if any(name in template for name in ('execute_at', 'deadline_at', 'deliver_not_before')):
             raise EngineError('recurrence_requires_relative_times')
-        if any(step['tool'].startswith('mcp.') for step in template['pipeline']):principal.require('mcp:execute')
-        self._prepare(agent, template)
+        # Scheduled objective-only requests are planned when their execution becomes due.
+        if 'pipeline' in template:
+            if any(step['tool'].startswith('mcp.') for step in template['pipeline']):principal.require('mcp:execute')
+            self._prepare(agent, template)
         definition = {key: value for key, value in body.items() if key != 'request'}
         due = next_occurrence(definition, self.now)
         delivery_time(definition, due)  # Reject an invalid first delivery date too.

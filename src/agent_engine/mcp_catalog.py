@@ -41,7 +41,7 @@ class LiveRegistry:
         result=dict(self.base.tools)
         for row in rows:
             identifier=tool_id(row['id'])
-            result[identifier]=ToolSpec(identifier,'mcp','mcp',row['input_schema'],'IMPLEMENTED','MCP Streamable HTTP; explicit agent grant required')
+            result[identifier]=ToolSpec(identifier,'mcp','mcp',row['input_schema'],'IMPLEMENTED','MCP Streamable HTTP; centrally enabled LOW tools')
         return result
 
     def validate_step(self,step,allowed):

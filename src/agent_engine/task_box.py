@@ -86,7 +86,17 @@ class TaskBox:
         capability = conn.execute(select(m.agent_capabilities.c.tool_id).where(
             m.agent_capabilities.c.owner_id == job['owner_id'], m.agent_capabilities.c.agent_id == job['agent_id'],
             m.agent_capabilities.c.tool_id == task['tool_id']).with_for_update()).first()
-        if capability is None or task['tool_id'] not in job['configuration_snapshot'].get('capabilities', []):
+        centrally_enabled_mcp = False
+        if task['tool_id'].startswith('mcp.'):
+            from .mcp_catalog import uuid_for_tool
+            from .mcp_repository import MCPRepository
+            try:
+                server, mcp_tool = MCPRepository(conn).authorized(job['owner_id'], job['agent_id'], uuid_for_tool(task['tool_id']))
+                centrally_enabled_mcp = (mcp_tool['risk_level'] == 'LOW' and
+                    mcp_tool['tool_name'] in ('web_search_exa', 'web_fetch_exa'))
+            except EngineError:
+                pass
+        if (capability is None and not centrally_enabled_mcp) or task['tool_id'] not in job['configuration_snapshot'].get('capabilities', []):
             raise EngineError('tool_authorization_revoked', 403)
         registry=self.registry.using(conn) if hasattr(self.registry,'using') else self.registry
         spec = registry.tools.get(task['tool_id'])
