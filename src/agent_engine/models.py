@@ -84,7 +84,8 @@ tool_grants = Table('ae_agent_tool_grants', metadata,
     tenant_ref('agent_id', 'ae_agents'), tenant_ref('connection_id', 'ae_provider_connections'))
 
 schedules = Table('ae_schedules', metadata, *identity(),
-    Column('agent_id', String(36), nullable=False), Column('timezone', String(64), nullable=False),
+    Column('agent_id', String(36), nullable=False), Column('legacy_task_id', BigInteger),
+    Column('timezone', String(64), nullable=False),
     Column('definition', JSON, nullable=False), Column('enabled', Boolean, nullable=False),
     Column('revision', Integer, nullable=False), Column('next_run_at', DateTime),
     Column('created_at', DateTime, nullable=False), tenant_ref('agent_id', 'ae_agents'))
@@ -92,6 +93,7 @@ schedules = Table('ae_schedules', metadata, *identity(),
 jobs = Table('ae_jobs', metadata, *identity(),
     Column('agent_id', String(36), nullable=False), Column('client_id', String(36)),
     Column('schedule_id', String(36)), Column('schedule_slot', DateTime),
+    Column('legacy_task_id', BigInteger),
     Column('idempotency_key', String(128), nullable=False), Column('request_hash', String(64), nullable=False),
     Column('correlation_id', String(36), nullable=False), Column('state', String(32), nullable=False),
     Column('revision', Integer, nullable=False, server_default='1'),

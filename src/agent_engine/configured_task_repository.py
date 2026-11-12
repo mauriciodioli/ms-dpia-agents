@@ -58,3 +58,35 @@ class ConfiguredTaskRepository:
     def lock_owner(self, owner):
         from model.usuario import Usuario
         self.conn.execute(select(Usuario.id).where(Usuario.id == owner).with_for_update()).first()
+
+    def task_schedules(self, agent, task_id):
+        return self.conn.execute(select(m.schedules).where(m.schedules.c.owner_id==agent['owner_id'],
+            m.schedules.c.agent_id==agent['id'],m.schedules.c.legacy_task_id==task_id).with_for_update()).mappings().all()
+
+    def original_schedule(self, agent):
+        if not inspect(self.conn).has_table('agente_programaciones'):
+            return None
+        table=Table('agente_programaciones',MetaData(),autoload_with=self.conn,resolve_fks=False)
+        return self.conn.execute(select(table).where(table.c.agente_id==agent['legacy_agent_id'])).mappings().first()
+
+    def bind_task(self, task, agent, parameters):
+        table=self.table()
+        values={'parametros':parameters}
+        if 'ae_agent_id' in table.c:values['ae_agent_id']=agent['id']
+        self.conn.execute(update(table).where(table.c.id==task['id'],table.c.agente_id==agent['legacy_agent_id']).values(**values))
+
+    def persist_schedule(self, values, previous=None):
+        from sqlalchemy import insert
+        if previous:
+            self.conn.execute(update(m.schedules).where(m.schedules.c.id==previous['id'],
+                m.schedules.c.owner_id==previous['owner_id'],m.schedules.c.revision==previous['revision']).values(**values))
+        else:self.conn.execute(insert(m.schedules).values(**values))
+
+    def retire_general_pwa_schedule(self, agent):
+        from uuid import uuid5, NAMESPACE_URL
+        identifier=str(uuid5(NAMESPACE_URL,'pwa-schedule:'+agent['id']))
+        self.conn.execute(update(m.schedules).where(m.schedules.c.id==identifier,
+            m.schedules.c.owner_id==agent['owner_id'],m.schedules.c.agent_id==agent['id'],
+            m.schedules.c.legacy_task_id.is_(None),
+            (m.schedules.c.enabled.is_(True) | m.schedules.c.next_run_at.is_not(None)))
+            .values(enabled=False,next_run_at=None,revision=m.schedules.c.revision+1))

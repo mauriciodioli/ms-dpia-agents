@@ -36,6 +36,8 @@ def activate_pwa():
     verify_hmac(PATH)
     arguments()
     body = json_body()
+    if body.get('operation')=='sync_task_schedule':
+        return synchronize_task_schedule(body)
     if (set(body) != {'owner_id', 'source_agent_id', 'source_revision', 'agent', 'schedule', 'preferences'}
             or any(type(body[k]) is not int or body[k] < 1 for k in ('owner_id', 'source_agent_id', 'source_revision'))):
         raise EngineError('invalid_contract')
@@ -90,16 +92,12 @@ def activate_pwa():
             audit_agent(conn, principal, row, 'PWA_ACTIVATED', {'fingerprint': fingerprint,
                 'engine_revision': row['revision'], 'source_revision': body['source_revision'],
                 'schedule': body['schedule'], 'preferences': prefs, 'execution_enabled': False})
-        # Stable ID plus the locked agent makes retries/backfill atomic and unique.
-        from uuid import uuid5, NAMESPACE_URL
-        from .auth import now_utc
-        schedule_id = str(uuid5(NAMESPACE_URL, 'pwa-schedule:' + row['id']))
-        if not conn.execute(select(m.schedules.c.id).where(m.schedules.c.id == schedule_id)).scalar_one_or_none():
-            conn.execute(insert(m.schedules).values(id=schedule_id, owner_id=owner, agent_id=row['id'],
-                timezone=body['schedule']['timezone'], definition=body['schedule'], enabled=False,
-                revision=1, next_run_at=None, created_at=now_utc()))
-            audit_agent(conn, principal, row, 'SCHEDULE_CREATED',
-                {'schedule_id': schedule_id, 'enabled': False, 'source': 'PWA'})
+        from .configured_task_repository import ConfiguredTaskRepository
+        from .task_schedules import synchronize
+        legacy_tasks=ConfiguredTaskRepository(conn).rows(row)
+        for task in legacy_tasks:
+            if not (task['parametros'] or {}).get('_deleted_at'):
+                synchronize(conn,principal,row,task['id'],default_schedule=body['schedule'])
         if row['name']!=verified_name:
             conn.execute(update(m.agents).where(m.agents.c.id==row['id'],m.agents.c.owner_id==owner).values(name=verified_name))
             row={**row,'name':verified_name}
@@ -107,3 +105,20 @@ def activate_pwa():
     return {'api_version': 'agents.v1', 'agent': agent, 'owner_id': owner,
             'source_agent_id': body['source_agent_id'], 'source_revision': body['source_revision'],
             'execution_enabled': False}, 200
+
+
+def synchronize_task_schedule(body):
+    if (set(body)!={'operation','owner_id','source_agent_id','task_id'} or
+            any(type(body[key]) is not int or body[key]<1 for key in ('owner_id','source_agent_id','task_id'))):
+        raise EngineError('invalid_contract')
+    with engine().begin() as conn:
+        active_user(conn,body['owner_id'])
+        principal=Principal(body['owner_id'],'PWA_SERVICE','ms202611sb2b',frozenset({'agents:read','agents:write'}),True,frozenset())
+        row=conn.execute(select(m.agents).where(m.agents.c.owner_id==body['owner_id'],
+            m.agents.c.legacy_agent_id==body['source_agent_id']).with_for_update()).mappings().first()
+        if row is None:raise EngineError('agent_not_found',404)
+        row=locked_agent(conn,principal,row['id'])
+        from .task_schedules import synchronize
+        schedule=synchronize(conn,principal,row,body['task_id'])
+    return {'api_version':'agents.v1','owner_id':body['owner_id'],'source_agent_id':body['source_agent_id'],
+            'task_id':body['task_id'],'schedule':schedule,'execution_enabled':False},200

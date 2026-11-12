@@ -102,6 +102,17 @@ class Dispatcher:
             return previous, False
         if agent['configuration_state'] != 'ENABLED':
             raise EngineError('agent_disabled', 409)
+        legacy_task_id=None
+        if schedule_id is not None:
+            schedule=self.conn.execute(select(m.schedules).where(m.schedules.c.id==schedule_id,
+                m.schedules.c.owner_id==principal.owner_id,m.schedules.c.agent_id==agent_id).with_for_update()).mappings().first()
+            if schedule is None:raise EngineError('schedule_not_found',404)
+            legacy_task_id=schedule['legacy_task_id']
+            if legacy_task_id is not None:
+                from .configured_task_repository import ConfiguredTaskRepository
+                tasks=ConfiguredTaskRepository(self.conn).rows(agent,legacy_task_id)
+                if not tasks or not tasks[0]['habilitada'] or (tasks[0]['parametros'] or {}).get('_deleted_at'):
+                    raise EngineError('task_paused',409)
         from .execution_manager import ExecutionManager
         # Generate job_id early for planner token tracking
         job_id = str(uuid4())
@@ -122,7 +133,7 @@ class Dispatcher:
                 mcp_versions[step['tool']]=require_tool(self.conn,agent['owner_id'],agent['id'],step['tool'])[2]
         values = dict(id=job_id, owner_id=principal.owner_id, agent_id=agent_id,
             client_id=principal.actor_id if principal.kind == 'API_CLIENT' else None,
-            schedule_id=schedule_id, schedule_slot=slot, idempotency_key=key, request_hash=fingerprint,
+            schedule_id=schedule_id, schedule_slot=slot, legacy_task_id=legacy_task_id, idempotency_key=key, request_hash=fingerprint,
             correlation_id=str(uuid4()), state='CREATED', revision=1, agent_revision=agent['revision'],
             request_snapshot=prepared, configuration_snapshot={
                 'name': agent['name'], 'instructions': agent['instructions'], 'limits': agent['limits'],
@@ -287,6 +298,13 @@ class Dispatcher:
                 agent=locked_agent(self.conn,principal,row['agent_id'])
                 from .pause_control import pause_state
                 if any(pause_state(self.conn,agent).values()):return
+                if row['legacy_task_id'] is not None:
+                    from .configured_task_repository import ConfiguredTaskRepository
+                    tasks=ConfiguredTaskRepository(self.conn).rows(agent,row['legacy_task_id'])
+                    if not tasks or not tasks[0]['habilitada'] or (tasks[0]['parametros'] or {}).get('_deleted_at'):
+                        self.conn.execute(update(m.schedules).where(m.schedules.c.id==row['id'],
+                            m.schedules.c.owner_id==row['owner_id']).values(enabled=False,next_run_at=None,revision=row['revision']+1))
+                        return
                 following = next_occurrence(row['definition'], self.now)
                 changed = self.conn.execute(update(m.schedules).where(m.schedules.c.id == row['id'],
                     m.schedules.c.owner_id == row['owner_id'], m.schedules.c.revision == row['revision'])
