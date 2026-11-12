@@ -39,18 +39,39 @@ def pwa_history():
             job=repo.job(job_id);agent=repo.agent(job['agent_id'])
             from .owner_identity import owner_email
             name=owner_email(conn,owner) if agent['legacy_agent_id'] is not None else agent['name']
-            return dict(api_version='agents.v1',owner_id=owner,agent_name=name,**result)
+            response=dict(api_version='agents.v1',owner_id=owner,agent_name=name,**result)
+            if job['schedule_id']:
+                current=conn.execute(select(m.schedule_current.c.last_checked_at,
+                    m.schedule_current.c.last_changed_at,m.schedule_current.c.version).where(
+                    m.schedule_current.c.owner_id==owner,
+                    m.schedule_current.c.schedule_id==job['schedule_id'],
+                    m.schedule_current.c.latest_job_id==job_id)).mappings().first()
+                if current:
+                    response.update(last_checked_at=iso(current['last_checked_at']),
+                        last_changed_at=iso(current['last_changed_at']),
+                        schedule_version=current['version'])
+            return response
         offset=body['offset']
         if type(offset) is not int or not 0<=offset<=999999:raise EngineError('invalid_contract')
         # Scan a bounded batch; only lightweight jobs/names are fetched. The result
         # policy is shared with the detail endpoint, including delivery availability.
         candidates=conn.execute(select(m.jobs.c.id,m.jobs.c.agent_id,m.jobs.c.finished_at,m.jobs.c.created_at,
-            m.jobs.c.owner_id,m.jobs.c.revision,m.jobs.c.state,m.jobs.c.deliver_not_before,m.agents.c.name,m.agents.c.legacy_agent_id).join(m.agents,
+            m.jobs.c.owner_id,m.jobs.c.revision,m.jobs.c.state,m.jobs.c.schedule_id,m.jobs.c.deliver_not_before,m.agents.c.name,m.agents.c.legacy_agent_id).join(m.agents,
                 (m.agents.c.id==m.jobs.c.agent_id)&(m.agents.c.owner_id==m.jobs.c.owner_id)).where(
                 m.jobs.c.owner_id==owner,m.jobs.c.state=='DELIVERED',repo.agent_filter())
             .order_by(m.jobs.c.created_at.desc(),m.jobs.c.id).offset(offset).limit(25)).mappings().all()
         items=[]
         for candidate in candidates[:24]:
+            refresh=None
+            if candidate['schedule_id']:
+                refresh=conn.execute(select(m.schedule_current.c.latest_job_id,
+                    m.schedule_current.c.last_checked_at,m.schedule_current.c.last_changed_at,
+                    m.schedule_current.c.version).where(
+                    m.schedule_current.c.owner_id==owner,
+                    m.schedule_current.c.schedule_id==candidate['schedule_id'])).mappings().first()
+                # Only the latest successful scheduled result appears as a history card.
+                if refresh and refresh['latest_job_id']!=candidate['id']:
+                    continue
             try:
                 job,query=repo._delivered_result_query(candidate)
                 result=conn.execute(query.with_only_columns(m.results.c.id,m.results.c.approved_at,
@@ -61,8 +82,13 @@ def pwa_history():
                 raise
             from .owner_identity import owner_email
             name=owner_email(conn,owner) if candidate['legacy_agent_id'] is not None else candidate['name']
-            items.append(dict(operation_id=candidate['id'],agent_id=candidate['agent_id'],agent_name=name,
+            item=dict(operation_id=candidate['id'],agent_id=candidate['agent_id'],agent_name=name,
                 query='Respuesta de Agente',source='agents',state='consumed',product_count=None,
-                created_at=iso(candidate['finished_at'] or candidate['created_at'])))
+                created_at=iso(candidate['finished_at'] or candidate['created_at']))
+            if refresh:
+                item.update(last_checked_at=iso(refresh['last_checked_at']),
+                    last_changed_at=iso(refresh['last_changed_at']),
+                    schedule_version=refresh['version'])
+            items.append(item)
         return dict(api_version='agents.v1',owner_id=owner,operations=items,
             has_more=len(candidates)>24,next_offset=offset+min(24,len(candidates)))
