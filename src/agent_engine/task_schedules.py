@@ -17,10 +17,11 @@ def task_request(task, agent, fallback=None):
                       for tool in configuration['capabilities']])
     context=parameters.get('query_context')
     if context:
-        import json
+        # Publication destination metadata (country, city, scope, category, etc.)
+        # must not influence the planner's search objective. It stays on the task
+        # for the separate DPIA publication stage.
         objective=context.get('prompt') or task['nombre'] or task['tipo']
-        location={key:parameters[key] for key in ('country','city','language','scope_ids','category_ids') if key in parameters}
-        return dict(objective=(objective+'\n'+json.dumps(location,ensure_ascii=False))[:4000],limits=agent['limits'])
+        return dict(objective=objective[:4000],limits=agent['limits'])
     if fallback:return fallback
     if task['tipo']=='PRODUCTOS_NUEVOS':
         return dict(instructions=task['nombre'] or agent['instructions'],limits=agent['limits'],

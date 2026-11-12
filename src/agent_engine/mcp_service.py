@@ -68,6 +68,47 @@ def safe_schema(schema):
     return schema
 
 
+
+def template_from_schema(schema):
+    """Generate editable argument placeholders from discovered MCP inputSchema.
+
+    These are configuration examples, not executable arguments; the planner
+    must replace placeholder values using the current task and prior results.
+    """
+    def sample(node, name, depth=0):
+        if depth > 12 or not isinstance(node, dict):
+            return None
+        if 'const' in node:
+            return node['const']
+        if isinstance(node.get('enum'), list) and node['enum']:
+            return node['enum'][0]
+        if 'default' in node:
+            return node['default']
+        for variant in ('oneOf', 'anyOf'):
+            if isinstance(node.get(variant), list) and node[variant]:
+                return sample(node[variant][0], name, depth+1)
+        kind = node.get('type')
+        if isinstance(kind, list):
+            kind = next((k for k in kind if k != 'null'), 'null')
+        if kind == 'object' or (kind is None and 'properties' in node):
+            props = node.get('properties', {})
+            if not isinstance(props, dict):
+                return {}
+            return {key: sample(value, key, depth+1) for key, value in props.items()}
+        if kind == 'array':
+            # An empty array is a safe template: real URLs/IDs must come from
+            # earlier execution steps, never from a fictitious example URL.
+            return []
+        if kind == 'string':
+            return '{{' + name + '}}'
+        if kind in ('integer', 'number'):
+            return node.get('minimum', 0)
+        if kind == 'boolean':
+            return False
+        return None
+    return sample(schema, 'arguments') or {}
+
+
 class MCPService:
     def __init__(self, engine, config, *, client_factory=MCPClient):
         self.engine,self.config,self.client_factory=engine,config,client_factory
@@ -191,6 +232,17 @@ class MCPService:
                 for name,old in existing.items():
                     if name not in names:
                         repo.change_tool(old['id'],enabled=False);repo.revoke_tool(old['id'])
+                # Fill missing/empty templates automatically from discovery.
+                # Preserve nonempty administrator-defined templates verbatim.
+                templates=dict(current['connection_template'] or {})
+                for definition in result:
+                    name=definition['name']
+                    if not templates.get(name):
+                        templates[name]=template_from_schema(definition['inputSchema'])
+                if len(json.dumps(templates))<=65536:
+                    values['connection_template']=templates
+                else:
+                    raise EngineError('mcp_template_too_large',422)
             current=repo.change_server(current,principal.actor_id,**values)
             repo.event(identifier,principal.actor_id,'TOOLS_DISCOVERED' if discover else 'SERVER_TESTED',reason=error.code if error else None)
             response=dict(server=public_server(current),tools=[public_tool(t) for t in repo.tools(identifier)])
