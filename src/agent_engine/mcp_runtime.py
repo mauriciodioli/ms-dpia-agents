@@ -50,6 +50,13 @@ class MCPHandler:
             summary=clean_text('\n'.join(texts),value,20000) or 'La herramienta MCP devolvió contenido sin representación textual.'
             output=dict(schema_version='agents.result.v1',summary=summary,findings=[],sources=[],
                         warnings=['Respuesta de una herramienta MCP autorizada; costos no informados por el proveedor.'])
+            from .result_presentation import present_result, text_records
+            structured=None
+            if 'structuredContent' in result:
+                try:structured=json.loads(clean_text(json.dumps(result['structuredContent'],ensure_ascii=False),value,200000))
+                except (ValueError,TypeError):pass
+            if not structured:structured=text_records(clean_text('\n'.join(texts),value,200000) or '')
+            output=present_result(output,structured,retrieved_at=iso(now_utc()))
             validate(RESULT,output)
             context.mark_submitted(execution_id)
             with self.engine.begin() as conn:

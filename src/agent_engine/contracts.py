@@ -98,6 +98,14 @@ RESULT = {
     'properties': {
         'schema_version': {'const': 'agents.result.v1'},
         'summary': {'type': 'string', 'maxLength': 20000},
+        'items': {'type':'array','maxItems':100,'items':{'type':'object','additionalProperties':False,
+            'required':['title','url','description'],'properties':{
+                'title':{'type':'string','minLength':1,'maxLength':1000},
+                'url':{'type':'string','maxLength':2000,'format':'uri'},
+                'description':{'type':'string','maxLength':8000},
+                'image':{'type':'string','maxLength':2000,'format':'uri'},
+                **{key:{'type':'string','maxLength':120} for key in ('company','location','published_at')}
+            }}},
         'findings': {'type': 'array', 'maxItems': 100, 'items': {
             'type': 'object', 'additionalProperties': False, 'required': ['text', 'source_ids'],
             'properties': {'text': {'type': 'string', 'maxLength': 8000},

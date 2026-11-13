@@ -146,9 +146,10 @@ class ReadRepository:
             validate(RESULT, row['payload'])
         except EngineError:
             raise EngineError('stored_result_unavailable', 503) from None
+        from .result_presentation import present_result
         return {'job_id': job_id, 'version': row['version'], 'evidence_status': row['evidence_status'],
                 'delivery_kind': 'INFORMATIONAL' if row['approved_at'] is None else 'APPROVED',
-                'result': row['payload']}
+                'result': present_result(row['payload'])}
 
     def events(self, job_id: str, after_sequence: int, limit: int):
         self.job(job_id)
