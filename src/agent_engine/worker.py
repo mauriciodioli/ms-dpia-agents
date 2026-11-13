@@ -1,4 +1,7 @@
 """Generic cooperative worker runtime; provider-specific agents belong to Phase D."""
+import logging
+import traceback
+from pathlib import Path
 from dataclasses import dataclass
 from threading import Event, Thread
 from uuid import uuid4
@@ -127,7 +130,10 @@ class Worker:
                     if deferred.code != 'provider_already_submitted':
                         raise
             try:
-                self.box.failed(lease)  # Safe retries only before external submission.
+                code=error.code if isinstance(error,EngineError) else 'HANDLER_FAILED'
+                frames=[f'{Path(frame.filename).name}:{frame.lineno}:{frame.name}' for frame in traceback.extract_tb(error.__traceback__)]
+                logging.getLogger(__name__).error('Task handler failed job=%s task=%s error_type=%s frames=%s',lease.job_id,lease.task_id,type(error).__name__,frames)
+                self.box.failed(lease,error_code=code)  # Safe retries only before external submission.
             except EngineError as error:
                 if error.code == 'lease_lost':
                     return 'LEASE_LOST'  # Leave PEL entry for reconciliation.

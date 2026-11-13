@@ -5,6 +5,7 @@ No DDL, provider calls or Redis connections. Construction performs no I/O.
 from dataclasses import dataclass
 from datetime import timedelta
 import json
+import re
 from uuid import uuid4
 from sqlalchemy import select, insert, update, func, and_
 from model.usuario import Usuario
@@ -338,7 +339,7 @@ class TaskBox:
                 m.workers.c.current_task_id == lease.task_id).values(
                     current_task_id=None, reported_state='AVAILABLE', heartbeat_at=self.now()))
 
-    def _retry_or_block(self, conn, job, task, *, recovery=False):
+    def _retry_or_block(self, conn, job, task, *, recovery=False, error_code=None):
         uncertain = task['provider_submission_state'] != 'NOT_SUBMITTED'
         if not uncertain and task['attempt_count'] >= self.policy.max_attempts:
             self._fail(conn, job, 'TASK_ATTEMPTS_EXHAUSTED')
@@ -352,7 +353,7 @@ class TaskBox:
         conn.execute(update(m.attempts).where(m.attempts.c.owner_id == task['owner_id'],
             m.attempts.c.task_id == task['id'], m.attempts.c.state == 'RUNNING').values(
                 state='UNCERTAIN' if uncertain else 'RETRYABLE_ERROR',
-                error_code='PROVIDER_CONFIRMATION_REQUIRED' if uncertain else 'LEASE_EXPIRED' if recovery else 'HANDLER_FAILED',
+                error_code='PROVIDER_CONFIRMATION_REQUIRED' if uncertain else 'LEASE_EXPIRED' if recovery else error_code or 'HANDLER_FAILED',
                 finished_at=self.now()))
         conn.execute(update(m.workers).where(m.workers.c.current_task_id == task['id']).values(
             current_task_id=None, reported_state='AVAILABLE'))
@@ -374,10 +375,14 @@ class TaskBox:
                 m.workers.c.current_task_id == lease.task_id).values(current_task_id=None, reported_state='AVAILABLE'))
             self._event(conn, job, 'TASK_INTEGRATION_DEFERRED')
 
-    def failed(self, lease):
+    def failed(self, lease, *, error_code=None):
+        if error_code is not None and (not isinstance(error_code,str) or not re.fullmatch(r'[A-Za-z][A-Za-z0-9_]{0,79}',error_code)):
+            error_code='HANDLER_FAILED'
         with self.engine.begin() as conn:
             job, task = self._owned(conn, lease)
-            self._retry_or_block(conn, job, task)
+            if error_code:
+                conn.execute(update(m.attempts).where(m.attempts.c.owner_id==lease.owner_id,m.attempts.c.id==lease.attempt_id).values(error_code=error_code))
+            self._retry_or_block(conn, job, task, error_code=error_code)
 
     def recover(self, limit=100):
         if type(limit) is not int or not 1 <= limit <= 1000:
