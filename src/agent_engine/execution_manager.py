@@ -32,6 +32,8 @@ class ExecutionManager:
         self.optimized = False
 
     def _plan(self, agent, body, *, permitted_tools=None):
+        from .provider_access import ensure_access
+        ensure_access(self.conn,agent,'openai')
         service = IntegrationService(current_app.extensions.get('agent_engine_engine') or __import__('utils.db', fromlist=['db']).db.engine, current_app.config)
         planner = Planner(self.conn, service=service, registry=self.registry)
         if permitted_tools is not None:
@@ -48,8 +50,18 @@ class ExecutionManager:
             from .dispatcher import validate_request_budget
             validate_request_budget(agent, {'limits':body['limits']})
         if 'pipeline' in body:
+            from .integrations import PROVIDERS
+            from .provider_access import ensure_access
+            selected={step['tool'] for step in body['pipeline']}
+            for provider,spec in PROVIDERS.items():
+                if spec['tool'] in selected:ensure_access(self.conn,agent,provider)
             return body
-        return self._plan(agent, body)
+        result=self._plan(agent, body)
+        from .integrations import PROVIDERS
+        from .provider_access import ensure_access
+        for provider,spec in PROVIDERS.items():
+            if any(step['tool']==spec['tool'] for step in result['pipeline']):ensure_access(self.conn,agent,provider)
+        return result
 
     def finalize(self, agent, body, *, scheduled=False, automatic=False):
         """Called after authorization/schema checks, before any job reaches a worker."""

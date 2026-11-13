@@ -43,7 +43,8 @@ class Planner:
         for identifier, provider, kind, description in (
             ('dpia.amazon.search', 'dpia-scraper', 'product_search', 'Structured Amazon product search with country and prices.'),
             ('openai.analysis', 'openai', 'analysis', 'Analyze and summarize previous step results.')):
-            if identifier not in grants:
+            from .provider_access import can_use
+            if not can_use(self.conn,agent,provider):
                 continue
             row = self.conn.execute(select(integrations).where(integrations.c.id == provider)).mappings().first()
             if row is not None and row['enabled'] and row['credential_ciphertext'] and identifier in self.registry.tools:
@@ -54,6 +55,8 @@ class Planner:
     def plan(self, objective, agent, limits, job_id=None):
         if not isinstance(objective, str) or not 1 <= len(objective.strip()) <= 4000:
             raise EngineError('invalid_objective')
+        from .provider_access import revoked
+        if revoked(self.conn,agent,'openai'):raise EngineError('provider_access_revoked',403)
         tools = self.capabilities(agent)
         if hasattr(self, 'permitted_tools'):
             tools = [tool for tool in tools if tool['id'] in self.permitted_tools]

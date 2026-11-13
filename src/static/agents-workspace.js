@@ -39,6 +39,7 @@
     'dpia.test.echo': 'Prueba interna (sin APIs)'
   };
   const errors = {
+    provider_access_revoked: 'Quitaste el acceso de este agente al proveedor. Podés restablecerlo desde Integraciones.',
     mcp_server_not_found:'El servidor MCP no existe o no tenés acceso.',
     mcp_not_ready:'Probá la conexión y descubrí herramientas antes de activar el MCP.',
     mcp_approval_required:'La herramienta requiere aprobación explícita de un administrador.',
@@ -1167,7 +1168,7 @@
     worker_unavailable: 'Worker no disponible. Revisá su proceso y su última señal.',
     adapter_not_implemented: 'El adaptador requerido no está implementado.',
     integration_disabled: 'La integración está desactivada.',
-    provider_not_authorized: 'Autorizá explícitamente este proveedor para el agente.',
+    provider_not_authorized: 'El proveedor no está disponible para este agente.',
     tool_not_authorized: 'El agente no tiene esta herramienta.',
     agent_budget_exceeded: 'La duración o la extensión solicitadas superan el máximo disponible para este agente.',
     cost_confirmation_required: 'La búsqueda requiere confirmación explícita del posible costo.',
@@ -1214,6 +1215,22 @@
     }
     await load();
   }
+  async function ownProviderAccess() {
+    const panel=node('section',undefined,'panel');panel.append(node('h2','Acceso de mis agentes'),node('p','El acceso es automático. Podés quitarlo por agente y proveedor.'));root.append(panel);
+    for(const [provider,label] of [['openai','OpenAI'],['dpia-scraper','DPIA Scraper']]){
+      try{
+        const data=await api('/integrations/'+provider+'/agents');
+        const group=node('section');group.append(node('h3',label));panel.append(group);
+        for(const agent of data.items){
+          const row=node('div'),description=node('p'),control=btn('',null,'quiet');
+          const draw=()=>{description.textContent=agent.name+' · '+agent.id.slice(0,8)+' · '+(agent.access_revoked?'Acceso quitado':agent.authorized?'Acceso automático':'Acceso automático cuando el servicio esté disponible');control.textContent=agent.access_revoked?'Restablecer acceso':'Quitar acceso';};
+          control.onclick=async()=>{control.disabled=true;try{await api('/integrations/'+provider+'/agents/'+agent.id,{method:'PUT',headers:{'X-DPIA-Action':'manage-integrations'},body:JSON.stringify({authorized:agent.access_revoked,expected_revision:data.integration_revision})});agent.access_revoked=!agent.access_revoked;agent.authorized=!agent.access_revoked&&data.provider_available;draw();}catch(e){notify(e.message);}finally{control.disabled=false;}};
+          draw();row.append(description,control);group.append(row);
+        }
+      }catch(e){showError(e,panel);}
+    }
+  }
+
   async function integrationsPage() {
     heading('Integraciones', 'Configuración, conexión y habilitación independiente de proveedores.');
     const dev = node('section', undefined, 'panel');
@@ -1223,7 +1240,8 @@
     root.append(dev);
     if(context.session.mcp_manage)await mcpSection();
     if (!context.session.admin) {
-      root.append(banner('La administración de integraciones requiere una sesión de administrador.'));
+      await ownProviderAccess();
+      root.append(banner('Las credenciales y la configuración global son administradas por DPIA.'));
       return;
     }
     const data = await api('/integrations');
@@ -1350,31 +1368,24 @@
           } catch (e) { message.textContent = e.message; }
           finally { delete body.credential; saving = false; save.disabled = cancel.disabled = false; }
         };
-        const assignments = node('section'); assignments.append(node('h3', 'Autorizar mis agentes'));
+        const assignments = node('section'); assignments.append(node('h3', 'Acceso de mis agentes'));
         dialog.append(assignments);
         try {
           const agents = (await api('/integrations/' + state.id + '/agents')).items;
           if (!agents.length) assignments.append(node('p', 'No hay agentes propios. Creá uno desde Mis agentes.'));
-          if (!state.credential_present) assignments.append(node('p', 'Guardá primero la credencial para autorizar agentes.'));
+          if (!state.credential_present) assignments.append(node('p', 'El acceso automático estará disponible cuando el servicio esté configurado y habilitado.'));
           for (const agent of agents) {
             const row = node('div'), description = node('p');
-            const updateDescription = () => description.textContent = agent.name + ': ' + (!agent.has_capability ?
-              'falta la herramienta del proveedor.' : agent.authorized ? 'autorizado.' : 'sin autorización.');
-            updateDescription(); row.append(description);
-            if (!agent.has_capability) {
-              row.append(link('Asignar herramienta', '/agents/' + agent.id + '/edit', 'secondary'));
-            } else {
-              const authorize = btn(agent.authorized ? 'Quitar autorización' : 'Autorizar agente', async () => {
-                authorize.disabled = true;
-                try {
-                  await operation(state.id, '/agents/' + agent.id, {authorized: !agent.authorized, expected_revision: state.revision}, 'PUT');
-                  agent.authorized = !agent.authorized; updateDescription();
-                  authorize.textContent = agent.authorized ? 'Quitar autorización' : 'Autorizar agente';
-                } catch (e) { message.textContent = e.message; }
-                finally { authorize.disabled = !state.credential_present; }
-              });
-              authorize.disabled = !state.credential_present; row.append(authorize);
-            }
+            const updateDescription = () => description.textContent = agent.name+' · '+agent.id.slice(0,8)+': '+(agent.access_revoked?'acceso quitado.':agent.authorized?'acceso automático.':'acceso automático cuando el servicio esté disponible.');
+            updateDescription();row.append(description);
+            const authorize=btn(agent.access_revoked?'Restablecer acceso':'Quitar acceso',async()=>{
+              authorize.disabled=true;
+              try{
+                await operation(state.id,'/agents/'+agent.id,{authorized:agent.access_revoked,expected_revision:state.revision},'PUT');
+                agent.access_revoked=!agent.access_revoked;agent.authorized=!agent.access_revoked&&state.enabled&&state.credential_present;updateDescription();
+                authorize.textContent=agent.access_revoked?'Restablecer acceso':'Quitar acceso';
+              }catch(e){message.textContent=e.message;}finally{authorize.disabled=false;}
+            });row.append(authorize);
             assignments.append(row);
           }
         } catch (e) { assignments.append(node('p', e.message)); }
@@ -1386,7 +1397,7 @@
         const agents = (await api('/integrations/dpia-scraper/agents')).items;
         const label = node('label', 'Agente autorizado'), select = node('select'); select.required = true;
         select.append(new Option('Seleccioná un agente', ''));
-        agents.forEach(x => select.append(new Option(x.name + (!x.has_capability ? ' · falta dpia.amazon.search' : !x.authorized ? ' · sin autorización' : !x.enabled ? ' · deshabilitado' : ''), x.id))); label.append(select); form.append(label);
+        agents.forEach(x => select.append(new Option(x.name + (!x.authorized ? ' · acceso quitado o no disponible' : !x.enabled ? ' · deshabilitado' : ''), x.id))); label.append(select); form.append(label);
         const countries = {'argentina':'Argentina','italia':'Italia','espana':'España','polonia':'Polonia','mexico':'México','uruguay':'Uruguay'};
         const countryLabel = node('label', 'País'), country = node('select'); country.required = true;
         for (const key of state.marketplaces.amazon || []) country.append(new Option(countries[key], countries[key]));
@@ -1398,9 +1409,9 @@
         form.append(send, btn('Cancelar', () => dialog.close()));
         let sending = false;
         const selectionMessage = node('p'), editAgent = link('Configurar agente', '/agents', 'secondary');
-        const authorizeAgent = btn('Autorizar agente', async () => {
+        const authorizeAgent = btn('Restablecer acceso', async () => {
           const agent = agents.find(x => x.id === select.value);
-          if (!agent || !agent.has_capability) return;
+          if (!agent) return;
           authorizeAgent.disabled = true; select.disabled = true;
           try {
             await operation(state.id, '/agents/' + agent.id, {authorized: true, expected_revision: state.revision}, 'PUT');
@@ -1413,13 +1424,13 @@
         const updateSelection = () => {
           const agent = agents.find(x => x.id === select.value);
           selectionMessage.textContent = !agents.length ? 'No hay agentes propios. Creá uno con dpia.amazon.search.' :
-            !agent ? 'Seleccioná un agente.' : !agent.has_capability ? 'Asigná dpia.amazon.search desde la configuración del agente.' :
-            !agent.authorized ? 'Este agente necesita autorización explícita para acceder a DPIA Scraper.' :
+            !agent ? 'Seleccioná un agente.' :
+            !agent.authorized ? 'El acceso de este agente está quitado o el proveedor no está disponible.' :
             !agent.enabled ? 'Habilitá el agente desde Mis agentes.' : 'Agente habilitado y autorizado.';
-          authorizeAgent.hidden = !agent || !agent.has_capability || agent.authorized;
-          editAgent.hidden = !agent || (agent.has_capability && agent.enabled);
+          authorizeAgent.hidden = !agent || !agent.access_revoked;
+          editAgent.hidden = !agent || agent.enabled;
           if (agent) editAgent.href = '/agents/' + agent.id + '/edit';
-          send.disabled = sending || !agent || !agent.has_capability || !agent.authorized || !agent.enabled;
+          send.disabled = sending || !agent || !agent.authorized || !agent.enabled;
         };
         select.onchange = updateSelection;
         form.insertBefore(selectionMessage, send); form.insertBefore(authorizeAgent, send); form.insertBefore(editAgent, send);

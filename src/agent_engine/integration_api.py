@@ -53,32 +53,32 @@ def integration_disable(conn, principal, repo, provider):
 
 
 @api.get('/integrations/<provider>/agents')
-@endpoint(admin_only=True)
+@endpoint('agents:read')
 def integration_agents(conn, principal, repo, provider):
     from sqlalchemy import select, and_
     from . import models as m
     from .integrations import provider_spec
     arguments()
     spec = provider_spec(provider)
-    # Assignment stays tenant-scoped: a global administrator does not silently
-    # grant another owner's agents access to a shared paid credential.
+    if principal.kind != 'SESSION':
+        from .errors import EngineError
+        raise EngineError('session_required',403)
+    # Owners can inspect and revoke only their own agents' automatic access.
     rows = conn.execute(select(m.agents).where(m.agents.c.owner_id == principal.owner_id)
         .order_by(m.agents.c.name).limit(100)).mappings().all()
     capable = set(conn.execute(select(m.agent_capabilities.c.agent_id).where(
         m.agent_capabilities.c.owner_id == principal.owner_id,
         m.agent_capabilities.c.tool_id == spec['tool'])).scalars())
-    grants = set(conn.execute(select(m.tool_grants.c.agent_id).join(m.connections, and_(
-        m.connections.c.owner_id == m.tool_grants.c.owner_id,
-        m.connections.c.id == m.tool_grants.c.connection_id)).where(
-            m.tool_grants.c.owner_id == principal.owner_id, m.tool_grants.c.tool_id == spec['tool'],
-            m.connections.c.credential_ref == 'integration:' + provider,
-            m.connections.c.enabled.is_(True))).scalars())
-    return {'items': [{'id': r['id'], 'name': r['name'], 'enabled': r['configuration_state'] == 'ENABLED',
-                       'has_capability': r['id'] in capable, 'authorized': r['id'] in grants} for r in rows]}
+    from .provider_access import can_use,revoked,available
+    state=service().row(conn,provider)
+    return {'integration_revision':state['revision'],'provider_available':available(conn,provider),'items': [{'id': r['id'], 'name': r['name'], 'enabled': r['configuration_state'] == 'ENABLED',
+                       'has_capability': r['id'] in capable, 'authorized': can_use(conn,r,provider),
+                       'access_revoked':revoked(conn,r,provider)} for r in rows]}
+
 
 
 @api.put('/integrations/<provider>/agents/<agent_id>')
-@endpoint(admin_only=True, write=True)
+@endpoint('agents:write', write=True)
 def integration_grant(conn, principal, repo, provider, agent_id):
     from uuid import uuid4, uuid5, NAMESPACE_URL
     from sqlalchemy import select, insert, delete
@@ -99,25 +99,8 @@ def integration_grant(conn, principal, repo, provider, agent_id):
     row = manager.row(conn, provider, lock=True)
     if row['revision'] != expected:
         raise EngineError('revision_conflict', 409)
-    if not conn.execute(select(m.agent_capabilities.c.tool_id).where(
-            m.agent_capabilities.c.owner_id == principal.owner_id,
-            m.agent_capabilities.c.agent_id == agent_id,
-            m.agent_capabilities.c.tool_id == spec['tool'])).first():
-        raise EngineError('tool_not_authorized', 403)
-    conn.execute(delete(m.tool_grants).where(m.tool_grants.c.owner_id == principal.owner_id,
-        m.tool_grants.c.agent_id == agent_id, m.tool_grants.c.tool_id == spec['tool']))
-    if body['authorized']:
-        if not row['credential_ciphertext']:
-            raise EngineError('integration_not_configured', 409)
-        if not conn.execute(select(m.providers.c.id).where(m.providers.c.id == spec['provider'])).first():
-            conn.execute(insert(m.providers).values(id=spec['provider'], kind=spec['capability'],
-                registry_key=spec['tool'], contract_version='v1'))
-        cid = str(uuid5(NAMESPACE_URL, f"agents-integration:{provider}:{principal.owner_id}"))
-        if not conn.execute(select(m.connections.c.id).where(m.connections.c.id == cid)).first():
-            conn.execute(insert(m.connections).values(id=cid, owner_id=principal.owner_id, provider_id=spec['provider'],
-                name=provider, credential_ref='integration:' + provider, enabled=True, created_at=now_utc()))
-        conn.execute(insert(m.tool_grants).values(owner_id=principal.owner_id, agent_id=agent_id,
-            tool_id=spec['tool'], connection_id=cid))
+    from .provider_access import set_access
+    set_access(conn,agent,provider,body['authorized'])
     audit_agent(conn, principal, agent, 'PROVIDER_GRANTED' if body['authorized'] else 'PROVIDER_REVOKED',
                 {'provider': spec['provider']}, now_utc())
     return {'authorized': body['authorized']}

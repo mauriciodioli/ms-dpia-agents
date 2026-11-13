@@ -109,6 +109,10 @@ class TaskBox:
             if expected is None:raise EngineError('mcp_catalog_changed',409)
             require_tool(conn,job['owner_id'],job['agent_id'],task['tool_id'],expected)
             return spec
+        from .integrations import BY_PROVIDER
+        if spec.provider in BY_PROVIDER:
+            from .provider_access import revoked
+            if revoked(conn,agent,BY_PROVIDER[spec.provider]):raise EngineError('provider_access_revoked',403)
         if check_integration:
             from .integrations import require_enabled
             require_enabled(conn, spec.provider)
