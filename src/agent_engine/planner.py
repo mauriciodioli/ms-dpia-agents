@@ -55,6 +55,8 @@ class Planner:
         if not isinstance(objective, str) or not 1 <= len(objective.strip()) <= 4000:
             raise EngineError('invalid_objective')
         tools = self.capabilities(agent)
+        if hasattr(self, 'permitted_tools'):
+            tools = [tool for tool in tools if tool['id'] in self.permitted_tools]
         if not tools:
             raise EngineError('planner_no_available_tools', 409)
         config = self.service.row(self.conn, 'openai')
@@ -72,13 +74,17 @@ class Planner:
         instructions = ('You are the DPIA execution planner. Return only a valid plan in JSON. '
                         'Choose the minimum necessary tools from the supplied catalog. Each parameters_json must be a JSON object encoded as a string matching that tool input schema. '
                         'Steps execute sequentially, and openai.analysis automatically receives earlier results. '
-                        'Do not invent provider capabilities. Never use Amazon to search local businesses. '
+                        'Do not invent provider capabilities or placeholder URLs (example.com, example.org, example.net). '
+                        'Search before reading pages. Only plan a fetch when real URLs are already present in the request; do not invent a binding to a future search result. '
+                        'Never use Amazon to search jobs or local businesses. '
                         'Use web search for general research; product search for Amazon products. '
                         'Use analysis after data gathering only if comparison or synthesis is needed. '
                         'No side effects, purchasing, posting or credential handling. '
                         'Do not assume that a tool can receive previous results as input unless its schema allows it.')
         payload = {'objective':objective,'agent_instructions':agent['instructions'][:4000],
                    'available_tools':tools,'max_steps':max_steps}
+        if hasattr(self, 'task_instructions'):
+            payload['task_instructions'] = self.task_instructions
         body = {'model':config['config']['model'],'store':False,'instructions':instructions,
                 'input':json.dumps(payload,ensure_ascii=False),
                 'max_output_tokens':min(1800,config['config']['max_output_tokens'],limits['max_output_tokens']),

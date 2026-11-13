@@ -62,6 +62,11 @@ class ConfiguredTaskManager:
             if body['expected_revision'] != params.get(REVISION_KEY, 1):
                 raise EngineError('revision_conflict', 409)
             configuration = {key:value for key,value in body.items() if key != 'expected_revision'}
+            from .execution_manager import automatic_request
+            candidate={'limits':configuration['limits'],'pipeline':[{'tool':tool,'parameters':{}} for tool in configuration['capabilities']]}
+            configuration={**configuration,'limits':automatic_request(agent,candidate)['limits']}
+            from .dispatcher import validate_request_budget
+            validate_request_budget(agent, {'limits':configuration['limits']})
             params[CONFIG_KEY] = configuration
             params[REVISION_KEY] = body['expected_revision'] + 1
             self.repository.save(row, name=body['name'].strip(), parameters=params, now=now_utc())

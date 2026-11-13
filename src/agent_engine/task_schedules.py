@@ -64,7 +64,9 @@ def synchronize(conn, principal, agent, task_id, *, default_schedule=None, defau
     request=task_request(task,agent,default_request if task['tipo']=='PRODUCTOS_NUEVOS' else None)
     validate(REQUEST_CREATE,request)
     from .dispatcher import request_hash, validate_request_budget
-    validate_request_budget(agent,request)
+    from .execution_manager import automatic_request
+    request=automatic_request(agent,request)
+    validate_request_budget(agent,{**request,'pipeline':[]})
     definition={**timing,'request':request,'request_hash':request_hash(request),
                 'author':{'kind':'SESSION','actor_id':str(agent['owner_id'])}}
     if managed:definition['configured_task_schedule']=True
@@ -142,7 +144,9 @@ def save_task_schedule(conn, principal, agent, task, command, *, now=None):
     if due is not None:delivery_time(timing,due)
     request = task_request(task,agent)
     validate(REQUEST_CREATE,request)
-    validate_request_budget(agent,request)
+    from .execution_manager import automatic_request
+    request=automatic_request(agent,request)
+    validate_request_budget(agent,{**request,'pipeline':[]})
     if any(step['tool'].startswith('mcp.') for step in request.get('pipeline',[])):
         principal.require('mcp:execute')
     definition = {**timing,'request':request,'request_hash':request_hash(request),

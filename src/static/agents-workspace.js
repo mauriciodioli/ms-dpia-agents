@@ -55,8 +55,10 @@
     task_schedule_conflict:'La tarea tiene varias programaciones vinculadas. Requiere revisión.',
     task_paused:'Activá la tarea antes de habilitar su programación.',
     no_sources_available: 'Ninguna fuente está disponible',
+    planner_no_available_tools: 'No hay conexiones disponibles para preparar la tarea.',
+    planner_openai_not_configured: 'El servicio de planificación no está disponible. Reintentá más tarde.',
     connections_skipped: 'Se omitieron conexiones no disponibles; continúa con las restantes',
-    tool_call_budget_exceeded:'La tarea tiene más pasos de herramientas que el máximo de llamadas permitido. Aumentá ese máximo o seleccioná menos herramientas.',
+    tool_call_budget_exceeded:'El plan anterior excedió el límite de ejecución. El manager prepara automáticamente los nuevos intentos.',
     agent_budget_exceeded:'Los límites de esta tarea superan los límites del agente.',
     execution_time_in_past:'La próxima ejecución debe estar en el futuro.',
     ambiguous_or_nonexistent_local_time:'La hora elegida es ambigua o inexistente por el cambio de horario. Elegí otra hora.',
@@ -210,7 +212,7 @@
         node('p','Próxima ejecución: '+scheduleDate(schedule.next_run_at,schedule.timezone),'help'),
         node('p','Última ejecución: '+scheduleDate(schedule.last_run_at,schedule.timezone),'help'));
       if(schedule.last_failure){const failure=schedule.last_failure;cell.append(node('p',
-        'Intento fallido: '+scheduleDate(failure.at,schedule.timezone)+' · '+(errors[failure.reason_code]||failure.reason_code||'Motivo no disponible')+' · El trabajo no llegó a crearse.','error'));}
+        'Último intento fallido: '+scheduleDate(failure.at,schedule.timezone)+' · '+(errors[failure.reason_code]||failure.reason_code||'Motivo no disponible')+' · El trabajo no llegó a crearse en ese intento.','error'));}
     }
     return cell;
   }
@@ -704,6 +706,7 @@
         max,
         step: 1
       }));
+    if(task){limitsGrid.querySelector('[name="max_tool_calls"]').closest('.field').hidden=true;panel.append(node('p','El manager calcula automáticamente las llamadas necesarias y adapta el plan al límite del servicio.','help'));}
     panel.append(limitsGrid);
     panel.hidden=generalOnly;
     if(generalOnly)panel.querySelectorAll('input').forEach(el=>el.disabled=true);
@@ -800,10 +803,6 @@
           tool_parameters: {}
         };
       Object.keys(limits).forEach(k => body.limits[k] = Number(values.get(k)));
-      if(task&&chosen.length>body.limits.max_tool_calls){
-        message.textContent='Seleccionaste '+chosen.length+' herramientas, pero el máximo de llamadas es '+body.limits.max_tool_calls+'. Aumentá el máximo o seleccioná menos herramientas.';
-        message.hidden=false;message.focus();return;
-      }
       let parameterError=false;
       chosen.forEach(t => {
         const params = {};

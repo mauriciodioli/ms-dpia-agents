@@ -123,20 +123,17 @@ class Dispatcher:
         # Generate job_id early for planner token tracking
         job_id = str(uuid4())
         manager = ExecutionManager(self.conn, self.registry)
-        effective_body = manager.prepare(agent, body, job_id=job_id)
+        automatic = legacy_task_id is not None
+        effective_body = manager.prepare(agent, body, job_id=job_id, automatic=automatic)
         if any(step['tool'].startswith('mcp.') for step in effective_body['pipeline']):principal.require('mcp:execute')
         prepared, allowed = self._prepare(agent, effective_body, check_budget=schedule_id is None)
-        skipped = []
-        no_sources = False
-        if schedule_id is not None:
-            from .connection_preflight import ConnectionPreflight
-            available, skipped = ConnectionPreflight(self.conn, self.registry).prepare(agent, prepared['pipeline'])
-            no_sources = not available
-            # Keep the requested snapshot for an unsuccessful preflight, with no executable tasks.
-            if available:
-                prepared = {**prepared, 'pipeline': available}
-            # Agent limits remain mandatory even when no connection is available.
-            validate_request_budget(agent, {**prepared, 'pipeline': available})
+        prepared = manager.finalize(agent, prepared, scheduled=schedule_id is not None, automatic=automatic)
+        skipped, no_sources = manager.skipped, manager.no_sources
+        if not no_sources:
+            # Revalidate optimized parameters and authorization before persistence.
+            prepared, allowed = self._prepare(agent, prepared)
+        else:
+            validate_request_budget(agent, {**prepared, 'pipeline': []})
         execution = utc(body['execute_at']) if 'execute_at' in body else self.now
         if schedule_id is None and 'execute_at' in body and execution < self.now:
             raise EngineError('execution_time_in_past')
@@ -166,6 +163,10 @@ class Dispatcher:
         self.conn.execute(insert(m.events).values(id=str(uuid4()), owner_id=principal.owner_id,
             job_id=job_id, sequence=1, type='CREATED', actor_type=principal.kind,
             actor_id=principal.actor_id, correlation_id=values['correlation_id'], created_at=self.now))
+        if manager.optimized:
+            audit_agent(self.conn, principal, agent, 'TASK_PLAN_OPTIMIZED', {
+                'job_id':job_id,'legacy_task_id':legacy_task_id,'schedule_id':schedule_id,
+                'planned_calls':len(prepared['pipeline'])}, self.now)
         if skipped:
             audit_agent(self.conn, principal, agent, 'SCHEDULE_CONNECTIONS_CHECKED', {
                 'schedule_id': schedule_id, 'job_id': job_id, 'skipped': skipped,
