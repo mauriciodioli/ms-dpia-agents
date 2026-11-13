@@ -1104,3 +1104,8 @@ button.agent-delete:hover { background:#fce8ec; }
 .agent-point-summary{display:flex;gap:6px;flex-direction:column;margin:12px 0;font-size:13px}.agent-point-status{display:inline-flex;align-items:center;gap:7px}.agent-point-dot{width:9px;height:9px;border-radius:50%;background:#87909c}.agent-point-dot[data-color="green"]{background:#159b61}.agent-point-dot[data-color="yellow"]{background:#d69a00}.agent-point-dot[data-color="red"]{background:#d14444}.agent-point-summary small{opacity:.75}
 
 .schedule-agent-list{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}.schedule-agent-card{min-width:0}.schedule-agent-card>summary{cursor:pointer}.schedule-agent-card>summary p{margin:6px 0}.schedule-agent-card[open]>summary{margin-bottom:18px}
+
+.task-schedule-dialog{width:min(600px,calc(100vw - 32px));padding:28px}.task-schedule-dialog h2{margin:0 0 8px}.task-schedule-dialog form{display:grid;gap:18px;margin-top:20px}
+.schedule-weekdays{border:0;padding:0;margin:0;min-width:0}.schedule-weekdays legend{font-weight:600;margin-bottom:10px}.schedule-weekday-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.schedule-weekday-options label{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer}.schedule-weekday-options label:has(input:checked){border-color:var(--primary,#7952e8);background:#7952e81a}.schedule-weekday-options input{width:18px;height:18px;accent-color:#7952e8;margin:0}.task-schedule-dialog [hidden]{display:none!important}.task-schedule-dialog [role=alert]:empty{display:none}
+@media(max-width:520px){.task-schedule-dialog{padding:22px 18px}.task-schedule-dialog .form-grid{grid-template-columns:1fr}}

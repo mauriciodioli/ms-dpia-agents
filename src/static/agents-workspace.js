@@ -218,32 +218,37 @@
     return cell;
   }
   function editTaskSchedule(host,task,agentId,administrative){
-    if(host.querySelector('form'))return;
+    if(document.querySelector('.task-schedule-dialog'))return;
     const saved=task.schedules?.[0],timing=saved?.configuration||{};
     if(task.schedules?.length>1){host.append(node('p','Hay más de una programación vinculada. No se puede elegir automáticamente.','error'));return;}
-    const form=node('form',undefined,'panel'),grid=node('div',undefined,'form-grid');
+    const dialog=node('dialog',undefined,'task-schedule-dialog'),form=node('form'),grid=node('div',undefined,'form-grid');dialog.setAttribute('aria-label','Editar programación');
     const enabled=field(grid,'Habilitar programación','edit-schedule-enabled','select',saved?.enabled?'Sí':'No',{values:['No','Sí']}),
       frequency=field(grid,'Frecuencia','edit-schedule-frequency','select',timing.frequency||'DAILY',{values:['ONCE','DAILY','WEEKLY']}),
       executionDate=field(grid,'Fecha de ejecución','edit-schedule-date','date',timing.execution_date||''),
-      days=field(grid,'Días de la semana (1=lunes, 7=domingo)','edit-schedule-days','text',(timing.weekdays||[1]).join(',')),
       time=field(grid,'Hora de ejecución','edit-schedule-time','time',timing.execution_time||'09:00',{required:true}),
       zone=field(grid,'Zona horaria','edit-schedule-zone','text',saved?.timezone||'Europe/Rome',{required:true});
+    const days=node('fieldset',undefined,'schedule-weekdays'),choices=node('div',undefined,'schedule-weekday-options'),checks=[];
+    days.append(node('legend','Días de la semana'),choices);
+    ['lunes','martes','miércoles','jueves','viernes','sábado','domingo'].forEach((name,index)=>{const label=node('label'),check=document.createElement('input');check.type='checkbox';check.value=index+1;check.checked=(timing.weekdays||[1]).includes(index+1);label.append(check,node('span',name));choices.append(label);checks.push(check);});
     [...frequency.options].forEach((option,i)=>option.textContent=['Una vez','Diaria','Semanal'][i]);
-    const visibility=()=>{executionDate.parentElement.hidden=frequency.value!=='ONCE';executionDate.required=frequency.value==='ONCE';days.parentElement.hidden=frequency.value!=='WEEKLY';};
+    const visibility=()=>{executionDate.parentElement.hidden=frequency.value!=='ONCE';executionDate.required=frequency.value==='ONCE';days.hidden=frequency.value!=='WEEKLY';};
     frequency.onchange=visibility;visibility();
     const status=node('p');status.setAttribute('role','alert');
     const save=node('button','Guardar programación','primary');save.type='submit';
-    form.append(node('h3','Editar programación'),grid,node('p','La próxima ejecución se calcula con la hora y zona elegidas. Para una fecha concreta, seleccioná Una vez.','help'),status,save,btn('Cancelar',()=>form.remove()));host.append(form);
-    form.onsubmit=async event=>{event.preventDefault();if(save.disabled)return;save.disabled=true;status.textContent='Guardando…';
+    const cancel=btn('Cancelar',()=>dialog.close(),'secondary'),actions=node('div',undefined,'form-actions');actions.append(cancel,save);
+    form.append(grid,days,node('p','La próxima ejecución se calcula con la hora y zona elegidas. Para una fecha concreta, seleccioná Una vez.','help'),status,actions);
+    dialog.append(node('h2','Editar programación'),node('p',task.name,'help'),form);document.body.append(dialog);dialog.showModal();
+    dialog.addEventListener('cancel',event=>{if(save.disabled)event.preventDefault();});dialog.addEventListener('close',()=>{dialog.remove();host.querySelector('button')?.focus();});
+    form.onsubmit=async event=>{event.preventDefault();if(save.disabled)return;if(frequency.value==='WEEKLY'&&!checks.some(check=>check.checked)){status.textContent='Seleccioná al menos un día.';status.className='error';checks[0].focus();return;}save.disabled=true;cancel.disabled=true;status.textContent='Guardando…';
       const command={enabled:enabled.value==='Sí',expected_revision:saved?.revision||0,timezone:zone.value.trim(),frequency:frequency.value,
-        weekdays:frequency.value==='DAILY'?[1,2,3,4,5,6,7]:frequency.value==='WEEKLY'?days.value.split(',').map(v=>Number(v.trim())):[],
-        execution_time:time.value,delivery_time:timing.delivery_time||time.value,dst_policy:'REJECT_AMBIGUOUS_OR_NONEXISTENT'};
+        weekdays:frequency.value==='DAILY'?[1,2,3,4,5,6,7]:frequency.value==='WEEKLY'?checks.filter(check=>check.checked).map(check=>Number(check.value)):[],
+        execution_time:time.value,delivery_time:time.value,dst_policy:'REJECT_AMBIGUOUS_OR_NONEXISTENT'};
       if(frequency.value==='ONCE')command.execution_date=executionDate.value;
       try{const data=await api((administrative?'/admin':'')+'/agents/'+agentId+'/configured-tasks/'+task.id+'/schedule',{
         method:'PATCH',body:JSON.stringify(command)});task.schedules=data.task.schedules;
         host.replaceChildren(...taskScheduleCell(task).childNodes,btn('✎',()=>editTaskSchedule(host,task,agentId,administrative)));
-        host.lastChild.setAttribute('aria-label','Editar programación de '+task.name);
-      }catch(e){status.textContent=e.message;status.className='error';}finally{save.disabled=false;}
+        host.lastChild.setAttribute('aria-label','Editar programación de '+task.name);dialog.close();
+      }catch(e){status.textContent=e.message;status.className='error';}finally{save.disabled=false;cancel.disabled=false;}
     };
   }
   function taskScheduleTable(host,tasks,agentId,administrative=false,editable=true){
@@ -763,7 +768,7 @@
         const c={enabled:enabled.value==='Sí',expected_revision:saved?.revision||0,timezone:zone.value.trim(),
           frequency:frequency.value==='Una vez'?'ONCE':frequency.value==='Diaria'?'DAILY':'WEEKLY',
           weekdays:frequency.value==='Semanal'?[Number(day.value)]:frequency.value==='Diaria'?[1,2,3,4,5,6,7]:[],
-          execution_time:executionTime.value,delivery_time:timing.delivery_time||executionTime.value,dst_policy:'REJECT_AMBIGUOUS_OR_NONEXISTENT'};
+          execution_time:executionTime.value,delivery_time:executionTime.value,dst_policy:'REJECT_AMBIGUOUS_OR_NONEXISTENT'};
         // Preserve multi-day weekly schedules unless the user explicitly changes days/frequency.
         if(c.frequency==='WEEKLY'&&!day.dataset.changed&&!frequency.dataset.changed&&timing.weekdays?.length)c.weekdays=[...timing.weekdays];
         if(c.frequency==='ONCE')c.execution_date=executionDate.value;
