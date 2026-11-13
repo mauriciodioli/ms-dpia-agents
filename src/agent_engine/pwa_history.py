@@ -15,10 +15,14 @@ def informational_metadata(conn, job, result):
     # Same narrow eligibility as informational_delivery, without transferring JSON payloads.
     latest=conn.execute(select(m.results.c.id).where(m.results.c.owner_id==job['owner_id'],
         m.results.c.job_id==job['id']).order_by(m.results.c.version.desc()).limit(1)).scalar_one_or_none()
-    if latest!=result['id'] or result['evidence_status']!='UNVERIFIED':return False
+    from .automatic_task_review import automatic_task
+    automatic=automatic_task(conn,job)
+    if latest!=result['id'] or result['evidence_status'] not in ('UNVERIFIED','SOURCE_REFERENCED'):return False
+    if not automatic and result['evidence_status']!='UNVERIFIED':return False
     tasks=conn.execute(select(m.tasks.c.id,m.tasks.c.tool_id,m.tasks.c.state).where(
         m.tasks.c.owner_id==job['owner_id'],m.tasks.c.job_id==job['id']).order_by(m.tasks.c.position)).mappings().all()
-    if not tasks or any(t['tool_id']!='dpia.amazon.search' or t['state']!='COMPLETED' for t in tasks):return False
+    if not tasks or any(t['state']!='COMPLETED' for t in tasks):return False
+    if not automatic and any(t['tool_id']!='dpia.amazon.search' for t in tasks):return False
     if conn.execute(select(m.reviews.c.id).where(m.reviews.c.owner_id==job['owner_id'],m.reviews.c.job_id==job['id'])).first():return False
     return bool(conn.execute(select(exists().where(m.tasks.c.id==tasks[-1]['id'],
         m.tasks.c.owner_id==job['owner_id'],m.results.c.id==result['id'],
@@ -56,7 +60,7 @@ def pwa_history():
         # Scan a bounded batch; only lightweight jobs/names are fetched. The result
         # policy is shared with the detail endpoint, including delivery availability.
         candidates=conn.execute(select(m.jobs.c.id,m.jobs.c.agent_id,m.jobs.c.finished_at,m.jobs.c.created_at,
-            m.jobs.c.owner_id,m.jobs.c.revision,m.jobs.c.state,m.jobs.c.schedule_id,m.jobs.c.deliver_not_before,m.agents.c.name,m.agents.c.legacy_agent_id).join(m.agents,
+            m.jobs.c.owner_id,m.jobs.c.revision,m.jobs.c.state,m.jobs.c.schedule_id,m.jobs.c.legacy_task_id,m.jobs.c.deliver_not_before,m.agents.c.name,m.agents.c.legacy_agent_id).join(m.agents,
                 (m.agents.c.id==m.jobs.c.agent_id)&(m.agents.c.owner_id==m.jobs.c.owner_id)).where(
                 m.jobs.c.owner_id==owner,m.jobs.c.state=='DELIVERED',repo.agent_filter())
             .order_by(m.jobs.c.created_at.desc(),m.jobs.c.id).offset(offset).limit(25)).mappings().all()
