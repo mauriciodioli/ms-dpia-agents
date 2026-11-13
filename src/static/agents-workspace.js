@@ -706,7 +706,7 @@
         max,
         step: 1
       }));
-    if(task){limitsGrid.querySelector('[name="max_tool_calls"]').closest('.field').hidden=true;panel.append(node('p','El manager calcula automáticamente las llamadas necesarias y adapta el plan al límite del servicio.','help'));}
+    if(task){for(const name of ['max_tool_calls','max_corrections'])limitsGrid.querySelector('[name="'+name+'"]').closest('.field').hidden=true;panel.append(node('p','El manager calcula automáticamente las llamadas necesarias y adapta el plan al límite del servicio.','help'));}
     panel.append(limitsGrid);
     panel.hidden=generalOnly;
     if(generalOnly)panel.querySelectorAll('input').forEach(el=>el.disabled=true);
@@ -1169,7 +1169,7 @@
     integration_disabled: 'La integración está desactivada.',
     provider_not_authorized: 'Autorizá explícitamente este proveedor para el agente.',
     tool_not_authorized: 'El agente no tiene esta herramienta.',
-    agent_budget_exceeded: 'Los límites del agente no alcanzan para esta prueba.',
+    agent_budget_exceeded: 'La duración o la extensión solicitadas superan el máximo disponible para este agente.',
     cost_confirmation_required: 'La búsqueda requiere confirmación explícita del posible costo.',
     revision_conflict: 'La configuración cambió. Actualizá los datos antes de repetir la acción.'
   };

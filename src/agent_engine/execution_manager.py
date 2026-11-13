@@ -14,6 +14,10 @@ def automatic_request(agent, body):
     limits = dict(body['limits'])
     ceiling = agent['limits']['max_tool_calls']
     steps = len(body.get('pipeline', []))
+    limits['max_corrections'] = min(limits['max_corrections'], agent['limits']['max_corrections'])
+    if steps:
+        # Reserve complete correction cycles only when the call ceiling permits them.
+        limits['max_corrections'] = min(limits['max_corrections'], max(0, ceiling // steps - 1))
     needed = steps * (1 + limits['max_corrections']) if steps else ceiling
     limits['max_tool_calls'] = max(1, min(needed, ceiling))
     return {**body, 'limits': limits}

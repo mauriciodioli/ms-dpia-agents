@@ -202,7 +202,7 @@ jobs:
             deploy_process ms202612agents-outbox "$@"
             COMMAND=agent-worker EXTRA='--local-test --capability local-test'
             deploy_process ms202612agents-worker-local "$@"
-            COMMAND=agent-worker EXTRA='--providers --capability search'
+            COMMAND=agent-worker EXTRA='--providers --capability search --capability analysis --capability mcp'
             deploy_process ms202612agents-worker-scraper "$@"
 
             sleep 8
