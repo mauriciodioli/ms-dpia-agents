@@ -6,6 +6,7 @@ from .configured_task_repository import ConfiguredTaskRepository
 from .errors import EngineError
 from .management import locked_agent, audit_agent
 from .tools import default_registry
+from .task_schedules import schedules_for_task, save_task_schedule
 
 CONFIG_KEY = '_agent_configuration'
 REVISION_KEY = '_configuration_revision'
@@ -41,7 +42,7 @@ class ConfiguredTaskManager:
 
     def listing(self, agent_id):
         principal, agent = self.access(agent_id)
-        return [public_task(row, agent_id) for row in self.repository.rows(agent)
+        return [{**public_task(row, agent_id), 'schedules':schedules_for_task(self.conn,agent,row['id'])} for row in self.repository.rows(agent)
                 if not (row['parametros'] or {}).get('_deleted_at')]
 
     def detail(self, agent_id, task_id, *, administrative=False, body=None):
@@ -53,6 +54,9 @@ class ConfiguredTaskManager:
         params = dict(row['parametros'] or {})
         if body is not None:
             self.principal.require('agents:write')
+            schedule = body.get('schedule')
+            if 'schedule' in body and not isinstance(schedule,dict):raise EngineError('invalid_contract')
+            body = {key:value for key,value in body.items() if key != 'schedule'}
             validate(AGENT_UPDATE, body)
             self.registry.validate_agent({key:value for key,value in body.items() if key != 'expected_revision'})
             if body['expected_revision'] != params.get(REVISION_KEY, 1):
@@ -64,11 +68,39 @@ class ConfiguredTaskManager:
             audit_agent(self.conn, self.principal, agent, 'TASK_CONFIGURATION_UPDATED',
                         {'task_id':task_id, 'task_revision':params[REVISION_KEY]})
             row = {**row, 'nombre':body['name'].strip(), 'parametros':params}
+            if schedule is None:
+                # Keep managed schedules' execution snapshots in sync with this task's tools/instructions.
+                from .contracts import SCHEDULE_CREATE
+                existing = self.repository.task_schedules(agent,task_id)
+                if len(existing)==1 and existing[0]['definition'].get('configured_task_schedule'):
+                    current=existing[0]
+                    schedule={key:value for key,value in current['definition'].items() if key in SCHEDULE_CREATE['properties']}
+                    schedule.update(enabled=current['enabled'],expected_revision=current['revision'])
+            if schedule is not None:
+                save_task_schedule(self.conn,principal,agent,row,schedule)
         task = public_task(row, agent_id)
+        task['schedules'] = schedules_for_task(self.conn,agent,task_id)
         task['configuration'] = params.get(CONFIG_KEY) or dict(name=task['name'], description='',
             instructions=agent['instructions'], timezone=agent['timezone'], capabilities=self.repository.capabilities(agent),
             limits=agent['limits'], tool_parameters=agent['search_parameters'])
         return task
+
+    def preview_schedule(self, agent_id, task_id, command, *, administrative=False):
+        from datetime import timezone
+        from zoneinfo import ZoneInfo
+        from .contracts import TASK_SCHEDULE_UPDATE, iso
+        from .scheduling import next_occurrence, delivery_time
+        principal, agent = self.access(agent_id, administrative)
+        rows = self.repository.rows(agent, task_id)
+        if not rows or (rows[0]['parametros'] or {}).get('_deleted_at'):
+            raise EngineError('task_not_found',404)
+        validate(TASK_SCHEDULE_UPDATE,command)
+        due = next_occurrence(command,now_utc())
+        if command['enabled'] and due is None:raise EngineError('execution_time_in_past',422)
+        if due is not None:delivery_time(command,due)
+        due = due if command['enabled'] else None
+        return {'next_run_at':iso(due), 'timezone':command['timezone'],
+                'local_next_run_at':due.replace(tzinfo=timezone.utc).astimezone(ZoneInfo(command['timezone'])).isoformat() if due else None}
 
     def administration(self, limit=25, after=0):
         if self.principal.kind != 'SESSION' or not self.principal.admin:

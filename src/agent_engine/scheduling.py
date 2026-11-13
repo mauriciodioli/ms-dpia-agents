@@ -15,11 +15,15 @@ def local_utc(local: datetime, zone: ZoneInfo) -> datetime:
     return candidates.pop()
 
 
-def next_occurrence(definition: dict, after: datetime) -> datetime:
-    # Convert the 'after' datetime to the local time in the specified timezone, ignoring DST issues for now.
+def next_occurrence(definition: dict, after: datetime) -> datetime | None:
+    # Compare local civil times; local_utc rejects DST gaps and folds.
     zone = ZoneInfo(definition['timezone'])
     local_after = after.replace(tzinfo=timezone.utc).astimezone(zone).replace(tzinfo=None)
     hour, minute = map(int, definition['execution_time'].split(':'))
+    if definition['frequency'] == 'ONCE':
+        local = datetime.fromisoformat(definition['execution_date'] + 'T' + definition['execution_time'])
+        candidate = local_utc(local, zone)
+        return candidate if candidate > after else None
     for offset in range(371):
         date = local_after.date() + timedelta(days=offset)
         if definition['frequency'] == 'WEEKLY' and date.isoweekday() not in definition['weekdays']:

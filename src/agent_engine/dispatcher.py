@@ -4,7 +4,7 @@ from hashlib import sha256
 import json
 import re
 from uuid import uuid4, uuid5, NAMESPACE_URL
-from sqlalchemy import select, insert, update, and_
+from sqlalchemy import or_, select, insert, update, and_
 from model.usuario import Usuario
 from . import models as m
 from .auth import Principal, SCOPES, now_utc
@@ -185,6 +185,7 @@ class Dispatcher:
             self._prepare(agent, template)
         definition = {key: value for key, value in body.items() if key != 'request'}
         due = next_occurrence(definition, self.now)
+        if due is None:raise EngineError('execution_time_in_past',422)
         delivery_time(definition, due)  # Reject an invalid first delivery date too.
         definition.update(request=template, request_hash=fingerprint,
                           author={'kind': principal.kind, 'actor_id': principal.actor_id})
@@ -287,7 +288,10 @@ class Dispatcher:
             except EngineError as error:
                 self._fail(row, error.code)
                 report['failed'].append(row['id'])
+        from .automatic_task_review import review_scheduled_tasks, deliver_reviewed_tasks
+        review_scheduled_tasks(self,report,batch_size)
         self._authorize_deliveries(report, batch_size)
+        deliver_reviewed_tasks(self,report,batch_size)
         self._deliver_informational(report, batch_size)
         return report
 
@@ -308,7 +312,7 @@ class Dispatcher:
                 following = next_occurrence(row['definition'], self.now)
                 changed = self.conn.execute(update(m.schedules).where(m.schedules.c.id == row['id'],
                     m.schedules.c.owner_id == row['owner_id'], m.schedules.c.revision == row['revision'])
-                    .values(next_run_at=following, revision=row['revision']+1)).rowcount
+                    .values(next_run_at=following, enabled=following is not None, revision=row['revision']+1)).rowcount
                 if changed != 1:
                     return
                 slot = row['next_run_at']
@@ -327,7 +331,7 @@ class Dispatcher:
             following = next_occurrence(row['definition'], self.now)
             changed = self.conn.execute(update(m.schedules).where(m.schedules.c.id == row['id'],
                 m.schedules.c.owner_id == row['owner_id'], m.schedules.c.revision == row['revision'])
-                .values(next_run_at=following, revision=row['revision']+1)).rowcount
+                .values(next_run_at=following, enabled=following is not None, revision=row['revision']+1)).rowcount
             if changed:
                 audit_agent(self.conn, principal, agent, 'SCHEDULE_RUN_FAILED',
                     {'schedule_id': row['id'], 'reason_code': error.code}, self.now)
@@ -338,8 +342,10 @@ class Dispatcher:
         rows = self.conn.execute(select(m.jobs).join(Usuario.__table__, Usuario.id == m.jobs.c.owner_id)
             .where(m.jobs.c.state == 'REVIEWING', Usuario.activo.is_(True),
                 (m.jobs.c.deliver_not_before.is_(None) | (m.jobs.c.deliver_not_before <= self.now)),
-                select(m.tasks.c.id).where(m.tasks.c.owner_id == m.jobs.c.owner_id,
-                    m.tasks.c.job_id == m.jobs.c.id, m.tasks.c.tool_id == 'dpia.amazon.search').exists())
+                or_(
+                    (m.jobs.c.schedule_id.is_not(None) & m.jobs.c.legacy_task_id.is_not(None)),
+                    select(m.tasks.c.id).where(m.tasks.c.owner_id == m.jobs.c.owner_id,
+                        m.tasks.c.job_id == m.jobs.c.id, m.tasks.c.tool_id == 'dpia.amazon.search').exists()))
             .order_by(m.jobs.c.priority.desc(), m.jobs.c.id).limit(limit)
             .with_for_update(skip_locked=True)).mappings().all()
         for job in rows:
@@ -374,7 +380,7 @@ class Dispatcher:
 
 
 def public_schedule(row):
-    return {'id': row['id'], 'agent_id': row['agent_id'], 'enabled': row['enabled'],
+    return {'id': row['id'], 'agent_id': row['agent_id'], 'legacy_task_id': row.get('legacy_task_id'), 'enabled': row['enabled'],
             'revision': row['revision'], 'timezone': row['timezone'], 'next_run_at': iso(row['next_run_at']),
             'configuration': {key: value for key, value in row['definition'].items()
                               if key not in ('request_hash', 'author')}}

@@ -52,6 +52,10 @@
     agent_not_found: 'El agente no existe o no tenés acceso.',
     task_not_found: 'La tarea no existe o fue eliminada.',
     task_agent_mismatch: 'Los vínculos de la tarea requieren revisión.',
+    task_schedule_conflict:'La tarea tiene varias programaciones vinculadas. Requiere revisión.',
+    task_paused:'Activá la tarea antes de habilitar su programación.',
+    execution_time_in_past:'La próxima ejecución debe estar en el futuro.',
+    ambiguous_or_nonexistent_local_time:'La hora elegida es ambigua o inexistente por el cambio de horario. Elegí otra hora.',
     administrator_session_required: 'Se requiere una sesión de administrador.',
     engine_storage_unavailable: 'El almacenamiento no está disponible. Reintentá en unos momentos.',
     result_not_delivered: 'El resultado todavía no está aprobado y entregado.'
@@ -186,6 +190,30 @@
     timeStyle: 'short'
   }).format(new Date(v)) : 'Sin fecha';
 
+  function scheduleText(s){
+    const c=s.configuration||{},days=(c.weekdays||[]).map(d=>['','lunes','martes','miércoles','jueves','viernes','sábado','domingo'][d]).join(', ');
+    return (c.frequency==='ONCE'?'Una vez · '+c.execution_date:c.frequency==='DAILY'?'Diaria':'Semanal · '+days)+' · '+(c.execution_time||'')+' · '+s.timezone;
+  }
+  function scheduleDate(value,zone){
+    if(!value)return 'Sin fecha';
+    return new Intl.DateTimeFormat('es',{dateStyle:'medium',timeStyle:'short',timeZone:zone}).format(new Date(value));
+  }
+  function taskScheduleCell(task){
+    const cell=node('div');
+    if(!task.schedules?.length){cell.append(node('p','Sin programación'));return cell;}
+    for(const schedule of task.schedules){
+      cell.append(node('p',schedule.enabled?'Programación habilitada':'Programación deshabilitada'),node('p',scheduleText(schedule),'help'),
+        node('p','Próxima ejecución: '+scheduleDate(schedule.next_run_at,schedule.timezone),'help'),
+        node('p','Última ejecución: '+scheduleDate(schedule.last_run_at,schedule.timezone),'help'));
+    }
+    return cell;
+  }
+  function taskScheduleTable(host,tasks,agentId,administrative=false,editable=true){
+    if(!tasks.length){host.append(node('p','Sin tareas configuradas.'));return;}
+    table(host,['Tarea','Programación'],tasks.map(task=>[
+      editable?link(task.name,(administrative?'/administration':'')+'/agents/'+agentId+'/tasks/'+task.id+'/edit','quiet'):node('span',task.name),taskScheduleCell(task)]));
+  }
+
   function pages(host, prev, next) {
     const row = node('div', undefined, 'pagination');
     if (prev) row.append(btn('Anterior', prev));
@@ -306,7 +334,7 @@
       try{const data=await api('/agents/'+a.id+'/configured-tasks');host.replaceChildren();
         summary.textContent='Tareas configuradas ('+data.items.length+')';
         if(!data.items.length)host.append(node('p','No hay tareas configuradas.','help'));
-        else table(host,['Tarea'],data.items.map(t=>[link(t.name,'/agents/'+a.id+'/tasks/'+t.id+'/edit','quiet')]));
+        else taskScheduleTable(host,data.items,a.id);
       }catch(e){loaded=false;showError(e,host);}
     });
     c.append(tasks,bottom);
@@ -674,6 +702,45 @@
     panel.hidden=generalOnly;
     if(generalOnly)panel.querySelectorAll('input').forEach(el=>el.disabled=true);
     form.append(panel);
+    let scheduleCommand=null;
+    if(task){
+      const section=node('fieldset',undefined,'panel'),grid=node('div',undefined,'form-grid');
+      section.append(node('legend','04 — Programación automática'),node('p','Los resultados se revisan y entregan automáticamente. Los datos sin verificación se muestran como información no verificada.','help'));
+      const saved=task.schedules?.[0],timing=saved?.configuration||{};
+      const enabled=field(grid,'Habilitar programación','schedule-enabled','select',saved?.enabled?'Sí':'No',{values:['No','Sí']}),
+        frequency=field(grid,'Frecuencia','schedule-frequency','select',timing.frequency==='ONCE'?'Una vez':timing.frequency==='DAILY'?'Diaria':'Semanal',{values:['Una vez','Diaria','Semanal']}),
+        day=field(grid,'Día de la semana','schedule-day','select',String(timing.weekdays?.[0]||1),{values:['1','2','3','4','5','6','7']}),
+        executionDate=field(grid,'Fecha de ejecución','schedule-date','date',timing.execution_date||''),
+        executionTime=field(grid,'Hora de ejecución','schedule-time','time',timing.execution_time||'09:00',{required:true}),
+        zone=field(grid,'Zona horaria de ejecución IANA','schedule-timezone','text',saved?.timezone||a.timezone,{required:true,maxLength:64});
+      [...day.options].forEach((option,index)=>{option.textContent=['lunes','martes','miércoles','jueves','viernes','sábado','domingo'][index];});
+      const preview=node('p','Próxima ejecución: '+scheduleDate(saved?.next_run_at,saved?.timezone||a.timezone),'help');preview.setAttribute('role','status');
+      section.append(grid,preview);form.append(section);
+      let dirty=false,sequence=0,timer;
+      function command(){
+        const c={enabled:enabled.value==='Sí',expected_revision:saved?.revision||0,timezone:zone.value.trim(),
+          frequency:frequency.value==='Una vez'?'ONCE':frequency.value==='Diaria'?'DAILY':'WEEKLY',
+          weekdays:frequency.value==='Semanal'?[Number(day.value)]:frequency.value==='Diaria'?[1,2,3,4,5,6,7]:[],
+          execution_time:executionTime.value,delivery_time:timing.delivery_time||executionTime.value,dst_policy:'REJECT_AMBIGUOUS_OR_NONEXISTENT'};
+        // Preserve multi-day weekly schedules unless the user explicitly changes days/frequency.
+        if(c.frequency==='WEEKLY'&&!day.dataset.changed&&!frequency.dataset.changed&&timing.weekdays?.length)c.weekdays=[...timing.weekdays];
+        if(c.frequency==='ONCE')c.execution_date=executionDate.value;
+        return c;
+      }
+      function visibility(){day.parentElement.hidden=frequency.value!=='Semanal';executionDate.parentElement.hidden=frequency.value!=='Una vez';executionDate.required=frequency.value==='Una vez';}
+      async function calculate(){
+        clearTimeout(timer);const serial=++sequence;
+        try{const data=await api(taskPath+'?schedule_preview='+encodeURIComponent(JSON.stringify(command())));
+          if(serial===sequence)preview.textContent='Próxima ejecución: '+scheduleDate(data.preview.next_run_at,zone.value.trim());
+        }catch(e){if(serial===sequence)preview.textContent=e.message;}
+      }
+      for(const input of [enabled,frequency,day,executionDate,executionTime,zone])input.addEventListener('input',()=>{
+        dirty=true;input.dataset.changed='true';visibility();clearTimeout(timer);timer=setTimeout(calculate,300);
+      });
+      section.append(btn('Calcular próxima ejecución',calculate));visibility();
+      scheduleCommand=()=>dirty?command():null;
+      if(task.schedules?.length>1){section.append(banner('Hay más de una programación vinculada. Requiere revisión antes de editar.'));section.querySelectorAll('input,select,button').forEach(input=>input.disabled=true);}
+    }
     const message = node('p', undefined, 'error');
     message.hidden = true;
     message.setAttribute('role', 'alert');
@@ -724,6 +791,7 @@
       });
       if(parameterError){message.textContent='Revisá los parámetros JSON de las herramientas MCP.';message.hidden=false;message.focus();return;}
       if (a) body.expected_revision = a.revision;
+      const timing=scheduleCommand?.();if(timing)body.schedule=timing;
       save.disabled = true;
       try {
         const payload=generalOnly?Object.fromEntries(['name','description','instructions','timezone','expected_revision'].map(k=>[k,body[k]])):body;
@@ -753,10 +821,6 @@
     const list=node('div',undefined,'schedule-agent-list');root.append(list);
     let cursor=null;
     const more=btn('Cargar más agentes',load);root.append(more);
-    function scheduleText(s){
-      const c=s.configuration||{},days=(c.weekdays||[]).map(d=>['','lunes','martes','miércoles','jueves','viernes','sábado','domingo'][d]).join(', ');
-      return (c.frequency==='DAILY'?'Diaria':'Semanal')+' · '+days+' · '+(c.execution_time||'')+' · '+s.timezone;
-    }
     async function load(){
       more.disabled=true;
       try{
@@ -766,7 +830,8 @@
           const card=node('details',undefined,'panel schedule-agent-card'),summary=node('summary');
           summary.append(node('strong',agent.name),node('p','Propietario #'+agent.owner_id,'muted'));
           summary.append(node('p',agent.next_run_at?'Próxima corrida: '+date(agent.next_run_at):'Sin corrida habilitada','help'));
-          agent.schedules.forEach(s=>summary.append(node('p','Horario previsto: '+scheduleText(s)+(s.enabled?'':' · Deshabilitada'),'help')));
+          for(const task of (agent.tasks||[])){summary.append(node('strong',task.name),taskScheduleCell(task));}
+          agent.schedules.filter(s=>s.legacy_task_id==null).forEach(s=>summary.append(node('p','Programación heredada sin tarea asignada: '+scheduleText(s)+(s.enabled?'':' · Deshabilitada'),'help')));
           if(!agent.schedules.length)summary.append(node('p','Sin programaciones','help'));
           card.append(summary);const content=node('div');card.append(content);list.append(card);
           let loaded=false;
@@ -775,8 +840,10 @@
             try{
               const detail=await api('/schedule-view/'+agent.id);content.replaceChildren();
               content.append(node('h3','Programaciones'));
-              if(detail.schedules.length)table(content,['Horario','Estado','Próxima corrida'],detail.schedules.map(s=>[scheduleText(s),s.enabled?'Habilitada':s.preference_only?'Preferencia guardada; ejecución deshabilitada':'Deshabilitada',date(s.next_run_at)]));
-              else content.append(node('p','Sin programaciones registradas.'));
+              taskScheduleTable(content,detail.tasks||[],agent.id,context.session.admin,agent.can_edit!==false);
+              const mapped=new Set((detail.tasks||[]).map(task=>task.id));
+              const legacy=detail.schedules.filter(schedule=>!mapped.has(schedule.legacy_task_id));
+              if(legacy.length){content.append(node('h3','Programaciones heredadas sin asociación inequívoca'));table(content,['Horario','Estado','Próxima ejecución'],legacy.map(s=>[scheduleText(s),s.enabled?'Habilitada':s.preference_only?'Preferencia guardada; ejecución deshabilitada':'Deshabilitada',scheduleDate(s.next_run_at,s.timezone)]));}
               content.append(node('h3','Historial de ejecuciones'));
               if(detail.jobs.length)table(content,['Creada','Estado','Inicio','Finalización'],detail.jobs.map(j=>[date(j.created_at),j.state,date(j.started_at),date(j.finished_at)]));
               else content.append(node('p','Sin ejecuciones.'));

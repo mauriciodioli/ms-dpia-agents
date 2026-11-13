@@ -123,7 +123,7 @@ class ReadRepository:
         delivery_policy = or_(
             and_(m.results.c.approved_at.is_not(None), m.results.c.approved_at <= now_utc(),
                  m.deliveries.c.authorized_at >= m.results.c.approved_at, approved_review),
-            and_(m.results.c.approved_at.is_(None), m.results.c.evidence_status == 'UNVERIFIED',
+            and_(m.results.c.approved_at.is_(None), m.results.c.evidence_status.in_(['UNVERIFIED','SOURCE_REFERENCED']),
                  m.deliveries.c.authorized_at >= m.results.c.created_at, informational_event))
         query = select(m.results).join(m.deliveries, and_(
             m.deliveries.c.owner_id == m.results.c.owner_id,

@@ -17,8 +17,13 @@ def list_configured_tasks(conn, principal, repo, agent_id):
 @endpoint('agents:read', write=True)
 def configured_task(conn, principal, repo, agent_id, task_id):
     from flask import request
-    arguments()
+    arguments(('schedule_preview',) if request.method == 'GET' else ())
     administrative = request.path.startswith('/api/agents/v1/admin/')
+    if 'schedule_preview' in request.args:
+        import json
+        try:command=json.loads(request.args['schedule_preview'])
+        except (ValueError,TypeError):raise EngineError('invalid_contract') from None
+        return {'preview':ConfiguredTaskManager(conn,principal).preview_schedule(identifier(agent_id),task_id,command,administrative=administrative)}
     body = None
     if request.method == 'PATCH':
         engine_write(principal)

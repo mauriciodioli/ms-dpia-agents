@@ -488,6 +488,7 @@ def schedule_view(conn, principal, repo):
     if after:
         query = query.where(m.agents.c.id > identifier(after))
     rows = conn.execute(query.order_by(m.agents.c.id).limit(101)).mappings().all()
+    from .task_schedules import scheduled_tasks
     items = []
     for row in rows[:100]:
         schedules = schedule_view_rows(conn, row)
@@ -496,6 +497,7 @@ def schedule_view(conn, principal, repo):
         items.append(dict(id=row['id'], owner_id=row['owner_id'],
             name=owner_email(conn,row['owner_id']) if row['legacy_agent_id'] is not None else row['name'],
             configuration_state=row['configuration_state'], schedules=schedules,
+            tasks=scheduled_tasks(conn,row),can_edit=principal.admin or row['owner_id']==principal.owner_id,
             next_run_at=upcoming[0] if upcoming else None))
     return dict(items=items, next_cursor=rows[99]['id'] if len(rows)>100 else None)
 
@@ -518,8 +520,9 @@ def schedule_view_detail(conn, principal, repo, agent_id):
         m.jobs.c.owner_id==agent['owner_id']).order_by(m.jobs.c.created_at.desc()).limit(100)).mappings()
     events = conn.execute(select(m.agent_events).where(m.agent_events.c.agent_id==agent_id,
         m.agent_events.c.owner_id==agent['owner_id'],
-        m.agent_events.c.action.in_(['SCHEDULE_CREATED','SCHEDULE_DISABLED','SCHEDULE_PAUSED','PWA_ACTIVATED']))
+        m.agent_events.c.action.in_(['SCHEDULE_CREATED','SCHEDULE_DISABLED','SCHEDULE_PAUSED','PWA_ACTIVATED','TASK_SCHEDULE_CREATED','TASK_SCHEDULE_UPDATED','SCHEDULE_RUN_FAILED','AUTOMATIC_TASK_REVIEW_COMPLETED']))
         .order_by(m.agent_events.c.created_at.desc()).limit(100)).mappings()
-    return dict(schedules=schedule_view_rows(conn,agent), jobs=[public_job(job) for job in jobs],
+    from .task_schedules import scheduled_tasks
+    return dict(tasks=scheduled_tasks(conn,agent), schedules=schedule_view_rows(conn,agent), jobs=[public_job(job) for job in jobs],
         events=[dict(action=e['action'], actor_id=e['actor_id'], actor_type=e['actor_type'],
             created_at=iso(e['created_at'])) for e in events], list_limit=100)

@@ -71,14 +71,21 @@ SCHEDULE_CREATE = {
     'required': ['timezone', 'frequency', 'weekdays', 'execution_time', 'delivery_time', 'dst_policy'],
     'properties': {
         'timezone': {'type': 'string', 'minLength': 1, 'maxLength': 64},
-        'frequency': {'enum': ['DAILY', 'WEEKLY']},
-        'weekdays': {'type': 'array', 'minItems': 1, 'maxItems': 7, 'uniqueItems': True,
+        'frequency': {'enum': ['ONCE', 'DAILY', 'WEEKLY']},
+        'weekdays': {'type': 'array', 'maxItems': 7, 'uniqueItems': True,
                      'items': {'type': 'integer', 'minimum': 1, 'maximum': 7}},
         'execution_time': {'type': 'string', 'pattern': r'^(?:[01][0-9]|2[0-3]):[0-5][0-9]$'},
         'delivery_time': {'type': 'string', 'pattern': r'^(?:[01][0-9]|2[0-3]):[0-5][0-9]$'},
         'dst_policy': {'const': 'REJECT_AMBIGUOUS_OR_NONEXISTENT'},
+        'execution_date': {'type': 'string', 'format': 'date'},
     },
+    'allOf': [{'if': {'properties': {'frequency': {'const': 'ONCE'}}},
+               'then': {'required': ['execution_date'], 'properties': {'weekdays': {'maxItems': 0}}},
+               'else': {'not': {'required': ['execution_date']}, 'properties': {'weekdays': {'minItems': 1}}}}],
 }
+TASK_SCHEDULE_UPDATE = {**SCHEDULE_CREATE, 'required': SCHEDULE_CREATE['required'] + ['enabled','expected_revision'],
+    'properties': {**SCHEDULE_CREATE['properties'], 'enabled': {'type':'boolean'},
+                   'expected_revision': {'type':'integer','minimum':0}}}
 REVISION = {'type': 'object', 'additionalProperties': False, 'required': ['expected_revision'],
             'properties': {'expected_revision': {'type': 'integer', 'minimum': 1}}}
 SCHEDULE_REQUEST = {**SCHEDULE_CREATE, '$id': 'urn:dpia:agents:v1:schedule-request',
