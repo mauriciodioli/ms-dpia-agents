@@ -217,10 +217,42 @@
     }
     return cell;
   }
+  function editTaskSchedule(host,task,agentId,administrative){
+    if(host.querySelector('form'))return;
+    const saved=task.schedules?.[0],timing=saved?.configuration||{};
+    if(task.schedules?.length>1){host.append(node('p','Hay más de una programación vinculada. No se puede elegir automáticamente.','error'));return;}
+    const form=node('form',undefined,'panel'),grid=node('div',undefined,'form-grid');
+    const enabled=field(grid,'Habilitar programación','edit-schedule-enabled','select',saved?.enabled?'Sí':'No',{values:['No','Sí']}),
+      frequency=field(grid,'Frecuencia','edit-schedule-frequency','select',timing.frequency||'DAILY',{values:['ONCE','DAILY','WEEKLY']}),
+      executionDate=field(grid,'Fecha de ejecución','edit-schedule-date','date',timing.execution_date||''),
+      days=field(grid,'Días de la semana (1=lunes, 7=domingo)','edit-schedule-days','text',(timing.weekdays||[1]).join(',')),
+      time=field(grid,'Hora de ejecución','edit-schedule-time','time',timing.execution_time||'09:00',{required:true}),
+      zone=field(grid,'Zona horaria','edit-schedule-zone','text',saved?.timezone||'Europe/Rome',{required:true});
+    [...frequency.options].forEach((option,i)=>option.textContent=['Una vez','Diaria','Semanal'][i]);
+    const visibility=()=>{executionDate.parentElement.hidden=frequency.value!=='ONCE';executionDate.required=frequency.value==='ONCE';days.parentElement.hidden=frequency.value!=='WEEKLY';};
+    frequency.onchange=visibility;visibility();
+    const status=node('p');status.setAttribute('role','alert');
+    const save=node('button','Guardar programación','primary');save.type='submit';
+    form.append(node('h3','Editar programación'),grid,node('p','La próxima ejecución se calcula con la hora y zona elegidas. Para una fecha concreta, seleccioná Una vez.','help'),status,save,btn('Cancelar',()=>form.remove()));host.append(form);
+    form.onsubmit=async event=>{event.preventDefault();if(save.disabled)return;save.disabled=true;status.textContent='Guardando…';
+      const command={enabled:enabled.value==='Sí',expected_revision:saved?.revision||0,timezone:zone.value.trim(),frequency:frequency.value,
+        weekdays:frequency.value==='DAILY'?[1,2,3,4,5,6,7]:frequency.value==='WEEKLY'?days.value.split(',').map(v=>Number(v.trim())):[],
+        execution_time:time.value,delivery_time:timing.delivery_time||time.value,dst_policy:'REJECT_AMBIGUOUS_OR_NONEXISTENT'};
+      if(frequency.value==='ONCE')command.execution_date=executionDate.value;
+      try{const data=await api((administrative?'/admin':'')+'/agents/'+agentId+'/configured-tasks/'+task.id+'/schedule',{
+        method:'PATCH',body:JSON.stringify(command)});task.schedules=data.task.schedules;
+        host.replaceChildren(...taskScheduleCell(task).childNodes,btn('✎',()=>editTaskSchedule(host,task,agentId,administrative)));
+        host.lastChild.setAttribute('aria-label','Editar programación de '+task.name);
+      }catch(e){status.textContent=e.message;status.className='error';}finally{save.disabled=false;}
+    };
+  }
   function taskScheduleTable(host,tasks,agentId,administrative=false,editable=true){
     if(!tasks.length){host.append(node('p','Sin tareas configuradas.'));return;}
-    table(host,['Tarea','Programación'],tasks.map(task=>[
-      editable?link(task.name,(administrative?'/administration':'')+'/agents/'+agentId+'/tasks/'+task.id+'/edit','quiet'):node('span',task.name),taskScheduleCell(task)]));
+    table(host,['Tarea','Programación'],tasks.map(task=>{
+      const cell=taskScheduleCell(task);
+      if(editable){const pencil=btn('✎',()=>editTaskSchedule(cell,task,agentId,administrative));pencil.setAttribute('aria-label','Editar programación de '+task.name);cell.append(pencil);}
+      return [editable?link(task.name,(administrative?'/administration':'')+'/agents/'+agentId+'/tasks/'+task.id+'/edit','quiet'):node('span',task.name),cell];
+    }));
   }
 
   function pages(host, prev, next) {

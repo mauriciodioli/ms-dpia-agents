@@ -53,3 +53,14 @@ def update_identity(conn, principal, repo, agent_id):
     arguments()
     engine_write(principal)
     return {'agent': AgentManager(conn, principal).save_identity(json_body(), identifier(agent_id))}
+
+
+@api.patch('/agents/<agent_id>/configured-tasks/<int:task_id>/schedule')
+@api.patch('/admin/agents/<agent_id>/configured-tasks/<int:task_id>/schedule')
+@endpoint('agents:write', write=True)
+def update_configured_task_schedule(conn, principal, repo, agent_id, task_id):
+    from flask import request
+    arguments()
+    engine_write(principal)
+    return {'task':ConfiguredTaskManager(conn,principal).update_schedule(identifier(agent_id),task_id,json_body(),
+        administrative=request.path.startswith('/api/agents/v1/admin/'))}

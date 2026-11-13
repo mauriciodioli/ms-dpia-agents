@@ -36,7 +36,7 @@ def activate_pwa():
     verify_hmac(PATH)
     arguments()
     body = json_body()
-    if body.get('operation')=='sync_task_schedule':
+    if body.get('operation') in ('sync_task_schedule','update_task_schedule'):
         return synchronize_task_schedule(body)
     if (set(body) != {'owner_id', 'source_agent_id', 'source_revision', 'agent', 'schedule', 'preferences'}
             or any(type(body[k]) is not int or body[k] < 1 for k in ('owner_id', 'source_agent_id', 'source_revision'))):
@@ -108,17 +108,26 @@ def activate_pwa():
 
 
 def synchronize_task_schedule(body):
-    if (set(body)!={'operation','owner_id','source_agent_id','task_id'} or
+    updating=body['operation']=='update_task_schedule'
+    if (set(body)!=({'operation','owner_id','source_agent_id','task_id','schedule'} if updating else {'operation','owner_id','source_agent_id','task_id'}) or
             any(type(body[key]) is not int or body[key]<1 for key in ('owner_id','source_agent_id','task_id'))):
         raise EngineError('invalid_contract')
     with engine().begin() as conn:
         active_user(conn,body['owner_id'])
-        principal=Principal(body['owner_id'],'PWA_SERVICE','ms202611sb2b',frozenset({'agents:read','agents:write'}),True,frozenset())
+        principal=Principal(body['owner_id'],'PWA_SERVICE','ms202611sb2b',frozenset({'agents:read','agents:write','jobs:create','mcp:execute'}),True,frozenset())
+        if updating:
+            from .configured_task_repository import ConfiguredTaskRepository
+            ConfiguredTaskRepository(conn).lock_owner(body['owner_id'])
         row=conn.execute(select(m.agents).where(m.agents.c.owner_id==body['owner_id'],
             m.agents.c.legacy_agent_id==body['source_agent_id']).with_for_update()).mappings().first()
         if row is None:raise EngineError('agent_not_found',404)
         row=locked_agent(conn,principal,row['id'])
         from .task_schedules import synchronize
-        schedule=synchronize(conn,principal,row,body['task_id'])
+        if updating:
+            from .configured_tasks import ConfiguredTaskManager
+            saved=ConfiguredTaskManager(conn,principal).update_schedule(row['id'],body['task_id'],body['schedule'])
+            schedule=saved['schedules'][0]
+        else:
+            schedule=synchronize(conn,principal,row,body['task_id'])
     return {'api_version':'agents.v1','owner_id':body['owner_id'],'source_agent_id':body['source_agent_id'],
             'task_id':body['task_id'],'schedule':schedule,'execution_enabled':False},200

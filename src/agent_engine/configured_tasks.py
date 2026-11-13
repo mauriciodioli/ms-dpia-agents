@@ -90,6 +90,15 @@ class ConfiguredTaskManager:
             limits=agent['limits'], tool_parameters=agent['search_parameters'])
         return task
 
+    def update_schedule(self, agent_id, task_id, command, *, administrative=False):
+        self.principal.require('agents:write')
+        principal, agent = self.access(agent_id, administrative)
+        rows = self.repository.rows(agent, task_id)
+        if not rows or (rows[0]['parametros'] or {}).get('_deleted_at'):
+            raise EngineError('task_not_found',404)
+        save_task_schedule(self.conn,principal,agent,rows[0],command)
+        return {'id':task_id,'schedules':schedules_for_task(self.conn,agent,task_id)}
+
     def preview_schedule(self, agent_id, task_id, command, *, administrative=False):
         from datetime import timezone
         from zoneinfo import ZoneInfo
