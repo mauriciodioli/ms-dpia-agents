@@ -63,7 +63,8 @@ def synchronize(conn, principal, agent, task_id, *, default_schedule=None, defau
     validate(SCHEDULE_CREATE,timing)
     request=task_request(task,agent,default_request if task['tipo']=='PRODUCTOS_NUEVOS' else None)
     validate(REQUEST_CREATE,request)
-    from .dispatcher import request_hash
+    from .dispatcher import request_hash, validate_request_budget
+    validate_request_budget(agent,request)
     definition={**timing,'request':request,'request_hash':request_hash(request),
                 'author':{'kind':'SESSION','actor_id':str(agent['owner_id'])}}
     if managed:definition['configured_task_schedule']=True
@@ -101,7 +102,13 @@ def schedules_for_task(conn, agent, task_id):
         last = conn.execute(select(func.max(m.jobs.c.started_at)).where(
             m.jobs.c.owner_id == agent['owner_id'], m.jobs.c.agent_id == agent['id'],
             m.jobs.c.schedule_id == row['id'], m.jobs.c.legacy_task_id == task_id)).scalar()
-        items.append({**public_schedule(row), 'last_run_at': iso(last)})
+        failure=conn.execute(select(m.agent_events.c.created_at,m.agent_events.c.details).where(
+            m.agent_events.c.owner_id==agent['owner_id'],m.agent_events.c.agent_id==agent['id'],
+            m.agent_events.c.action=='SCHEDULE_RUN_FAILED',
+            m.agent_events.c.details['schedule_id'].as_string()==row['id'])
+            .order_by(m.agent_events.c.created_at.desc(),m.agent_events.c.id.desc()).limit(1)).mappings().first()
+        items.append({**public_schedule(row), 'last_run_at': iso(last),
+            'last_failure':{'at':iso(failure['created_at']),'reason_code':(failure['details'] or {}).get('reason_code')} if failure else None})
     return items
 
 
@@ -115,7 +122,7 @@ def scheduled_tasks(conn, agent):
 def save_task_schedule(conn, principal, agent, task, command, *, now=None):
     """Edit one task's schedule with existing persistence, request and time services."""
     from .contracts import TASK_SCHEDULE_UPDATE
-    from .dispatcher import request_hash
+    from .dispatcher import request_hash, validate_request_budget
     validate(TASK_SCHEDULE_UPDATE, command)
     principal.require('jobs:create')
     repo = ConfiguredTaskRepository(conn)
@@ -135,6 +142,7 @@ def save_task_schedule(conn, principal, agent, task, command, *, now=None):
     if due is not None:delivery_time(timing,due)
     request = task_request(task,agent)
     validate(REQUEST_CREATE,request)
+    validate_request_budget(agent,request)
     if any(step['tool'].startswith('mcp.') for step in request.get('pipeline',[])):
         principal.require('mcp:execute')
     definition = {**timing,'request':request,'request_hash':request_hash(request),

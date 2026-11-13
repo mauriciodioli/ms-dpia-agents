@@ -1,4 +1,4 @@
-"""Transactional Dispatcher. Produces MySQL outbox records, never provider calls."""
+"""Transactional Dispatcher with read-only scheduled connection preflight."""
 from datetime import timedelta
 from hashlib import sha256
 import json
@@ -31,13 +31,22 @@ def idempotency_key(value):
     return value
 
 
+def validate_request_budget(agent, body):
+    """Shared preflight for saved schedules and dispatch; never invokes tools."""
+    for name, value in body['limits'].items():
+        if value > agent['limits'].get(name, 0):
+            raise EngineError('agent_budget_exceeded', 403)
+    if 'pipeline' in body and len(body['pipeline']) > body['limits']['max_tool_calls']:
+        raise EngineError('tool_call_budget_exceeded')
+
+
 class Dispatcher:
     def __init__(self, conn, *, now=None, registry=None):
         self.conn = conn
         self.now = now or now_utc()
         self.registry = registry or default_registry(conn=conn)
 
-    def _prepare(self, agent, body):
+    def _prepare(self, agent, body, *, check_budget=True):
         from .pause_control import require_unpaused
         require_unpaused(self.conn, agent)
         validate(REQUEST_CREATE, body)
@@ -48,11 +57,8 @@ class Dispatcher:
         from .mcp_repository import MCPRepository, tool_id
         allowed.update(tool_id(row['id']) for row in MCPRepository(self.conn).catalog(agent['owner_id'])
                        if row['risk_level']=='LOW' and row['tool_name'] in ('web_search_exa','web_fetch_exa'))
-        for name, value in body['limits'].items():
-            if value > agent['limits'].get(name, 0):
-                raise EngineError('agent_budget_exceeded', 403)
-        if len(body['pipeline']) > body['limits']['max_tool_calls']:
-            raise EngineError('tool_call_budget_exceeded')
+        if check_budget:
+            validate_request_budget(agent,body)
         pipeline = []
         for step in body['pipeline']:
             effective = {'tool': step['tool'], 'parameters': {
@@ -119,7 +125,18 @@ class Dispatcher:
         manager = ExecutionManager(self.conn, self.registry)
         effective_body = manager.prepare(agent, body, job_id=job_id)
         if any(step['tool'].startswith('mcp.') for step in effective_body['pipeline']):principal.require('mcp:execute')
-        prepared, allowed = self._prepare(agent, effective_body)
+        prepared, allowed = self._prepare(agent, effective_body, check_budget=schedule_id is None)
+        skipped = []
+        no_sources = False
+        if schedule_id is not None:
+            from .connection_preflight import ConnectionPreflight
+            available, skipped = ConnectionPreflight(self.conn, self.registry).prepare(agent, prepared['pipeline'])
+            no_sources = not available
+            # Keep the requested snapshot for an unsuccessful preflight, with no executable tasks.
+            if available:
+                prepared = {**prepared, 'pipeline': available}
+            # Agent limits remain mandatory even when no connection is available.
+            validate_request_budget(agent, {**prepared, 'pipeline': available})
         execution = utc(body['execute_at']) if 'execute_at' in body else self.now
         if schedule_id is None and 'execute_at' in body and execution < self.now:
             raise EngineError('execution_time_in_past')
@@ -149,11 +166,18 @@ class Dispatcher:
         self.conn.execute(insert(m.events).values(id=str(uuid4()), owner_id=principal.owner_id,
             job_id=job_id, sequence=1, type='CREATED', actor_type=principal.kind,
             actor_id=principal.actor_id, correlation_id=values['correlation_id'], created_at=self.now))
-        for position, step in enumerate(prepared['pipeline']):
+        if skipped:
+            audit_agent(self.conn, principal, agent, 'SCHEDULE_CONNECTIONS_CHECKED', {
+                'schedule_id': schedule_id, 'job_id': job_id, 'skipped': skipped,
+                'reason_code': 'no_sources_available' if no_sources else 'connections_skipped',
+                'available_tools': [] if no_sources else [step['tool'] for step in prepared['pipeline']]}, self.now)
+        for position, step in enumerate([] if no_sources else prepared['pipeline']):
             self.conn.execute(insert(m.tasks).values(id=str(uuid4()), owner_id=principal.owner_id,
                 job_id=job_id, position=position, tool_id=step['tool'],
                 state='PENDING' if position == 0 else 'WAITING_DEPENDENCY', input_snapshot=step))
-        if deadline <= self.now:
+        if no_sources:
+            self._fail(values, 'no_sources_available')
+        elif deadline <= self.now:
             self._fail(values)
         elif execution <= self.now and schedule_id is None:
             self._queue(values)
@@ -334,7 +358,7 @@ class Dispatcher:
                 .values(next_run_at=following, enabled=following is not None, revision=row['revision']+1)).rowcount
             if changed:
                 audit_agent(self.conn, principal, agent, 'SCHEDULE_RUN_FAILED',
-                    {'schedule_id': row['id'], 'reason_code': error.code}, self.now)
+                    {'schedule_id': row['id'], 'legacy_task_id':row['legacy_task_id'], 'schedule_slot':iso(row['next_run_at']), 'reason_code': error.code}, self.now)
 
     def _deliver_informational(self, report, limit):
         from .informational_delivery import REASON, eligible_result

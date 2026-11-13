@@ -54,6 +54,10 @@
     task_agent_mismatch: 'Los vínculos de la tarea requieren revisión.',
     task_schedule_conflict:'La tarea tiene varias programaciones vinculadas. Requiere revisión.',
     task_paused:'Activá la tarea antes de habilitar su programación.',
+    no_sources_available: 'Ninguna fuente está disponible',
+    connections_skipped: 'Se omitieron conexiones no disponibles; continúa con las restantes',
+    tool_call_budget_exceeded:'La tarea tiene más pasos de herramientas que el máximo de llamadas permitido. Aumentá ese máximo o seleccioná menos herramientas.',
+    agent_budget_exceeded:'Los límites de esta tarea superan los límites del agente.',
     execution_time_in_past:'La próxima ejecución debe estar en el futuro.',
     ambiguous_or_nonexistent_local_time:'La hora elegida es ambigua o inexistente por el cambio de horario. Elegí otra hora.',
     administrator_session_required: 'Se requiere una sesión de administrador.',
@@ -205,6 +209,8 @@
       cell.append(node('p',schedule.enabled?'Programación habilitada':'Programación deshabilitada'),node('p',scheduleText(schedule),'help'),
         node('p','Próxima ejecución: '+scheduleDate(schedule.next_run_at,schedule.timezone),'help'),
         node('p','Última ejecución: '+scheduleDate(schedule.last_run_at,schedule.timezone),'help'));
+      if(schedule.last_failure){const failure=schedule.last_failure;cell.append(node('p',
+        'Intento fallido: '+scheduleDate(failure.at,schedule.timezone)+' · '+(errors[failure.reason_code]||failure.reason_code||'Motivo no disponible')+' · El trabajo no llegó a crearse.','error'));}
     }
     return cell;
   }
@@ -714,7 +720,7 @@
         executionTime=field(grid,'Hora de ejecución','schedule-time','time',timing.execution_time||'09:00',{required:true}),
         zone=field(grid,'Zona horaria de ejecución IANA','schedule-timezone','text',saved?.timezone||a.timezone,{required:true,maxLength:64});
       [...day.options].forEach((option,index)=>{option.textContent=['lunes','martes','miércoles','jueves','viernes','sábado','domingo'][index];});
-      const preview=node('p','Próxima ejecución: '+scheduleDate(saved?.next_run_at,saved?.timezone||a.timezone),'help');preview.setAttribute('role','status');
+      const preview=node('p','Próxima ejecución: '+scheduleDate(saved?.next_run_at,saved?.timezone||a.timezone),'help');preview.setAttribute('role','status');preview.setAttribute('aria-live','polite');preview.tabIndex=-1;
       section.append(grid,preview);form.append(section);
       let dirty=false,sequence=0,timer;
       function command(){
@@ -728,16 +734,35 @@
         return c;
       }
       function visibility(){day.parentElement.hidden=frequency.value!=='Semanal';executionDate.parentElement.hidden=frequency.value!=='Una vez';executionDate.required=frequency.value==='Una vez';}
-      async function calculate(){
+      async function calculate(explicit=false){
         clearTimeout(timer);const serial=++sequence;
-        try{const data=await api(taskPath+'?schedule_preview='+encodeURIComponent(JSON.stringify(command())));
-          if(serial===sequence)preview.textContent='Próxima ejecución: '+scheduleDate(data.preview.next_run_at,zone.value.trim());
-        }catch(e){if(serial===sequence)preview.textContent=e.message;}
+        preview.className='help';preview.textContent='Calculando próxima ejecución…';preview.setAttribute('aria-busy','true');
+        calculateButton.disabled=true;
+        if(explicit){preview.focus({preventScroll:true});preview.scrollIntoView({block:'nearest'});}
+        try{
+          const data=await api(taskPath+'?schedule_preview='+encodeURIComponent(JSON.stringify(command())),{
+            signal:AbortSignal.any([abort.signal,AbortSignal.timeout(10000)])
+          });
+          if(serial!==sequence)return;
+          if(!data.preview)throw Error('La API no devolvió el cálculo de la próxima ejecución. Reintentá.');
+          const value=data.preview.candidate_run_at??data.preview.next_run_at;
+          if(value){
+            preview.textContent=(enabled.value==='Sí'?'Próxima ejecución calculada: ':'Vista previa con programación deshabilitada: ')+
+              scheduleDate(value,zone.value.trim())+' · '+zone.value.trim()+'. Guardá los cambios para aplicar la programación.';
+          }else{
+            preview.textContent=enabled.value==='Sí'?'No hay una próxima ejecución válida. Revisá la fecha y la hora.':
+              'Programación deshabilitada. La fecha seleccionada ya pasó; elegí una fecha futura para calcular la vista previa.';
+          }
+        }catch(e){
+          if(serial===sequence&&!abort.signal.aborted){preview.className='error';preview.textContent=
+            e.name==='TimeoutError'?'El cálculo tardó demasiado. Volvé a intentarlo.':e.message||'No se pudo calcular la próxima ejecución. Reintentá.';}
+        }finally{if(serial===sequence){calculateButton.disabled=false;preview.removeAttribute('aria-busy');}}
       }
       for(const input of [enabled,frequency,day,executionDate,executionTime,zone])input.addEventListener('input',()=>{
         dirty=true;input.dataset.changed='true';visibility();clearTimeout(timer);timer=setTimeout(calculate,300);
       });
-      section.append(btn('Calcular próxima ejecución',calculate));visibility();
+      const calculateButton=btn('Calcular próxima ejecución',()=>calculate(true));
+      section.append(calculateButton);visibility();
       scheduleCommand=()=>dirty?command():null;
       if(task.schedules?.length>1){section.append(banner('Hay más de una programación vinculada. Requiere revisión antes de editar.'));section.querySelectorAll('input,select,button').forEach(input=>input.disabled=true);}
     }
@@ -775,6 +800,10 @@
           tool_parameters: {}
         };
       Object.keys(limits).forEach(k => body.limits[k] = Number(values.get(k)));
+      if(task&&chosen.length>body.limits.max_tool_calls){
+        message.textContent='Seleccionaste '+chosen.length+' herramientas, pero el máximo de llamadas es '+body.limits.max_tool_calls+'. Aumentá el máximo o seleccioná menos herramientas.';
+        message.hidden=false;message.focus();return;
+      }
       let parameterError=false;
       chosen.forEach(t => {
         const params = {};
@@ -845,10 +874,10 @@
               const legacy=detail.schedules.filter(schedule=>!mapped.has(schedule.legacy_task_id));
               if(legacy.length){content.append(node('h3','Programaciones heredadas sin asociación inequívoca'));table(content,['Horario','Estado','Próxima ejecución'],legacy.map(s=>[scheduleText(s),s.enabled?'Habilitada':s.preference_only?'Preferencia guardada; ejecución deshabilitada':'Deshabilitada',scheduleDate(s.next_run_at,s.timezone)]));}
               content.append(node('h3','Historial de ejecuciones'));
-              if(detail.jobs.length)table(content,['Creada','Estado','Inicio','Finalización'],detail.jobs.map(j=>[date(j.created_at),j.state,date(j.started_at),date(j.finished_at)]));
+              if(detail.jobs.length)table(content,['Creada','Estado','Inicio','Finalización','Motivo'],detail.jobs.map(j=>[date(j.created_at),j.state,date(j.started_at),date(j.finished_at),j.error_code?(errors[j.error_code]||j.error_code):'—']));
               else content.append(node('p','Sin ejecuciones.'));
               content.append(node('h3','Historial de programación'));
-              if(detail.events.length)table(content,['Fecha','Acción','Actor'],detail.events.map(e=>[date(e.created_at),e.action,e.actor_type+' · '+e.actor_id]));
+              if(detail.events.length)table(content,['Fecha','Acción','Motivo','Actor'],detail.events.map(e=>[date(e.created_at),e.action,e.reason_code?(errors[e.reason_code]||e.reason_code)+' ('+e.reason_code+')':'—',e.actor_type+' · '+e.actor_id]));
               else content.append(node('p','Sin eventos registrados.'));
               content.append(node('p','Hasta '+detail.list_limit+' registros recientes por historial.','help'));
             }catch(e){loaded=false;content.replaceChildren();showError(e,content);}
@@ -964,7 +993,7 @@
         else table(host, ['Trabajo', 'Estado', 'Creación', 'Progreso', 'Resultado'], data.items.map(
           j => [j.id, badge(j.state), date(j.created_at), j.progress === null ? 'No disponible' : j
             .progress + '%', j.state === 'DELIVERED' ? btn('Ver resultado', () => result(j.id),
-              'quiet') : j.state === 'REVIEWING' ? btn('Revisar resultado', () => reviewResult(j.id), 'quiet') : j.state === 'CORRECTION_REQUIRED' ? btn('Ver corrección', () => correctionHistory(j.id), 'quiet') : 'Todavía no disponible'
+              'quiet') : j.state === 'REVIEWING' ? btn('Revisar resultado', () => reviewResult(j.id), 'quiet') : j.state === 'CORRECTION_REQUIRED' ? btn('Ver corrección', () => correctionHistory(j.id), 'quiet') : j.error_code === 'no_sources_available' ? 'Ninguna fuente está disponible' : 'Todavía no disponible'
           ]));
         pages(host, cursors.length > 1 ? () => {
           cursors.pop();

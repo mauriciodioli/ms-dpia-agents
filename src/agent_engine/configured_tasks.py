@@ -98,9 +98,10 @@ class ConfiguredTaskManager:
         due = next_occurrence(command,now_utc())
         if command['enabled'] and due is None:raise EngineError('execution_time_in_past',422)
         if due is not None:delivery_time(command,due)
-        due = due if command['enabled'] else None
-        return {'next_run_at':iso(due), 'timezone':command['timezone'],
-                'local_next_run_at':due.replace(tzinfo=timezone.utc).astimezone(ZoneInfo(command['timezone'])).isoformat() if due else None}
+        local=due.replace(tzinfo=timezone.utc).astimezone(ZoneInfo(command['timezone'])).isoformat() if due else None
+        return {'next_run_at':iso(due) if command['enabled'] else None, 'timezone':command['timezone'],
+                'local_next_run_at':local if command['enabled'] else None,
+                'candidate_run_at':iso(due), 'local_candidate_run_at':local}
 
     def administration(self, limit=25, after=0):
         if self.principal.kind != 'SESSION' or not self.principal.admin:
