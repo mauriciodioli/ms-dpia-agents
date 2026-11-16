@@ -12,6 +12,13 @@ PATH='/api/agents/v1/internal/pwa-history'
 
 
 def informational_metadata(conn, job, result):
+    if 'configuration_snapshot' not in job:
+        job = {**job, 'configuration_snapshot':conn.execute(select(m.jobs.c.configuration_snapshot).where(
+            m.jobs.c.owner_id==job['owner_id'],m.jobs.c.id==job['id'])).scalar_one()}
+    if job['configuration_snapshot'].get('canonical_result_version') == 1:
+        from .informational_delivery import eligible_result
+        latest = eligible_result(conn,job)
+        return latest is not None and latest['id'] == result['id']
     # Same narrow eligibility as informational_delivery, without transferring JSON payloads.
     latest=conn.execute(select(m.results.c.id).where(m.results.c.owner_id==job['owner_id'],
         m.results.c.job_id==job['id']).order_by(m.results.c.version.desc()).limit(1)).scalar_one_or_none()

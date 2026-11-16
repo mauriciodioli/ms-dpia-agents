@@ -7,6 +7,7 @@ from .verifier import inspect_output
 from .reviewer import Reviewer
 from .management import audit_agent
 from .auth import Principal, SCOPES
+from .result_consolidation import persisted_matches
 
 
 def automatic_task(conn, job):
@@ -28,7 +29,7 @@ def validation_reasons(conn, job, result):
     active=[task for task in tasks if not (early and task['state']=='CANCELLED')]
     if not active or any(task['state']!='COMPLETED' for task in active):
         reasons.append('INCOMPLETE_TASK_PIPELINE')
-    elif active[-1]['output']!=result['payload']:
+    elif not persisted_matches(job,active,result['payload']):
         reasons.append('RESULT_OUTPUT_MISMATCH')
     return reasons
 

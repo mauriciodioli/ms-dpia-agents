@@ -25,7 +25,8 @@ def eligible_result(conn, job, result=None):
             or (not automatic and not early and (latest['evidence_status']!='UNVERIFIED' or any(t['tool_id']!='dpia.amazon.search' for t in tasks)))):
         return None
     if (automatic or early) and validation_reasons(conn,job,latest):return None
-    if tasks[-1]['output'] != latest['payload']:
+    from .result_consolidation import persisted_matches
+    if not persisted_matches(job,tasks,latest['payload']):
         return None
     if conn.execute(select(m.reviews.c.id).where(m.reviews.c.owner_id == job['owner_id'],
             m.reviews.c.job_id == job['id'], m.reviews.c.result_id == latest['id'])).first():

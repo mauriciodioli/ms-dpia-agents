@@ -156,7 +156,7 @@ class ReadRepository:
         from .result_presentation import present_result
         return {'job_id': job_id, 'version': row['version'], 'evidence_status': row['evidence_status'],
                 'delivery_kind': 'INFORMATIONAL' if row['approved_at'] is None else 'APPROVED',
-                'result': present_result(row['payload'])}
+                'result': row['payload'] if job['configuration_snapshot'].get('canonical_result_version') == 1 else present_result(row['payload'])}
 
     def events(self, job_id: str, after_sequence: int, limit: int):
         self.job(job_id)

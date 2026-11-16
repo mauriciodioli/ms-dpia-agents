@@ -58,13 +58,15 @@ class ExecutionManager:
         explicit_analysis = any(word in text for word in ('analiz', 'compar', 'resum', 'anális'))
         requested_count = re.search(r'\b(\d+)\s+(?:ofertas|empleos|vacantes|resultados)\b', text)
         enough = not requested_count or len(items) >= int(requested_count.group(1))
-        sufficient = (jobs and enough and terms and items and all(item.get('company') and item.get('location')
+        sufficient = (jobs and enough and terms and items and all(item.get('title') and item.get('description')
             and item.get('url','').startswith(('https://','http://')) for item in items)
             and all(term in ' '.join(str(item.get(k,'')) for item in items
                 for k in ('title','description','location')).casefold() for term in terms))
-        optional = following and all(step['tool_id']=='openai.analysis' for step in following)
+        optional = not following or all(step['tool_id']=='openai.analysis' for step in following)
         if task['tool_id'].startswith('mcp.') and sufficient and optional and not explicit_analysis:
             return 'ACCEPT', 'STRUCTURED_JOB_OBJECTIVE_SATISFIED'
+        if jobs and not sufficient and not following:
+            return 'REJECT', 'RESULT_OBJECTIVE_NOT_SATISFIED'
         return ('CONTINUE', 'NEXT_AUTHORIZED_STAGE_REQUIRED') if following else ('ACCEPT', 'PLAN_COMPLETED')
 
     def advance(self, box, conn, job, task, output):
@@ -74,7 +76,10 @@ class ExecutionManager:
         following = conn.execute(select(m.tasks).where(m.tasks.c.owner_id==job['owner_id'],
             m.tasks.c.job_id==job['id'],m.tasks.c.position>task['position'])
             .order_by(m.tasks.c.position).with_for_update()).mappings().all()
-        decision, reason = self.evaluate_step(job, task, output, following)
+        from .result_consolidation import normalize, consolidate
+        try: normalized = normalize(output)
+        except EngineError: normalized = None
+        decision, reason = self.evaluate_step(job, task, normalized or output, following)
         snapshot = dict(job['configuration_snapshot'])
         decisions = dict(snapshot.get('manager_decisions', {}))
         decisions[task['id']] = {'decision':decision,'reason':reason,'tool':task['tool_id']}
@@ -102,7 +107,22 @@ class ExecutionManager:
                 m.tasks.c.job_id==job['id'],m.tasks.c.position>task['position'])
                 .values(state='CANCELLED'))
         from .dispatcher import Dispatcher
-        Dispatcher(conn, now=box.now(), registry=self.registry).complete_result(job,output)
+        completed = conn.execute(select(m.tasks).where(m.tasks.c.owner_id==job['owner_id'],
+            m.tasks.c.job_id==job['id'],m.tasks.c.state=='COMPLETED').order_by(m.tasks.c.position)).mappings().all()
+        try:
+            canonical = consolidate([step['output'] for step in completed])
+        except EngineError:
+            decisions[task['id']] = {'decision':'REJECT','reason':'RESULT_CONSOLIDATION_INVALID','tool':task['tool_id']}
+            conn.execute(update(m.jobs).where(m.jobs.c.id==job['id'],m.jobs.c.owner_id==job['owner_id'])
+                .values(configuration_snapshot={**snapshot,'manager_decisions':decisions}))
+            box._fail(conn,job,'RESULT_CONSOLIDATION_INVALID')
+            return
+        if canonical is not None:
+            snapshot['canonical_result_version'] = 1
+            snapshot['result_provenance'] = [{'task_id':step['id'],'tool':step['tool_id']} for step in completed]
+            conn.execute(update(m.jobs).where(m.jobs.c.id==job['id'],m.jobs.c.owner_id==job['owner_id'])
+                .values(configuration_snapshot=snapshot))
+        Dispatcher(conn, now=box.now(), registry=self.registry).complete_result(job,canonical or output)
 
     def handle_failure(self, box, conn, job, task, error_code):
         # Keep the established safe-retry/uncertain-submission policy intact.
