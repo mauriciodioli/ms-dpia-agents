@@ -9,6 +9,7 @@ from . import models as m
 from .errors import EngineError
 
 PAID_TOOL='dpia.amazon.search'
+PAID_TOOLS={PAID_TOOL,'dpia.commercial.search'}
 BLOCKS=('INSUFFICIENT_POINTS','AGENT_BUDGET_EXHAUSTED','AGENT_BUDGET_MISSING','AUTOMATIC_EXECUTION_DISABLED')
 
 
@@ -26,7 +27,7 @@ def policy(conn,agent):
 
 
 def reserve(conn,job,task,now):
-    if task['tool_id']!=PAID_TOOL:return None
+    if task['tool_id'] not in PAID_TOOLS:return None
     agent=conn.execute(select(m.agents).where(m.agents.c.id==job['agent_id'],m.agents.c.owner_id==job['owner_id']).with_for_update()).mappings().one()
     source=policy(conn,agent)
     if not source or source['presupuesto_puntos_periodo']<1:return 'AGENT_BUDGET_MISSING'
@@ -61,7 +62,7 @@ def reserve(conn,job,task,now):
 
 
 def settle(conn,job,task,now,state):
-    if task['tool_id']!=PAID_TOOL:return
+    if task['tool_id'] not in PAID_TOOLS:return
     conn.execute(select(cupos.c.usuario_id).where(cupos.c.usuario_id==job['owner_id']).with_for_update()).first()
     row=conn.execute(select(operaciones).where(operaciones.c.operacion_id==operation_id(task),
         operaciones.c.usuario_id==job['owner_id']).with_for_update()).mappings().first()

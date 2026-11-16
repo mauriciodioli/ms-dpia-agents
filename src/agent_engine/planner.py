@@ -51,6 +51,11 @@ class Planner:
             if row is not None and row['enabled'] and row['credential_ciphertext'] and identifier in self.registry.tools:
                 result.append({'id': identifier, 'description': description,
                                'schema': self.registry.tools[identifier].input_schema, 'kind': kind})
+        from .commercial import TOOL, DEPENDENCIES, configured
+        if configured() and DEPENDENCIES.issubset({tool['id'] for tool in result}):
+            result.append({'id': TOOL, 'kind': 'commercial_search',
+                'description': 'Generate and validate a commercial search using the existing B2B OpenAI flow, then retrieve actual Amazon products through Apify. Prefer this for direct product discovery. It already includes commercial JSON generation: do not add web research or Analysis unless independently required. Requires the actual request location and postal/category context; never infer missing location from another task.',
+                'schema': self.registry.tools[TOOL].input_schema})
         return result
 
     def plan(self, objective, agent, limits, job_id=None):
@@ -79,7 +84,7 @@ class Planner:
                   'items':{'type':'object','additionalProperties':False,'required':['tool','parameters_json'],
                   'properties':{'tool':{'type':'string','enum':[t['id'] for t in tools]},
                                 'parameters_json':{'type':'string'}}}}}}
-        instructions = ('Product search after research will have its query resolved by the Manager from actual preceding result titles. '
+        instructions = ('Never turn research headlines into commercial search queries. '
                         'Never fabricate URLs or ASINs; omit a future fetch if its real URLs are not known yet. '
                         'You are the DPIA execution planner. Return only a valid plan in JSON. '
                         'Choose the minimum necessary tools from the supplied catalog. Each parameters_json must be a JSON object encoded as a string matching that tool input schema. '
@@ -87,12 +92,13 @@ class Planner:
                         'Do not invent provider capabilities or placeholder URLs (example.com, example.org, example.net). '
                         'Search before reading pages. Only plan a fetch when real URLs are already present in the request; do not invent a binding to a future search result. '
                         'Never use Amazon to search jobs or local businesses. '
-                        'Use web search for general research; product search for Amazon products. '
+                        'Select by the tool capabilities and the complete objective, not by a fixed sequence. Prefer commercial_search for direct product discovery when available. Use web search for actual job offers and necessary research, never as a mandatory precursor to commercial_search. Do not add Analysis when retrieved structured evidence already answers the objective. commercial_search already generates the commercial JSON once. Its request.user_message must preserve the original objective exactly. Never invent missing postal or category IDs; use only supplied verified context. '
                         'Use analysis after data gathering only if comparison or synthesis is needed. '
                         'No side effects, purchasing, posting or credential handling. '
                         'Do not assume that a tool can receive previous results as input unless its schema allows it.')
         payload = {'objective':objective,'agent_instructions':agent['instructions'][:4000],
-                   'available_tools':tools,'max_steps':max_steps}
+                   'available_tools':tools,'max_steps':max_steps,
+                   'task_context':agent.get('_task_context',{})}
         if agent.get('_execution_sources') is not None:
             payload['execution_sources'] = agent['_execution_sources']
         if hasattr(self, 'task_instructions'):

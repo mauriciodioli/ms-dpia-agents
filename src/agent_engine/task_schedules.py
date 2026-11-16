@@ -32,6 +32,12 @@ def execution_agent(task, agent):
     task_context.update(objective='jobs' if task.get('tipo') == 'OPORTUNIDADES_LABORALES' else task.get('tipo'), prompt=instructions[:8000])
     for key, values in (('scope_id', parameters.get('scope_ids', [])), ('category_id', parameters.get('category_ids', []))):
         if len(values) == 1: task_context[key] = values[0]
+    # Commercial execution needs the actual task's verified postal/catalog IDs,
+    # never the first activation's geography. No temporal scheduling changes.
+    if (context.get('country')==task_context.get('country') and context.get('city')==task_context.get('city')):
+        for key in ('postal_id','scope_id','category_id'):
+            if context.get(key) is not None and key not in task_context:task_context[key]=context[key]
+    if parameters.get('postal_id') is not None:task_context['postal_id']=parameters['postal_id']
     effective = {**agent, 'instructions': instructions[:8000], '_initial_context':initial_context(agent), '_task_context':task_context}
     preference = parameters.get('execution_sources', (parameters.get('query_context') or {}).get('execution_sources'))
     if preference is not None:

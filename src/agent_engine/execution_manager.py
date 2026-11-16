@@ -49,15 +49,15 @@ class ExecutionManager:
             if not output or re.search(r'producto|reventa|revender|emple|vacante|laboral|trabajo',objective.casefold()):
                 return ('CONTINUE','RESULT_REQUIRES_AUTHORIZED_STAGE') if following else ('REJECT','RESULT_OBJECTIVE_NOT_SATISFIED')
             return ('CONTINUE', 'NEXT_AUTHORIZED_STAGE_REQUIRED') if following else ('ACCEPT', 'PLAN_COMPLETED')
-        from .adaptive_steps import commercial_objective, relevant_products
-        if commercial_objective(objective) and not re.search(r'emple|vacante|laboral|trabajo',objective.casefold()):
-            products=relevant_products(job,output,objective)
-            quantity=re.search(r'\b(\d+)\s+productos\b',objective.casefold())
-            if products and (not quantity or len(products)>=int(quantity.group(1))):return 'ACCEPT', 'STRUCTURED_COMMERCIAL_OBJECTIVE_SATISFIED'
-            if following:return 'CONTINUE', 'COMMERCIAL_EVIDENCE_REQUIRED'
-            if output.get('items') or output.get('findings'):
-                return 'ACCEPT', 'PARTIAL_JOB_RESULTS'
-            return 'REJECT', 'RESULT_OBJECTIVE_NOT_SATISFIED'
+        from .adaptive_steps import commercial_objective
+        if (task['tool_id'] in ('dpia.commercial.search','dpia.amazon.search') or commercial_objective(objective)) and not re.search(r'emple|vacante|laboral|trabajo',objective.casefold()):
+            # Product/domain relevance cannot be proven by a shared title word.
+            # Structured exact-filter checks may accept first; ambiguous evidence
+            # goes through the durable internal reasoner, never lexical fallback.
+            from .structured_acceptance import sufficient
+            if sufficient(job,task,output):
+                return 'ACCEPT','STRUCTURED_COMMERCIAL_OBJECTIVE_SATISFIED'
+            return 'REASON','SEMANTIC_EVALUATION_REQUIRED'
         useful, enough, jobs, analysis = employment_sufficiency(job, output, objective)
         if jobs and enough and not analysis:
             return 'ACCEPT', 'STRUCTURED_JOB_OBJECTIVE_SATISFIED'
@@ -69,7 +69,7 @@ class ExecutionManager:
             return 'REJECT', 'RESULT_OBJECTIVE_NOT_SATISFIED'
         return ('CONTINUE', 'NEXT_AUTHORIZED_STAGE_REQUIRED') if following else ('ACCEPT', 'PLAN_COMPLETED')
 
-    def advance(self, box, conn, job, task, output):
+    def advance(self, box, conn, job, task, output, *, evaluation=None):
         """Persist decision and authorize one next step under the existing job lock."""
         from sqlalchemy import select, update, func
         from . import models as m
@@ -83,10 +83,15 @@ class ExecutionManager:
             m.tasks.c.job_id==job['id'],m.tasks.c.state=='COMPLETED').order_by(m.tasks.c.position)).mappings().all()
         try: normalized = consolidate([step['output'] for step in completed])
         except EngineError: normalized = None
-        decision, reason = self.evaluate_step(job, task, normalized or output, following)
+        decision, reason = evaluation or self.evaluate_step(job, task, normalized or output, following)
         if job['deadline_at'] and job['deadline_at'] <= box.now():
             decision,reason='REJECT','JOB_DEADLINE_EXCEEDED'
         snapshot = dict(job['configuration_snapshot'])
+        if decision == 'REASON':
+            snapshot['manager_pending']={'task_id':task['id'],'state':'READY'}
+            conn.execute(update(m.jobs).where(m.jobs.c.id==job['id'],m.jobs.c.owner_id==job['owner_id'])
+                .values(configuration_snapshot=snapshot))
+            return
         decisions = dict(snapshot.get('manager_decisions', {}))
         decisions[task['id']] = {'decision':decision,'reason':reason,'tool':task['tool_id']}
         snapshot['manager_decisions'] = decisions
@@ -145,6 +150,9 @@ class ExecutionManager:
             m.tasks.c.job_id==job['id'],m.tasks.c.state=='COMPLETED').order_by(m.tasks.c.position)).mappings().all()
         try:
             canonical = consolidate([step['output'] for step in completed], partial=reason=='PARTIAL_JOB_RESULTS')
+            if snapshot.get('accepted_evidence_urls'):
+                from .result_consolidation import select_evidence
+                canonical = select_evidence(canonical,snapshot['accepted_evidence_urls'])
         except EngineError:
             decisions[task['id']] = {'decision':'REJECT','reason':'RESULT_CONSOLIDATION_INVALID','tool':task['tool_id']}
             conn.execute(update(m.jobs).where(m.jobs.c.id==job['id'],m.jobs.c.owner_id==job['owner_id'])
@@ -171,6 +179,11 @@ class ExecutionManager:
         snapshot['manager_failures'] = history[-100:]
         conn.execute(update(m.jobs).where(m.jobs.c.id==job['id'],m.jobs.c.owner_id==job['owner_id'])
             .values(configuration_snapshot=snapshot))
+        if error_code in ('analysis_input_limit','commercial_request_mismatch','output_token_budget_exceeded',
+                'commercial_integration_unavailable','provider_deadline_insufficient') and task['provider_submission_state']=='NOT_SUBMITTED':
+            from .dispatcher import Dispatcher
+            Dispatcher(conn,now=box.now(),registry=self.registry)._fail(job,error_code)
+            return
         box._retry_or_block(conn, job, task, error_code=error_code)
 
     def _plan(self, agent, body, *, permitted_tools=None):
@@ -178,6 +191,7 @@ class ExecutionManager:
         ensure_access(self.conn,agent,'openai')
         service = IntegrationService(current_app.extensions.get('agent_engine_engine') or __import__('utils.db', fromlist=['db']).db.engine, current_app.config)
         planner = Planner(self.conn, service=service, registry=self.registry)
+        planner.task_instructions = body.get('instructions', '')
         if permitted_tools is not None:
             planner.permitted_tools = frozenset(permitted_tools)
             planner.task_instructions = body.get('instructions', '')
@@ -196,14 +210,19 @@ class ExecutionManager:
             from .integrations import PROVIDERS
             from .provider_access import ensure_access
             selected={step['tool'] for step in body['pipeline']}
+            from .commercial import TOOL, DEPENDENCIES
+            if TOOL in selected: selected.update(DEPENDENCIES)
             for provider,spec in PROVIDERS.items():
                 if spec['tool'] in selected:ensure_access(self.conn,agent,provider)
             return body
         result=self._plan(agent, body)
         from .integrations import PROVIDERS
         from .provider_access import ensure_access
+        from .commercial import TOOL, DEPENDENCIES
+        selected={step['tool'] for step in result['pipeline']}
+        if TOOL in selected: selected.update(DEPENDENCIES)
         for provider,spec in PROVIDERS.items():
-            if any(step['tool']==spec['tool'] for step in result['pipeline']):ensure_access(self.conn,agent,provider)
+            if spec['tool'] in selected:ensure_access(self.conn,agent,provider)
         return result
 
     def finalize(self, agent, body, *, scheduled=False, automatic=False):

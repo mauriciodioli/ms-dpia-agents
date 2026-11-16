@@ -16,6 +16,10 @@ class ConnectionPreflight:
 
     def check(self, agent, step):
         identifier = step['tool']
+        from .commercial import TOOL, DEPENDENCIES
+        if identifier == TOOL:
+            for dependency in sorted(DEPENDENCIES):self.check(agent,{'tool':dependency,'parameters':{}})
+            return ('composite',TOOL)
         if identifier.startswith('mcp.'):
             server, tool, _ = require_tool(self.conn, agent['owner_id'], agent['id'], identifier)
             # Initialization and discovery cannot execute a tool or spend its call budget.
@@ -57,7 +61,8 @@ class ConnectionPreflight:
                 server, _, _ = require_tool(self.conn, agent['owner_id'], agent['id'], identifier)
                 key = ('mcp', server['id'], identifier)
             else:
-                key = ('provider', spec.provider)
+                from .commercial import TOOL
+                key = ('composite',TOOL) if identifier==TOOL else ('provider',spec.provider)
             if key not in cache:
                 try:
                     self.check(agent, step)

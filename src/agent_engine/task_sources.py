@@ -52,4 +52,7 @@ def allowed_tools(conn, agent, registry):
     selected = set(by_id) if preference['mode'] == 'all' else set(preference['ids'])
     if not selected or not selected.issubset(by_id):
         raise EngineError('selected_sources_unavailable', 409)
-    return {tool for key in selected for tool in by_id[key]['tools']}
+    result = {tool for key in selected for tool in by_id[key]['tools']}
+    from .commercial import TOOL, DEPENDENCIES, configured
+    if configured() and DEPENDENCIES.issubset(result): result.add(TOOL)
+    return result

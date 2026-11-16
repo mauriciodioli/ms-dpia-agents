@@ -113,3 +113,6 @@ AGENTS_OPENAI_MODELS = tuple(filter(None, (x.strip() for x in os.getenv(
 
 # Dedicated server-to-server PWA provisioning credential; never exposed to the browser.
 PWA_ACTIVATION_SECRET = os.environ.get('PWA_ACTIVATION_SECRET', '')
+
+# Disabled until an administrator supplies the trusted B2B service URL.
+B2B_INTERNAL_URL = os.environ.get('B2B_INTERNAL_URL', '')

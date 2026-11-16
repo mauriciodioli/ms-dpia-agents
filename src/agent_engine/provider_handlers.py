@@ -50,7 +50,7 @@ def normalize_scraper(data, secret, country, at, max_products):
             raise ValueError
     except (ValueError, KeyError, TypeError, AttributeError):
         raise EngineError('provider_invalid_response', 502) from None
-    findings, sources, partial = [], [], False
+    findings, sources, cards, partial = [], [], [], False
     for batch in data['datos']:
         if not isinstance(batch, dict):
             raise EngineError('provider_invalid_response', 502)
@@ -81,13 +81,17 @@ def normalize_scraper(data, secret, country, at, max_products):
                 record['url'] = url
                 refs.append(source_id)
             findings.append({'text': json.dumps(record, ensure_ascii=False, allow_nan=False), 'source_ids': refs})
+            if url:
+                card={'title':title,'url':url,'description':clean_text(product.get('descripcion'),secret,8000) or ''}
+                if image:card['image']=image
+                cards.append(card)
     warnings = ['Datos recibidos de DPIA Scraper; requieren verificación independiente y aprobación.']
     if partial or data.get('estado') in ('parcial', 'fallido'):
         warnings.append('El proveedor informó errores parciales; no se reintenta el scraping automáticamente.')
     if not findings:
         warnings.append('Sin productos válidos; el éxito HTTP no confirma evidencia comercial.')
     output = dict(schema_version='agents.result.v1', summary=f'Amazon: {len(findings)} productos recibidos. Trabajo externo: {reference}.',
-                  findings=findings, sources=sources, warnings=warnings)
+                  findings=findings, sources=sources, warnings=warnings, items=cards)
     validate(RESULT, output)
     return reference, output
 
@@ -152,12 +156,20 @@ class ProviderHandlers:
         budget = min(row['config']['max_output_tokens'], remaining)
         if budget < 16:
             raise EngineError('output_token_budget_exceeded', 409)
-        inputs = json.dumps({'request': instructions['request_instructions'], 'previous_results': context.previous_outputs}, ensure_ascii=False)
-        if len(inputs.encode('utf-8')) > 24000:
-            raise EngineError('analysis_input_limit', 409)
+        from .evidence_context import compact
+        analysis_instructions = 'Analizá solo los datos suministrados. No inventes fuentes, precios ni verificaciones. ' + instructions['agent_instructions'] + '\n' + parameters.get('instructions', '')
+        token_bound=self.service.config.get('OPENAI_ANALYSIS_MAX_INPUT_TOKENS',32000)
+        if type(token_bound) is not int:raise EngineError('analysis_input_limit',409)
+        input_bytes=min(24000,token_bound-len(analysis_instructions.encode('utf-8'))-2048)
+        if input_bytes<512:raise EngineError('analysis_input_limit',409)
+        inputs, compaction = compact(instructions['request_instructions'], context.previous_outputs,max_bytes=input_bytes)
+        from sqlalchemy import update
+        with context.box.engine.begin() as conn:
+            _, task = context.box._owned(conn, context.lease)
+            conn.execute(update(m.tasks).where(m.tasks.c.id==task['id'],m.tasks.c.owner_id==context.lease.owner_id)
+                .values(input_snapshot={**task['input_snapshot'],'analysis_compaction':compaction}))
         body = {'model': row['config']['model'], 'store': False,
-                'instructions': 'Analizá solo los datos suministrados. No inventes fuentes, precios ni verificaciones. ' +
-                    instructions['agent_instructions'] + '\n' + parameters.get('instructions', ''),
+                'instructions': analysis_instructions,
                 'input': inputs, 'max_output_tokens': budget}
         context.mark_submitting(row['revision'])
         data = self.service.http.request('POST', OPENAI_BASE + '/responses', secret,

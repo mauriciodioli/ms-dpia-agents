@@ -53,6 +53,9 @@ class Dispatcher:
         allowed = set(self.conn.execute(select(m.agent_capabilities.c.tool_id).where(
             m.agent_capabilities.c.owner_id == agent['owner_id'],
             m.agent_capabilities.c.agent_id == agent['id'])).scalars())
+        from .commercial import TOOL, DEPENDENCIES, configured
+        if configured() and DEPENDENCIES.issubset(allowed):
+            allowed.add(TOOL)
         # Centrally enabled LOW MCP tools do not require per-agent capability rows.
         from .mcp_repository import MCPRepository, tool_id
         allowed.update(tool_id(row['id']) for row in MCPRepository(self.conn).catalog(agent['owner_id'])

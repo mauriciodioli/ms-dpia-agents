@@ -84,6 +84,14 @@ class TaskBox:
         require_unpaused(conn,agent)
         if agent['configuration_state'] != 'ENABLED':
             raise EngineError('agent_paused', 409)
+        from .commercial import TOOL, DEPENDENCIES, configured
+        if task['tool_id'] == TOOL:
+            if not configured() or TOOL not in job['configuration_snapshot'].get('capabilities', []):
+                raise EngineError('tool_authorization_revoked', 403)
+            for dependency in sorted(DEPENDENCIES):
+                self.authorized(conn, job, {**task, 'tool_id':dependency},
+                    require_provider=require_provider, check_integration=check_integration)
+            return self.registry.tools[TOOL]
         capability = conn.execute(select(m.agent_capabilities.c.tool_id).where(
             m.agent_capabilities.c.owner_id == job['owner_id'], m.agent_capabilities.c.agent_id == job['agent_id'],
             m.agent_capabilities.c.tool_id == task['tool_id']).with_for_update()).first()
@@ -318,6 +326,13 @@ class TaskBox:
             conn.execute(update(m.workers).where(m.workers.c.id == lease.worker_id,
                 m.workers.c.current_task_id == lease.task_id).values(
                     current_task_id=None, reported_state='AVAILABLE', heartbeat_at=self.now()))
+        # Semantic provider I/O starts only AFTER raw output and intent commit.
+        from .manager_reasoning import resume
+        with self.engine.connect() as conn:
+            current = conn.execute(select(m.jobs.c.configuration_snapshot).where(
+                m.jobs.c.id==lease.job_id,m.jobs.c.owner_id==lease.owner_id)).scalar_one()
+        if current.get('manager_pending'):
+            resume(self,lease.owner_id,lease.job_id)
 
     def _retry_or_block(self, conn, job, task, *, recovery=False, error_code=None):
         uncertain = task['provider_submission_state'] != 'NOT_SUBMITTED'

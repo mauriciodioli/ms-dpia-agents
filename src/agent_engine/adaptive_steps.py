@@ -57,31 +57,12 @@ def resolve_parameters(step, completed, registry):
     properties=spec.input_schema.get('properties',{})
     outputs=[item['output'] for item in completed]
     provenance=[]
-    # A commercial search after research depends on discovered subjects, not the
-    # generic initial query. Preserve country, filters and the authorized call count.
+    # Semantic bindings are proposed by the Manager's durable reasoner. Never
+    # turn article headlines or arbitrary bullets into commercial product terms.
     if 'query' in properties and 'max_products' in properties and completed:
-        subjects=[]
-        for item in completed:
-            output=item['output'];rows=records(output)
-            explicit=[value.strip() for value in output.get('trends',[]) if isinstance(value,str) and value.strip()]
-            texts=[output.get('summary','')]+[finding.get('text','') for finding in output.get('findings',[])]
-            for text in texts:
-                for line in text.splitlines():
-                    match=re.match(r'^\s*(?:[-*•]|\d+[.)])\s+(.+?)\s*$',line)
-                    if match and 3<=len(match[1])<=120:explicit.append(match[1])
-            if explicit:rows=[{'title':value} for value in explicit]
-            for row in rows:
-                title=row.get('title') or row.get('titulo')
-                if isinstance(title,str) and title.strip() and title.strip() not in subjects:
-                    subjects.append(title.strip());provenance.append(item['id'])
-        if not subjects:raise EngineError('dependent_search_subjects_missing',409)
-        limit=properties['query'].get('maxLength',500)
-        query=' OR '.join(subjects)
-        if len(query)>limit:
-            while len(subjects)>1 and len(query)>limit:
-                subjects.pop();query=' OR '.join(subjects)
-        if len(query)>limit:raise EngineError('dependent_search_subjects_invalid',409)
-        params['query']=query
+        if not step['input_snapshot'].get('manager_bound'):
+            raise EngineError('dependent_search_requires_reasoning',409)
+        provenance=[item['id'] for item in completed]
     if 'urls' in properties and completed:
         urls=[]
         for item in completed:

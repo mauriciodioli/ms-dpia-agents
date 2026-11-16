@@ -79,6 +79,11 @@ def default_registry(*, conn=None, engine=None, owner=None) -> ToolRegistry:
         input_schema={'type': 'object', 'additionalProperties': False,
                       'properties': {'instructions': {'type': 'string', 'maxLength': 8000}}},
     ))
+    # Composite capability: execution requires BOTH existing provider grants.
+    from .commercial import TOOL, INPUT_SCHEMA
+    registry.register(ToolSpec(id=TOOL, provider='dpia.scraper', capability='commercial',
+        input_schema=INPUT_SCHEMA, implementation_status='IMPLEMENTED',
+        contract_reference='B2B internal commercial operation; dpia.results.v2 -> agents.result.v1'))
     if conn is not None or engine is not None:
         from .mcp_catalog import LiveRegistry
         return LiveRegistry(registry,conn,engine,owner)

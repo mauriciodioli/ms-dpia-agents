@@ -69,5 +69,29 @@ def consolidate(outputs, *, partial=False):
 def persisted_matches(job, tasks, payload):
     if job['configuration_snapshot'].get('canonical_result_version') == 1:
         partial=any(value.get('reason')=='PARTIAL_JOB_RESULTS' for value in job['configuration_snapshot'].get('manager_decisions',{}).values())
-        return consolidate([task['output'] for task in tasks if task['state']=='COMPLETED'],partial=partial) == payload
+        value=consolidate([task['output'] for task in tasks if task['state']=='COMPLETED'],partial=partial)
+        if job['configuration_snapshot'].get('accepted_evidence_urls'):
+            value=select_evidence(value,job['configuration_snapshot']['accepted_evidence_urls'])
+        return value == payload
     return bool(tasks) and tasks[-1]['output'] == payload
+
+
+def select_evidence(payload, urls):
+    """One business mapping shared by finalization and persisted validation."""
+    from .errors import EngineError
+    accepted=set(urls)
+    result=dict(payload)
+    result['items']=[row for row in payload.get('items',[]) if row['url'] in accepted]
+    result['sources']=[row for row in payload.get('sources',[]) if row['url'] in accepted]
+    source_ids={row['id'] for row in result['sources']}
+    result['findings']=[]
+    for finding in payload.get('findings',[]):
+        try: row=json.loads(finding['text'])
+        except (ValueError,TypeError):row={}
+        if isinstance(row,dict) and row.get('url') in accepted or (finding['source_ids'] and set(finding['source_ids']).issubset(source_ids)):
+            result['findings'].append(finding)
+    if not result['items'] and not result['findings']:
+        raise EngineError('RESULT_EVIDENCE_SELECTION_EMPTY',409)
+    result['summary']='Resultados aceptados por el Manager.'
+    validate(RESULT,result)
+    return result

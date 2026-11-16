@@ -89,10 +89,15 @@ def worker_command(capability, watch, interval, local_test, providers):
     from .streams import RedisStreams
     handlers = current_app.extensions.get('agent_engine_handlers')
     if providers:
-        if local_test or not set(capability).issubset({'search', 'analysis', 'mcp'}):
+        if local_test or not set(capability).issubset({'search', 'analysis', 'mcp', 'commercial'}):
             raise click.ClickException('invalid_provider_worker_capability')
         from .provider_handlers import provider_handlers
         handlers = provider_handlers(engine(), current_app.config)
+        if 'commercial' in capability:
+            if set(capability) != {'commercial'}:
+                raise click.ClickException('commercial_requires_dedicated_worker')
+            from .commercial_worker import commercial_handlers
+            handlers = commercial_handlers(engine(), current_app.config)
     if local_test:
         if set(capability) != {'local-test'}:
             raise click.ClickException('local_test_requires_local_test_capability_only')
@@ -101,7 +106,11 @@ def worker_command(capability, watch, interval, local_test, providers):
     if not isinstance(handlers, HandlerRegistry) or not handlers.handlers:
         raise click.ClickException('worker_handlers_not_configured')
     try:
-        worker = Worker(TaskBox(engine()), RedisStreams.from_config(current_app.config), handlers, capability)
+        if 'commercial' in capability:
+            from .commercial_worker import CommercialWorker
+            worker = CommercialWorker(TaskBox(engine()), RedisStreams.from_config(current_app.config), handlers)
+        else:
+            worker = Worker(TaskBox(engine()), RedisStreams.from_config(current_app.config), handlers, capability)
     except EngineError as error:
         raise click.ClickException(error.code) from None
     _repeat_queue_operation(worker.work_once, watch, interval)

@@ -151,6 +151,8 @@ class Worker:
     def work_once(self):
         self.start()
         self.box.recover()
+        from .manager_reasoning import pending_jobs
+        pending_jobs(self.box)
         self.box.idle(self.worker_id)
         outcomes = []
         for capability in self.capabilities:
