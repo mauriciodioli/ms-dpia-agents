@@ -211,7 +211,8 @@ class TaskBox:
             previous = conn.execute(select(m.tasks).where(m.tasks.c.owner_id == job['owner_id'],
                 m.tasks.c.job_id == job['id'], m.tasks.c.position < task['position'])
                 .order_by(m.tasks.c.position).with_for_update()).mappings().all()
-            if any(row['state'] != 'COMPLETED' for row in previous):
+            skipped=job['configuration_snapshot'].get('dependency_bindings',{})
+            if any(row['state'] != 'COMPLETED' and not (row['state']=='CANCELLED' and skipped.get(row['id'],{}).get('skipped')) for row in previous):
                 return 'DEFER', None
             worker = conn.execute(select(m.workers).where(m.workers.c.id == worker_id).with_for_update()).mappings().first()
             if worker is None or capability not in worker['capabilities'] or worker['current_task_id'] is not None:
@@ -240,7 +241,7 @@ class TaskBox:
                     target='RUNNING', actor_id=worker_id, now=self.now())
             return 'LEASE', Lease(job['owner_id'], job['id'], task['id'], worker_id, token, version,
                 attempt_id, task['tool_id'], task['input_snapshot'].get('parameters', {}),
-                tuple(row['output'] for row in previous))
+                tuple(row['output'] for row in previous if row['state']=='COMPLETED'))
 
     def _owned(self, conn, lease):
         job = self._job(conn, lease.owner_id, lease.job_id)

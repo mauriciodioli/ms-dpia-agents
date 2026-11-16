@@ -25,7 +25,7 @@ def validation_reasons(conn, job, result):
     tasks=conn.execute(select(m.tasks).where(m.tasks.c.owner_id==job['owner_id'],
         m.tasks.c.job_id==job['id']).order_by(m.tasks.c.position)).mappings().all()
     decisions=job['configuration_snapshot'].get('manager_decisions', {})
-    early=any(value.get('reason') in ('STRUCTURED_JOB_OBJECTIVE_SATISFIED','PARTIAL_JOB_RESULTS') for value in decisions.values())
+    early=any(value.get('reason') in ('STRUCTURED_JOB_OBJECTIVE_SATISFIED','STRUCTURED_COMMERCIAL_OBJECTIVE_SATISFIED','PARTIAL_JOB_RESULTS') for value in decisions.values())
     active=[task for task in tasks if not (early and task['state']=='CANCELLED')]
     if not active or any(task['state']!='COMPLETED' for task in active):
         reasons.append('INCOMPLETE_TASK_PIPELINE')

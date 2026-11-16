@@ -18,7 +18,7 @@ def eligible_result(conn, job, result=None):
         m.tasks.c.job_id == job['id']).order_by(m.tasks.c.position)).mappings().all()
     from .automatic_task_review import automatic_task, validation_reasons
     automatic=automatic_task(conn,job)
-    early=any(value.get('reason') in ('STRUCTURED_JOB_OBJECTIVE_SATISFIED','PARTIAL_JOB_RESULTS') for value in job['configuration_snapshot'].get('manager_decisions',{}).values())
+    early=any(value.get('reason') in ('STRUCTURED_JOB_OBJECTIVE_SATISFIED','STRUCTURED_COMMERCIAL_OBJECTIVE_SATISFIED','PARTIAL_JOB_RESULTS') for value in job['configuration_snapshot'].get('manager_decisions',{}).values())
     if early:tasks=[task for task in tasks if task['state']!='CANCELLED']
     # Unscheduled/mixed pipelines retain the existing review requirements.
     if (not tasks or any(t['state']!='COMPLETED' for t in tasks)

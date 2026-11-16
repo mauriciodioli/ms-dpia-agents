@@ -1,4 +1,5 @@
 """Prepare execution plans and resources; workers only execute validated steps."""
+import re
 from flask import current_app
 from .planner import Planner
 from .integrations import IntegrationService
@@ -38,14 +39,25 @@ class ExecutionManager:
     def evaluate_step(self, job, task, output, following):
         """Authorize advancement; sufficiency never implies factual verification."""
         from .contracts import RESULT, validate
+        objective = job['request_snapshot'].get('objective') or job['request_snapshot'].get('instructions', '')
         try:
             validate(RESULT, output)
         except EngineError:
             # Existing local/custom outputs retain their final review contract.
             if output.get('schema_version') == 'agents.result.v1':
                 return 'REJECT', 'INVALID_RESULT_CONTRACT'
+            if not output or re.search(r'producto|reventa|revender|emple|vacante|laboral|trabajo',objective.casefold()):
+                return ('CONTINUE','RESULT_REQUIRES_AUTHORIZED_STAGE') if following else ('REJECT','RESULT_OBJECTIVE_NOT_SATISFIED')
             return ('CONTINUE', 'NEXT_AUTHORIZED_STAGE_REQUIRED') if following else ('ACCEPT', 'PLAN_COMPLETED')
-        objective = job['request_snapshot'].get('objective') or job['request_snapshot'].get('instructions', '')
+        from .adaptive_steps import commercial_objective, relevant_products
+        if commercial_objective(objective) and not re.search(r'emple|vacante|laboral|trabajo',objective.casefold()):
+            products=relevant_products(job,output,objective)
+            quantity=re.search(r'\b(\d+)\s+productos\b',objective.casefold())
+            if products and (not quantity or len(products)>=int(quantity.group(1))):return 'ACCEPT', 'STRUCTURED_COMMERCIAL_OBJECTIVE_SATISFIED'
+            if following:return 'CONTINUE', 'COMMERCIAL_EVIDENCE_REQUIRED'
+            if output.get('items') or output.get('findings'):
+                return 'ACCEPT', 'PARTIAL_JOB_RESULTS'
+            return 'REJECT', 'RESULT_OBJECTIVE_NOT_SATISFIED'
         useful, enough, jobs, analysis = employment_sufficiency(job, output, objective)
         if jobs and enough and not analysis:
             return 'ACCEPT', 'STRUCTURED_JOB_OBJECTIVE_SATISFIED'
@@ -63,7 +75,8 @@ class ExecutionManager:
         from . import models as m
         from .dispatcher import Dispatcher
         following = conn.execute(select(m.tasks).where(m.tasks.c.owner_id==job['owner_id'],
-            m.tasks.c.job_id==job['id'],m.tasks.c.position>task['position'])
+            m.tasks.c.job_id==job['id'],m.tasks.c.position>task['position'],
+            m.tasks.c.state.in_(['WAITING_DEPENDENCY','PENDING']))
             .order_by(m.tasks.c.position).with_for_update()).mappings().all()
         from .result_consolidation import consolidate
         completed = conn.execute(select(m.tasks).where(m.tasks.c.owner_id==job['owner_id'],
@@ -71,6 +84,8 @@ class ExecutionManager:
         try: normalized = consolidate([step['output'] for step in completed])
         except EngineError: normalized = None
         decision, reason = self.evaluate_step(job, task, normalized or output, following)
+        if job['deadline_at'] and job['deadline_at'] <= box.now():
+            decision,reason='REJECT','JOB_DEADLINE_EXCEEDED'
         snapshot = dict(job['configuration_snapshot'])
         decisions = dict(snapshot.get('manager_decisions', {}))
         decisions[task['id']] = {'decision':decision,'reason':reason,'tool':task['tool_id']}
@@ -87,9 +102,38 @@ class ExecutionManager:
             if used >= limits['max_tool_calls']:
                 Dispatcher(conn, now=box.now(), registry=self.registry)._fail(job,'TASK_ATTEMPT_BUDGET_EXCEEDED')
                 return
+            if job['deadline_at'] and job['deadline_at'] <= box.now():
+                Dispatcher(conn, now=box.now(), registry=self.registry)._fail(job,'JOB_DEADLINE_EXCEEDED')
+                return
             next_task = following[0]
+            from .adaptive_steps import resolve_parameters
+            registry=self.registry.using(conn) if hasattr(self.registry,'using') else self.registry
+            try:
+                parameters,binding=resolve_parameters(next_task,completed,registry)
+                box.authorized(conn,job,next_task,require_provider=True)
+            except EngineError as error:
+                if error.code == 'dependent_urls_missing':
+                    conn.execute(update(m.tasks).where(m.tasks.c.id==next_task['id'],m.tasks.c.owner_id==job['owner_id'])
+                        .values(state='CANCELLED'))
+                    bindings=dict(snapshot.get('dependency_bindings',{}))
+                    bindings[next_task['id']]={'skipped':True,'reason':error.code}
+                    conn.execute(update(m.jobs).where(m.jobs.c.id==job['id'],m.jobs.c.owner_id==job['owner_id'])
+                        .values(configuration_snapshot={**snapshot,'dependency_bindings':bindings}))
+                    current=conn.execute(select(m.jobs).where(m.jobs.c.id==job['id'],m.jobs.c.owner_id==job['owner_id'])).mappings().one()
+                    return self.advance(box,conn,current,task,output)
+                # Missing search subjects are explicit failures, never fabricated inputs.
+                decisions[task['id']]={**decisions[task['id']],'dependency_error':error.code}
+                conn.execute(update(m.jobs).where(m.jobs.c.id==job['id'],m.jobs.c.owner_id==job['owner_id'])
+                    .values(configuration_snapshot={**snapshot,'manager_decisions':decisions}))
+                Dispatcher(conn, now=box.now(), registry=self.registry)._fail(job,error.code)
+                return
+            bindings=dict(snapshot.get('dependency_bindings',{}));bindings[next_task['id']]=binding
+            snapshot['dependency_bindings']=bindings
+            conn.execute(update(m.jobs).where(m.jobs.c.id==job['id'],m.jobs.c.owner_id==job['owner_id'])
+                .values(configuration_snapshot=snapshot))
             conn.execute(update(m.tasks).where(m.tasks.c.owner_id==job['owner_id'],
-                m.tasks.c.id==next_task['id']).values(state='PENDING'))
+                m.tasks.c.id==next_task['id']).values(state='PENDING',
+                    input_snapshot={**next_task['input_snapshot'],'parameters':parameters}))
             box._rearm(conn,job,next_task,box.now())
             box._event(conn,job,'MANAGER_CONTINUE',progress=int(100*(task['position']+1)/(task['position']+1+len(following))))
             return
@@ -140,6 +184,7 @@ class ExecutionManager:
         objective = body.get('objective') or 'Prepare the smallest executable plan for the complete task instructions supplied below.'
         steps = planner.plan(objective, agent, body['limits'])
         self.planner_usage = planner.usage_record
+        self.plan_omissions = planner.omitted_steps if hasattr(planner,'omitted_steps') else []
         return {**body, 'pipeline': steps, 'instructions': body.get('instructions', objective)}
 
     def prepare(self, agent, body, job_id=None, *, automatic=False):

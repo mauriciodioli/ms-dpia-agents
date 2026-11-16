@@ -70,6 +70,9 @@ class Dispatcher:
             if step['tool'].startswith('mcp.'):
                 from .mcp_catalog import require_tool
                 require_tool(self.conn,agent['owner_id'],agent['id'],step['tool'])
+            from .adaptive_steps import real_reference, references
+            if any(not real_reference(url) for url in references(effective['parameters'])):
+                raise EngineError('unsafe_planned_reference',422)
             self.registry.validate_step(effective, allowed)
             pipeline.append(effective)
         return {**body, 'pipeline': pipeline}, allowed
@@ -174,6 +177,7 @@ class Dispatcher:
                 'name': agent['name'], 'instructions': agent['instructions'], 'limits': agent['limits'],
                 'execution_sources': agent.get('_execution_sources'),
                 'context_matching': {**context_match, 'tool_contexts': prepared['pipeline']},
+                'plan_omissions':getattr(manager,'plan_omissions',[]),
                 'capabilities': sorted(allowed), 'revision': agent['revision'], 'mcp_tools':mcp_versions},
             priority=body.get('priority', 0), progress=None, execute_at=execution,
             deliver_not_before=utc(body['deliver_not_before']) if 'deliver_not_before' in body else execution,

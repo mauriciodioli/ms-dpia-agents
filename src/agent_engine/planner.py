@@ -78,7 +78,9 @@ class Planner:
                   'items':{'type':'object','additionalProperties':False,'required':['tool','parameters_json'],
                   'properties':{'tool':{'type':'string','enum':[t['id'] for t in tools]},
                                 'parameters_json':{'type':'string'}}}}}}
-        instructions = ('You are the DPIA execution planner. Return only a valid plan in JSON. '
+        instructions = ('Product search after research will have its query resolved by the Manager from actual preceding result titles. '
+                        'Never fabricate URLs or ASINs; omit a future fetch if its real URLs are not known yet. '
+                        'You are the DPIA execution planner. Return only a valid plan in JSON. '
                         'Choose the minimum necessary tools from the supplied catalog. Each parameters_json must be a JSON object encoded as a string matching that tool input schema. '
                         'Steps execute sequentially, and openai.analysis automatically receives earlier results. '
                         'Do not invent provider capabilities or placeholder URLs (example.com, example.org, example.net). '
@@ -115,6 +117,7 @@ class Planner:
             raise EngineError('planner_invalid_response',502) from None
         # Validate against real schemas and reject hallucinated parameters.
         validated = []
+        self.omitted_steps = []
         for step in parsed['steps']:
             try:
                 parameters = json.loads(step['parameters_json'])
@@ -123,6 +126,13 @@ class Planner:
             if not isinstance(parameters, dict):
                 raise EngineError('planner_invalid_response', 502)
             normalized = {'tool':step['tool'], 'parameters':parameters}
+            from .adaptive_steps import real_reference, references
+            if any(not real_reference(url) for url in references(parameters)):
+                spec=self.registry.tools.get(step['tool'])
+                if validated and spec and 'urls' in spec.input_schema.get('properties',{}):
+                    self.omitted_steps.append({'tool':step['tool'],'reason':'planner_unsafe_reference'})
+                    continue
+                raise EngineError('planner_unsafe_reference',502)
             self.registry.validate_step(normalized,{t['id'] for t in tools})
             validated.append(normalized)
         # Defer usage persistence until Dispatcher has inserted ae_jobs.

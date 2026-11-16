@@ -1,4 +1,5 @@
 """Manager-owned canonical JSON; raw provider outputs remain in ae_tasks.output."""
+import json
 from .contracts import RESULT, validate
 from .result_presentation import records, text_records, card
 
@@ -16,6 +17,18 @@ def normalize(output):
         if item and item['url'] not in seen:
             items.append(item); seen.add(item['url'])
     if items: payload['items'] = items[:100]
+    from .adaptive_steps import product_records
+    payload['findings']=list(payload['findings'])
+    for record in product_records([{'items':rows}]):
+        # The established findings JSON carries commercial fields that are not
+        # public card properties. Do not extend agents.result.v1 or invent prices.
+        selected={key:value for key,value in record.items() if key in
+                  ('title','titulo','url','precio','price','moneda','currency','marketplace','image_url','imagen','image','description','descripcion','asin')}
+        encoded=json.dumps(selected,ensure_ascii=False,allow_nan=False)
+        if not any(finding['text']==encoded for finding in payload['findings']):
+            refs=[source['id'] for source in payload['sources'] if source['url']==record['url']]
+            payload['findings'].append({'text':encoded,'source_ids':refs})
+
     validate(RESULT, payload)
     return payload
 
