@@ -36,6 +36,8 @@ def activate_pwa():
     verify_hmac(PATH)
     arguments()
     body = json_body()
+    if body.get('operation') == 'task_sources':
+        return task_sources_catalog(body)
     if body.get('operation') in ('sync_task_schedule','update_task_schedule'):
         return synchronize_task_schedule(body)
     if (set(body) != {'owner_id', 'source_agent_id', 'source_revision', 'agent', 'schedule', 'preferences'}
@@ -131,3 +133,19 @@ def synchronize_task_schedule(body):
             schedule=synchronize(conn,principal,row,body['task_id'])
     return {'api_version':'agents.v1','owner_id':body['owner_id'],'source_agent_id':body['source_agent_id'],
             'task_id':body['task_id'],'schedule':schedule,'execution_enabled':False},200
+
+
+def task_sources_catalog(body):
+    if set(body) != {'operation', 'owner_id'} or type(body['owner_id']) is not int or body['owner_id'] < 1:
+        raise EngineError('invalid_contract')
+    with engine().connect() as conn:
+        active_user(conn, body['owner_id'])
+        agent = conn.execute(select(m.agents).where(m.agents.c.owner_id == body['owner_id'],
+            ~select(m.agent_deletions.c.agent_id).where(m.agent_deletions.c.agent_id == m.agents.c.id).exists())
+            .order_by(m.agents.c.legacy_agent_id.is_(None), m.agents.c.created_at.desc()).limit(1)).mappings().first()
+        # Before first provisioning, display the central available catalog only.
+        if agent is None:
+            agent = {'owner_id':body['owner_id'], 'id':'00000000-0000-0000-0000-000000000000'}
+        from .task_sources import catalog
+        items = catalog(conn, agent, default_registry(conn=conn, owner=body['owner_id']))
+    return {'api_version':'agents.v1', 'owner_id':body['owner_id'], 'items':items}, 200

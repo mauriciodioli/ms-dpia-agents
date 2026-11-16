@@ -58,6 +58,10 @@ class Planner:
         from .provider_access import revoked
         if revoked(self.conn,agent,'openai'):raise EngineError('provider_access_revoked',403)
         tools = self.capabilities(agent)
+        from .task_sources import allowed_tools
+        selected = allowed_tools(self.conn, agent, self.registry)
+        if selected is not None:
+            tools = [tool for tool in tools if tool['id'] in selected]
         if hasattr(self, 'permitted_tools'):
             tools = [tool for tool in tools if tool['id'] in self.permitted_tools]
         if not tools:
@@ -86,6 +90,8 @@ class Planner:
                         'Do not assume that a tool can receive previous results as input unless its schema allows it.')
         payload = {'objective':objective,'agent_instructions':agent['instructions'][:4000],
                    'available_tools':tools,'max_steps':max_steps}
+        if agent.get('_execution_sources') is not None:
+            payload['execution_sources'] = agent['_execution_sources']
         if hasattr(self, 'task_instructions'):
             payload['task_instructions'] = self.task_instructions
         body = {'model':config['config']['model'],'store':False,'instructions':instructions,

@@ -23,8 +23,15 @@ def execution_agent(task, agent):
         if location:
             instructions += '\nUbicación de esta consulta: ' + location + '.'
     else:
-        return agent
-    return {**agent, 'instructions': instructions[:8000]}
+        if not parameters.get('execution_sources'):
+            return agent
+        instructions = agent['instructions']
+    effective = {**agent, 'instructions': instructions[:8000]}
+    preference = parameters.get('execution_sources', (parameters.get('query_context') or {}).get('execution_sources'))
+    if preference is not None:
+        from .task_sources import validate_preference
+        effective['_execution_sources'] = validate_preference(preference)
+    return effective
 
 
 def task_request(task, agent, fallback=None):
@@ -41,6 +48,8 @@ def task_request(task, agent, fallback=None):
         # for the separate DPIA publication stage.
         objective=context.get('prompt') or task['nombre'] or task['tipo']
         return dict(objective=objective[:4000],limits=agent['limits'])
+    if parameters.get('execution_sources'):
+        return dict(objective=(task['nombre'] or task['tipo'])[:4000], limits=agent['limits'])
     if fallback:return fallback
     if task['tipo']=='PRODUCTOS_NUEVOS':
         return dict(instructions=task['nombre'] or agent['instructions'],limits=agent['limits'],

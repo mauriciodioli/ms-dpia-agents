@@ -57,6 +57,10 @@ class Dispatcher:
         from .mcp_repository import MCPRepository, tool_id
         allowed.update(tool_id(row['id']) for row in MCPRepository(self.conn).catalog(agent['owner_id'])
                        if row['risk_level']=='LOW' and row['tool_name'] in ('web_search_exa','web_fetch_exa'))
+        from .task_sources import allowed_tools
+        selected = allowed_tools(self.conn, agent, self.registry)
+        if selected is not None:
+            allowed.intersection_update(selected)
         if check_budget:
             validate_request_budget(agent,body)
         pipeline = []
@@ -153,6 +157,7 @@ class Dispatcher:
             correlation_id=str(uuid4()), state='CREATED', revision=1, agent_revision=agent['revision'],
             request_snapshot=prepared, configuration_snapshot={
                 'name': agent['name'], 'instructions': agent['instructions'], 'limits': agent['limits'],
+                'execution_sources': agent.get('_execution_sources'),
                 'capabilities': sorted(allowed), 'revision': agent['revision'], 'mcp_tools':mcp_versions},
             priority=body.get('priority', 0), progress=None, execute_at=execution,
             deliver_not_before=utc(body['deliver_not_before']) if 'deliver_not_before' in body else execution,

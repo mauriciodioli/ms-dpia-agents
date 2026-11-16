@@ -39,6 +39,8 @@
     'dpia.test.echo': 'Prueba interna (sin APIs)'
   };
   const errors = {
+    selected_sources_unavailable:'Una conexión elegida para esta tarea ya no está disponible o autorizada. Revisá la selección de conexiones.',
+    invalid_execution_sources:'Revisá las conexiones elegidas para esta tarea.',
     JOB_DEADLINE_EXCEEDED: 'La ejecución superó su fecha u hora límite y se detuvo antes de completarse.',
     DISPATCH_DEADLINE_EXCEEDED: 'El trabajo no pudo iniciarse antes de su fecha u hora límite.',
     TASK_ATTEMPT_BUDGET_EXCEEDED: 'Se agotó el límite de intentos permitido para completar la tarea.',
