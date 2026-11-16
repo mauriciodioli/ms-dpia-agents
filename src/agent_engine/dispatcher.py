@@ -392,6 +392,7 @@ class Dispatcher:
                 (m.jobs.c.deliver_not_before.is_(None) | (m.jobs.c.deliver_not_before <= self.now)),
                 or_(
                     (m.jobs.c.schedule_id.is_not(None) & m.jobs.c.legacy_task_id.is_not(None)),
+                    m.jobs.c.configuration_snapshot['canonical_result_version'].as_integer()==1,
                     select(m.tasks.c.id).where(m.tasks.c.owner_id == m.jobs.c.owner_id,
                         m.tasks.c.job_id == m.jobs.c.id, or_(m.tasks.c.tool_id == 'dpia.amazon.search', m.tasks.c.tool_id.like('mcp.%'))).exists()))
             .order_by(m.jobs.c.priority.desc(), m.jobs.c.id).limit(limit)

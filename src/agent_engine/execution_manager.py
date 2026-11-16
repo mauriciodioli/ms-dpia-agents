@@ -38,7 +38,6 @@ class ExecutionManager:
     def evaluate_step(self, job, task, output, following):
         """Authorize advancement; sufficiency never implies factual verification."""
         from .contracts import RESULT, validate
-        import re
         try:
             validate(RESULT, output)
         except EngineError:
@@ -46,26 +45,15 @@ class ExecutionManager:
             if output.get('schema_version') == 'agents.result.v1':
                 return 'REJECT', 'INVALID_RESULT_CONTRACT'
             return ('CONTINUE', 'NEXT_AUTHORIZED_STAGE_REQUIRED') if following else ('ACCEPT', 'PLAN_COMPLETED')
-        # Only structured job offers can short-circuit optional analysis. Free text
-        # cannot establish role/location sufficiency deterministically.
         objective = job['request_snapshot'].get('objective') or job['request_snapshot'].get('instructions', '')
-        text = objective.casefold()
-        items = output.get('items') or []
-        stop = {'buscar','buscá','busca','empleos','empleo','trabajo','ofertas','laborales',
-                'oportunidades','de','en','para','y','el','la','los','las','méxico','mexico'}
-        terms = [x for x in re.findall(r'[\w]+', text) if x not in stop and len(x)>2]
-        jobs = any(word in text for word in ('empleo', 'trabajo', 'laboral'))
-        explicit_analysis = any(word in text for word in ('analiz', 'compar', 'resum', 'anális'))
-        requested_count = re.search(r'\b(\d+)\s+(?:ofertas|empleos|vacantes|resultados)\b', text)
-        enough = not requested_count or len(items) >= int(requested_count.group(1))
-        sufficient = (jobs and enough and terms and items and all(item.get('title') and item.get('description')
-            and item.get('url','').startswith(('https://','http://')) for item in items)
-            and all(term in ' '.join(str(item.get(k,'')) for item in items
-                for k in ('title','description','location')).casefold() for term in terms))
-        optional = not following or all(step['tool_id']=='openai.analysis' for step in following)
-        if task['tool_id'].startswith('mcp.') and sufficient and optional and not explicit_analysis:
+        useful, enough, jobs, analysis = employment_sufficiency(job, output, objective)
+        if jobs and enough and not analysis:
             return 'ACCEPT', 'STRUCTURED_JOB_OBJECTIVE_SATISFIED'
-        if jobs and not sufficient and not following:
+        if jobs:
+            if following:
+                return 'CONTINUE', 'RESULT_REQUIRES_AUTHORIZED_STAGE'
+            if useful:
+                return 'ACCEPT', 'PARTIAL_JOB_RESULTS'
             return 'REJECT', 'RESULT_OBJECTIVE_NOT_SATISFIED'
         return ('CONTINUE', 'NEXT_AUTHORIZED_STAGE_REQUIRED') if following else ('ACCEPT', 'PLAN_COMPLETED')
 
@@ -73,11 +61,14 @@ class ExecutionManager:
         """Persist decision and authorize one next step under the existing job lock."""
         from sqlalchemy import select, update, func
         from . import models as m
+        from .dispatcher import Dispatcher
         following = conn.execute(select(m.tasks).where(m.tasks.c.owner_id==job['owner_id'],
             m.tasks.c.job_id==job['id'],m.tasks.c.position>task['position'])
             .order_by(m.tasks.c.position).with_for_update()).mappings().all()
-        from .result_consolidation import normalize, consolidate
-        try: normalized = normalize(output)
+        from .result_consolidation import consolidate
+        completed = conn.execute(select(m.tasks).where(m.tasks.c.owner_id==job['owner_id'],
+            m.tasks.c.job_id==job['id'],m.tasks.c.state=='COMPLETED').order_by(m.tasks.c.position)).mappings().all()
+        try: normalized = consolidate([step['output'] for step in completed])
         except EngineError: normalized = None
         decision, reason = self.evaluate_step(job, task, normalized or output, following)
         snapshot = dict(job['configuration_snapshot'])
@@ -87,14 +78,14 @@ class ExecutionManager:
         conn.execute(update(m.jobs).where(m.jobs.c.id==job['id'],m.jobs.c.owner_id==job['owner_id'])
             .values(configuration_snapshot=snapshot))
         if decision == 'REJECT':
-            box._fail(conn, job, reason)
+            Dispatcher(conn, now=box.now(), registry=self.registry)._fail(job,reason)
             return
         if decision == 'CONTINUE':
             limits = job['request_snapshot']['limits']
             used = conn.execute(select(func.sum(m.tasks.c.attempt_count)).where(
                 m.tasks.c.owner_id==job['owner_id'],m.tasks.c.job_id==job['id'])).scalar() or 0
             if used >= limits['max_tool_calls']:
-                box._fail(conn,job,'TASK_ATTEMPT_BUDGET_EXCEEDED')
+                Dispatcher(conn, now=box.now(), registry=self.registry)._fail(job,'TASK_ATTEMPT_BUDGET_EXCEEDED')
                 return
             next_task = following[0]
             conn.execute(update(m.tasks).where(m.tasks.c.owner_id==job['owner_id'],
@@ -106,16 +97,15 @@ class ExecutionManager:
             conn.execute(update(m.tasks).where(m.tasks.c.owner_id==job['owner_id'],
                 m.tasks.c.job_id==job['id'],m.tasks.c.position>task['position'])
                 .values(state='CANCELLED'))
-        from .dispatcher import Dispatcher
         completed = conn.execute(select(m.tasks).where(m.tasks.c.owner_id==job['owner_id'],
             m.tasks.c.job_id==job['id'],m.tasks.c.state=='COMPLETED').order_by(m.tasks.c.position)).mappings().all()
         try:
-            canonical = consolidate([step['output'] for step in completed])
+            canonical = consolidate([step['output'] for step in completed], partial=reason=='PARTIAL_JOB_RESULTS')
         except EngineError:
             decisions[task['id']] = {'decision':'REJECT','reason':'RESULT_CONSOLIDATION_INVALID','tool':task['tool_id']}
             conn.execute(update(m.jobs).where(m.jobs.c.id==job['id'],m.jobs.c.owner_id==job['owner_id'])
                 .values(configuration_snapshot={**snapshot,'manager_decisions':decisions}))
-            box._fail(conn,job,'RESULT_CONSOLIDATION_INVALID')
+            Dispatcher(conn, now=box.now(), registry=self.registry)._fail(job,'RESULT_CONSOLIDATION_INVALID')
             return
         if canonical is not None:
             snapshot['canonical_result_version'] = 1
@@ -190,3 +180,41 @@ class ExecutionManager:
             from .dispatcher import validate_request_budget
             validate_request_budget(agent, body)
         return body
+
+
+def employment_sufficiency(job, output, objective):
+    """Cheap relevance rules over the requested subject, never every instruction word."""
+    import re
+    import unicodedata
+    from .result_presentation import web_url
+    def clean(value):
+        return ''.join(c for c in unicodedata.normalize('NFKD',str(value).casefold())
+                       if not unicodedata.combining(c))
+    text = clean(objective)
+    jobs = bool(re.search(r'emple|vacante|laboral|trabajo|\bjobs?\b',text))
+    # Operational sentences, filters and requested response format are not keywords.
+    first = re.split(r'[.\n;]',text,maxsplit=1)[0]
+    subject = re.split(r'\b(?:en|para|in)\b',first,maxsplit=1)[0]
+    subject = re.sub(r'^.*?(?:empleos?|vacantes?|ofertas(?: laborales)?|trabajos?|jobs?)\s*(?:reales|verificables|laborales)?\s*(?:de|para|como|of)?\s*','',subject)
+    ignored={'buscar','busca','busque','ofertas','laborales','reales','verificables','digital',
+             'especialista','coordinador','coordinadora','gerente','senior','junior','de','y','el','la'}
+    anchors={word for word in re.findall(r'\w+',subject) if len(word)>2 and word not in ignored}
+    aliases={'mercadotecnia':'marketing','mercadeo':'marketing','developer':'programador',
+             'desarrollador':'programador','desarrolladora':'programador'}
+    anchors={aliases.get(word,word) for word in anchors}
+    # If a request is opaque, do not accept arbitrary cards just because they have links.
+    useful=[];seen=set()
+    for item in output.get('items',[]):
+        title=clean(item.get('title',''));description=clean(item.get('description',''))
+        url=web_url(item.get('url'))
+        words={aliases.get(word,word) for word in re.findall(r'\w+',title+' '+description)}
+        meaningful=len(description.split())>=3 or len(description)>=20
+        related=bool(anchors & words) if anchors else bool(re.search(r'emple|vacante|marketing|puesto|\bjob\b',title+' '+description))
+        wrong_city=('guadalajara' in text or 'gdl' in text) and not re.search(r'guadalajara|\bgdl\b|jalisco|remot',title+' '+description) and any(city in title+' '+description for city in ('buenos aires','madrid','monterrey','ciudad de mexico'))
+        if re.search(r'no (?:hay|tenemos|existen) (?:vacantes|ofertas|empleos)|no (?:jobs|vacancies) (?:found|available)',description): meaningful=False
+        if title.strip() and meaningful and url and related and not wrong_city and url not in seen:
+            useful.append(item);seen.add(url)
+    quantity=re.search(r'\b(\d+)\s+(?:ofertas|empleos|vacantes|resultados)\b',text)
+    enough=bool(useful) and (not quantity or len(useful)>=int(quantity.group(1)))
+    analysis=bool(re.search(r'analiz|compara|resumi|resume|resumen|analisis',text))
+    return useful,enough,jobs,analysis

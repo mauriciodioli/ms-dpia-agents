@@ -20,7 +20,7 @@ def normalize(output):
     return payload
 
 
-def consolidate(outputs):
+def consolidate(outputs, *, partial=False):
     values = [value for value in (normalize(output) for output in outputs) if value is not None]
     if not values:return None
     # Source identifiers are local to each Worker output; preserve references
@@ -47,11 +47,14 @@ def consolidate(outputs):
                 else: duplicate = entry in merged
                 if not duplicate:merged.append(entry)
         if merged or key != 'items':result[key]=merged
+    if partial and 'PARTIAL_RESULTS: No se completaron todos los requisitos solicitados.' not in result['warnings']:
+        result['warnings'].append('PARTIAL_RESULTS: No se completaron todos los requisitos solicitados.')
     validate(RESULT,result)
     return result
 
 
 def persisted_matches(job, tasks, payload):
     if job['configuration_snapshot'].get('canonical_result_version') == 1:
-        return consolidate([task['output'] for task in tasks if task['state']=='COMPLETED']) == payload
+        partial=any(value.get('reason')=='PARTIAL_JOB_RESULTS' for value in job['configuration_snapshot'].get('manager_decisions',{}).values())
+        return consolidate([task['output'] for task in tasks if task['state']=='COMPLETED'],partial=partial) == payload
     return bool(tasks) and tasks[-1]['output'] == payload
