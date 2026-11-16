@@ -3,6 +3,7 @@
 Never invokes an MCP, scraper or analysis tool. Credentials stay server-side.
 """
 import json
+import logging
 from sqlalchemy import select
 from .errors import EngineError
 from .integrations import IntegrationService
@@ -133,7 +134,30 @@ class Planner:
                     self.omitted_steps.append({'tool':step['tool'],'reason':'planner_unsafe_reference'})
                     continue
                 raise EngineError('planner_unsafe_reference',502)
-            self.registry.validate_step(normalized,{t['id'] for t in tools})
+            try:
+                self.registry.validate_step(normalized,{t['id'] for t in tools})
+            except EngineError as error:
+                if error.code != 'invalid_contract':
+                    raise
+                # Only schema metadata is logged: never values, validation messages,
+                # provider responses, credentials or arbitrary instance property names.
+                from jsonschema import Draft202012Validator, FormatChecker
+                spec=self.registry.tools.get(step['tool'])
+                paths=[]
+                required_fields=[]
+                if spec is not None:
+                    for failure in Draft202012Validator(spec.input_schema,format_checker=FormatChecker()).iter_errors(parameters):
+                        path=list(failure.absolute_schema_path)
+                        if failure.validator == 'required' and isinstance(failure.instance,dict):
+                            missing=[index for index,key in enumerate(failure.validator_value) if key not in failure.instance]
+                            paths.extend(path+[index] for index in missing[:5])
+                            required_fields.extend(failure.validator_value[index] for index in missing[:5])
+                        else:
+                            paths.append(path)
+                        if len(paths)>=5:break
+                logging.getLogger(__name__).warning('Planner tool parameters invalid tool=%s schema_paths=%s required_fields=%s',
+                    step['tool'],json.dumps(paths[:5],ensure_ascii=True),json.dumps(required_fields[:5],ensure_ascii=True))
+                raise EngineError('planner_invalid_response',502) from None
             validated.append(normalized)
         # Defer usage persistence until Dispatcher has inserted ae_jobs.
         # ae_usage has a mandatory foreign key to ae_jobs.
