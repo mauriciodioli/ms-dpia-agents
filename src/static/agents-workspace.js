@@ -39,6 +39,10 @@
     'dpia.test.echo': 'Prueba interna (sin APIs)'
   };
   const errors = {
+    JOB_DEADLINE_EXCEEDED: 'La ejecución superó su fecha u hora límite y se detuvo antes de completarse.',
+    DISPATCH_DEADLINE_EXCEEDED: 'El trabajo no pudo iniciarse antes de su fecha u hora límite.',
+    TASK_ATTEMPT_BUDGET_EXCEEDED: 'Se agotó el límite de intentos permitido para completar la tarea.',
+    HANDLER_FAILED: 'Un paso de la tarea falló. No se registró una causa más específica.',
     provider_access_revoked: 'Quitaste el acceso de este agente al proveedor. Podés restablecerlo desde Integraciones.',
     mcp_server_not_found:'El servidor MCP no existe o no tenés acceso.',
     mcp_not_ready:'Probá la conexión y descubrí herramientas antes de activar el MCP.',
@@ -911,7 +915,7 @@
               const legacy=detail.schedules.filter(schedule=>!mapped.has(schedule.legacy_task_id));
               if(legacy.length){content.append(node('h3','Programaciones heredadas sin asociación inequívoca'));table(content,['Horario','Estado','Próxima ejecución'],legacy.map(s=>[scheduleText(s),s.enabled?'Habilitada':s.preference_only?'Preferencia guardada; ejecución deshabilitada':'Deshabilitada',scheduleDate(s.next_run_at,s.timezone)]));}
               content.append(node('h3','Historial de ejecuciones'));
-              if(detail.jobs.length)table(content,['Creada','Estado','Inicio','Finalización','Motivo'],detail.jobs.map(j=>[date(j.created_at),j.state,date(j.started_at),date(j.finished_at),j.error_code?(errors[j.error_code]||j.error_code):'—']));
+              if(detail.jobs.length)table(content,['Creada','Estado','Inicio','Finalización','Motivo'],detail.jobs.map(j=>[date(j.created_at),badge(j.state),date(j.started_at),date(j.finished_at),j.state === 'FAILED' ? jobFailureCell(j) : j.error_code?(errors[j.error_code]||j.error_code):'—']));
               else content.append(node('p','Sin ejecuciones.'));
               content.append(node('h3','Historial de programación'));
               if(detail.events.length)table(content,['Fecha','Acción','Motivo','Actor'],detail.events.map(e=>[date(e.created_at),e.action,e.reason_code?(errors[e.reason_code]||e.reason_code)+' ('+e.reason_code+')':'—',e.actor_type+' · '+e.actor_id]));
@@ -925,6 +929,36 @@
     }
     await load();
   }
+  function jobFailureMessage(job) {
+    return errors[job.error_code] || (job.error_code ?
+      'La ejecución falló. Consultá el código del motivo en el detalle.' :
+      'La ejecución falló sin un motivo registrado.');
+  }
+
+  function jobFailureDetails(job) {
+    const dialog = document.querySelector('#result-dialog'),
+      host = document.querySelector('#result-content');
+    host.replaceChildren(node('h3', 'Detalle de la ejecución'),
+      node('p', jobFailureMessage(job), 'error'));
+    const details = node('dl');
+    for (const [label, value] of [
+      ['Trabajo', job.id], ['Estado', states[job.state] || job.state],
+      ['Motivo', jobFailureMessage(job)], ['Código', job.error_code || 'No registrado'],
+      ['Creación', date(job.created_at)], ['Inicio', date(job.started_at)],
+      ['Finalización', date(job.finished_at)], ['Fecha límite', date(job.deadline_at)],
+      ['Progreso', job.progress === null ? 'No disponible' : job.progress + '%']
+    ]) details.append(node('dt', label), node('dd', value));
+    host.append(details, node('p', 'Esta corrida no se completó. No hay una respuesta final entregada.', 'help'));
+    dialog.showModal();
+  }
+
+  function jobFailureCell(job) {
+    const cell = node('div');
+    cell.append(node('p', jobFailureMessage(job)),
+      btn('Ver detalle del error', () => jobFailureDetails(job), 'quiet'));
+    return cell;
+  }
+
   async function executionsPage() {
     heading('Ejecuciones', 'Historial real de los trabajos de tu cuenta.');
     const launch = node('section', undefined, 'panel');
@@ -1027,9 +1061,9 @@
         host.replaceChildren();
         if (!data.items.length) empty(host, 'Sin ejecuciones',
           'No hay trabajos registrados para esta selección.');
-        else table(host, ['Trabajo', 'Estado', 'Creación', 'Progreso', 'Resultado'], data.items.map(
-          j => [j.id, badge(j.state), date(j.created_at), j.progress === null ? 'No disponible' : j
-            .progress + '%', j.state === 'DELIVERED' ? btn('Ver resultado', () => result(j.id),
+        else table(host, ['Trabajo', 'Estado', 'Última ejecución', 'Progreso', 'Resultado'], data.items.map(
+          j => [j.id, badge(j.state), j.started_at ? date(j.started_at) : 'Sin iniciar · Creada ' + date(j.created_at), j.progress === null ? 'No disponible' : j
+            .progress + '%', j.state === 'FAILED' ? jobFailureCell(j) : j.state === 'DELIVERED' ? btn('Ver resultado', () => result(j.id),
               'quiet') : j.state === 'REVIEWING' ? btn('Revisar resultado', () => reviewResult(j.id), 'quiet') : j.state === 'CORRECTION_REQUIRED' ? btn('Ver corrección', () => correctionHistory(j.id), 'quiet') : j.error_code === 'no_sources_available' ? 'Ninguna fuente está disponible' : 'Todavía no disponible'
           ]));
         pages(host, cursors.length > 1 ? () => {

@@ -8,6 +8,25 @@ from .management import audit_agent
 from .scheduling import next_occurrence, delivery_time
 
 
+def execution_agent(task, agent):
+    """Use the configured task instructions without mutating the shared agent."""
+    parameters = task['parametros'] or {}
+    configuration = parameters.get('_agent_configuration') or {}
+    if configuration.get('instructions'):
+        instructions = configuration['instructions']
+    elif parameters.get('query_context'):
+        # The shared agent may retain a different query from its first activation.
+        # Classification and publication metadata are not search instructions.
+        context = parameters['query_context']
+        instructions = context.get('prompt') or task['nombre'] or task['tipo']
+        location = ', '.join(str(parameters[key]) for key in ('city', 'country') if parameters.get(key))
+        if location:
+            instructions += '\nUbicación de esta consulta: ' + location + '.'
+    else:
+        return agent
+    return {**agent, 'instructions': instructions[:8000]}
+
+
 def task_request(task, agent, fallback=None):
     parameters=task['parametros'] or {}
     configuration=parameters.get('_agent_configuration')

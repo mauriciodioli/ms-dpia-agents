@@ -119,6 +119,8 @@ class Dispatcher:
                 tasks=ConfiguredTaskRepository(self.conn).rows(agent,legacy_task_id)
                 if not tasks or not tasks[0]['habilitada'] or (tasks[0]['parametros'] or {}).get('_deleted_at'):
                     raise EngineError('task_paused',409)
+                from .task_schedules import execution_agent
+                agent = execution_agent(tasks[0], agent)
         from .execution_manager import ExecutionManager
         # Generate job_id early for planner token tracking
         job_id = str(uuid4())

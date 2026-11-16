@@ -1,6 +1,6 @@
 """Read models scoped by owner AND per-client agent grants. No provider calls."""
 from datetime import timedelta
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, or_
 from .auth import Principal, now_utc
 from .contracts import iso, validate, RESULT
 from .errors import EngineError
@@ -99,9 +99,16 @@ class ReadRepository:
             query = query.where(m.jobs.c.agent_id == agent_id)
         if state:
             query = query.where(m.jobs.c.state == state)
+        executed_at = func.coalesce(m.jobs.c.started_at, m.jobs.c.created_at)
         if after:
-            query = query.where(m.jobs.c.id > after)
-        rows = self.conn.execute(query.order_by(m.jobs.c.id).limit(limit + 1)).mappings().all()
+            anchor = self.conn.execute(query.where(m.jobs.c.id == after)).mappings().first()
+            if anchor is None:
+                raise EngineError('invalid_cursor')
+            anchor_time = anchor['started_at'] or anchor['created_at']
+            query = query.where(or_(executed_at < anchor_time,
+                and_(executed_at == anchor_time, m.jobs.c.id < after)))
+        rows = self.conn.execute(query.order_by(executed_at.desc(), m.jobs.c.id.desc())
+                                 .limit(limit + 1)).mappings().all()
         return {'items': [public_job(row) for row in rows[:limit]],
                 'next_cursor': rows[limit - 1]['id'] if len(rows) > limit else None}
 
