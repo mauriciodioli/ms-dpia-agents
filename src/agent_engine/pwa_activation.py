@@ -36,6 +36,10 @@ def activate_pwa():
     verify_hmac(PATH)
     arguments()
     body = json_body()
+    if body.get('operation') == 'schedule_task_now':
+        from .immediate_tasks import schedule_now
+        with engine().begin() as conn:
+            return schedule_now(conn,body),200
     if body.get('operation') == 'task_sources':
         return task_sources_catalog(body)
     if body.get('operation') in ('sync_task_schedule','update_task_schedule'):
