@@ -129,6 +129,7 @@ class Dispatcher:
         # Generate job_id early for planner token tracking
         job_id = str(uuid4())
         manager = ExecutionManager(self.conn, self.registry)
+        agent, context_match = manager.resolve_context(agent, body)
         automatic = legacy_task_id is not None
         effective_body = manager.prepare(agent, body, job_id=job_id, automatic=automatic)
         if any(step['tool'].startswith('mcp.') for step in effective_body['pipeline']):principal.require('mcp:execute')
@@ -158,6 +159,7 @@ class Dispatcher:
             request_snapshot=prepared, configuration_snapshot={
                 'name': agent['name'], 'instructions': agent['instructions'], 'limits': agent['limits'],
                 'execution_sources': agent.get('_execution_sources'),
+                'context_matching': {**context_match, 'tool_contexts': prepared['pipeline']},
                 'capabilities': sorted(allowed), 'revision': agent['revision'], 'mcp_tools':mcp_versions},
             priority=body.get('priority', 0), progress=None, execute_at=execution,
             deliver_not_before=utc(body['deliver_not_before']) if 'deliver_not_before' in body else execution,

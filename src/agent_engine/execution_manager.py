@@ -31,6 +31,10 @@ class ExecutionManager:
         self.no_sources = False
         self.optimized = False
 
+    def resolve_context(self, agent, body):
+        from .context_matching import resolve
+        return resolve(agent, body)
+
     def _plan(self, agent, body, *, permitted_tools=None):
         from .provider_access import ensure_access
         ensure_access(self.conn,agent,'openai')
