@@ -4,7 +4,7 @@ from hashlib import sha256
 import json
 import re
 from uuid import uuid4, uuid5, NAMESPACE_URL
-from sqlalchemy import or_, select, insert, update, and_
+from sqlalchemy import or_, select, insert, update, and_, func
 from model.usuario import Usuario
 from . import models as m
 from .auth import Principal, SCOPES, now_utc
@@ -73,6 +73,20 @@ class Dispatcher:
             self.registry.validate_step(effective, allowed)
             pipeline.append(effective)
         return {**body, 'pipeline': pipeline}, allowed
+
+    def complete_result(self, job, output):
+        """Single finalization path, called after the Manager accepts a stage."""
+        version = (self.conn.execute(select(func.max(m.results.c.version)).where(
+            m.results.c.owner_id==job['owner_id'],m.results.c.job_id==job['id'])).scalar() or 0)+1
+        result_id = str(uuid4())
+        self.conn.execute(insert(m.results).values(id=result_id,owner_id=job['owner_id'],
+            job_id=job['id'],version=version,schema_version='agents.task-output.v1',payload=output,
+            evidence_status='UNVERIFIED',created_at=self.now,approved_at=None))
+        from .recurring_results import record_success
+        record_success(self.conn,job,result_id,output,self.now)
+        revision = self._transition(job,'REVIEWING',reason='MANAGER_ACCEPTED')
+        self.conn.execute(update(m.jobs).where(m.jobs.c.owner_id==job['owner_id'],
+            m.jobs.c.id==job['id'],m.jobs.c.revision==revision).values(progress=100))
 
     def _transition(self, row, target, principal=None, reason=None):
         return transition_job(self.conn, owner_id=row['owner_id'], job_id=row['id'],
@@ -379,7 +393,7 @@ class Dispatcher:
                 or_(
                     (m.jobs.c.schedule_id.is_not(None) & m.jobs.c.legacy_task_id.is_not(None)),
                     select(m.tasks.c.id).where(m.tasks.c.owner_id == m.jobs.c.owner_id,
-                        m.tasks.c.job_id == m.jobs.c.id, m.tasks.c.tool_id == 'dpia.amazon.search').exists()))
+                        m.tasks.c.job_id == m.jobs.c.id, or_(m.tasks.c.tool_id == 'dpia.amazon.search', m.tasks.c.tool_id.like('mcp.%'))).exists()))
             .order_by(m.jobs.c.priority.desc(), m.jobs.c.id).limit(limit)
             .with_for_update(skip_locked=True)).mappings().all()
         for job in rows:

@@ -23,9 +23,12 @@ def validation_reasons(conn, job, result):
     except EngineError:reasons.append('INVALID_RESULT_CONTRACT')
     tasks=conn.execute(select(m.tasks).where(m.tasks.c.owner_id==job['owner_id'],
         m.tasks.c.job_id==job['id']).order_by(m.tasks.c.position)).mappings().all()
-    if not tasks or any(task['state']!='COMPLETED' for task in tasks):
+    decisions=job['configuration_snapshot'].get('manager_decisions', {})
+    early=any(value.get('reason')=='STRUCTURED_JOB_OBJECTIVE_SATISFIED' for value in decisions.values())
+    active=[task for task in tasks if not (early and task['state']=='CANCELLED')]
+    if not active or any(task['state']!='COMPLETED' for task in active):
         reasons.append('INCOMPLETE_TASK_PIPELINE')
-    elif tasks[-1]['output']!=result['payload']:
+    elif active[-1]['output']!=result['payload']:
         reasons.append('RESULT_OUTPUT_MISMATCH')
     return reasons
 

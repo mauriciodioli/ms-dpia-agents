@@ -312,29 +312,8 @@ class TaskBox:
                 .values(state='COMPLETED', output=output, lease_token=None, lease_until=None))
             conn.execute(update(m.attempts).where(m.attempts.c.id == lease.attempt_id,
                 m.attempts.c.owner_id == lease.owner_id).values(state='COMPLETED', finished_at=self.now()))
-            next_task = conn.execute(select(m.tasks).where(m.tasks.c.owner_id == lease.owner_id,
-                m.tasks.c.job_id == lease.job_id, m.tasks.c.position == task['position']+1)
-                .with_for_update()).mappings().first()
-            total = conn.execute(select(func.count()).select_from(m.tasks).where(
-                m.tasks.c.owner_id == lease.owner_id, m.tasks.c.job_id == lease.job_id)).scalar_one()
-            if next_task:
-                conn.execute(update(m.tasks).where(m.tasks.c.owner_id == lease.owner_id,
-                    m.tasks.c.id == next_task['id']).values(state='PENDING'))
-                self._rearm(conn, job, next_task, self.now())
-                self._event(conn, job, 'TASK_COMPLETED', progress=int(100*(task['position']+1)/total))
-            else:
-                version = (conn.execute(select(func.max(m.results.c.version)).where(
-                    m.results.c.owner_id == lease.owner_id, m.results.c.job_id == lease.job_id)).scalar() or 0)+1
-                result_id = str(uuid4())
-                conn.execute(insert(m.results).values(id=result_id, owner_id=lease.owner_id,
-                    job_id=lease.job_id, version=version, schema_version='agents.task-output.v1', payload=output,
-                    evidence_status='UNVERIFIED', created_at=self.now(), approved_at=None))
-                from .recurring_results import record_success
-                record_success(conn, job, result_id, output, self.now())
-                revision = transition_job(conn, owner_id=lease.owner_id, job_id=lease.job_id,
-                    expected_revision=job['revision'], target='REVIEWING', actor_id=lease.worker_id, now=self.now())
-                conn.execute(update(m.jobs).where(m.jobs.c.owner_id == lease.owner_id,
-                    m.jobs.c.id == lease.job_id, m.jobs.c.revision == revision).values(progress=100))
+            from .execution_manager import ExecutionManager
+            ExecutionManager(conn, self.registry).advance(self,conn,job,task,output)
             conn.execute(update(m.workers).where(m.workers.c.id == lease.worker_id,
                 m.workers.c.current_task_id == lease.task_id).values(
                     current_task_id=None, reported_state='AVAILABLE', heartbeat_at=self.now()))
@@ -382,7 +361,8 @@ class TaskBox:
             job, task = self._owned(conn, lease)
             if error_code:
                 conn.execute(update(m.attempts).where(m.attempts.c.owner_id==lease.owner_id,m.attempts.c.id==lease.attempt_id).values(error_code=error_code))
-            self._retry_or_block(conn, job, task, error_code=error_code)
+            from .execution_manager import ExecutionManager
+            ExecutionManager(conn,self.registry).handle_failure(self,conn,job,task,error_code)
 
     def recover(self, limit=100):
         if type(limit) is not int or not 1 <= limit <= 1000:
