@@ -558,7 +558,7 @@
       check.type = 'checkbox';
       check.name = 'capability';
       check.value = t.id;
-      check.checked = t.provider === 'mcp' ? true : (a ? a.capabilities.includes(t.id) : t.id === 'openai.analysis');
+      check.checked = a ? a.capabilities.includes(t.id) : false;
       label.append(check, node('span', names[t.id] || t.id),
         t.id === 'dpia.test.echo' ? node('span', 'Local', 'badge active') :
         t.implementation_status === 'IMPLEMENTED' ? node('span', 'Disponible', 'badge active') : pending());
@@ -1737,6 +1737,31 @@
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') closeMenu();
   });
+  document.querySelector('#copy-result').onclick = async () => {
+    const button = document.querySelector('#copy-result');
+    const host = document.querySelector('#result-content');
+    const text = ['Resultado', host.innerText, ...Array.from(host.querySelectorAll('input,textarea,select'))
+      .filter(input => input.type !== 'hidden' && input.value)
+      .map(input => (input.getAttribute('aria-label') || input.name || 'Valor') + ': ' + input.value)]
+      .filter(Boolean).join('\n\n');
+    button.disabled = true;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const area = node('textarea');
+        area.value = text;
+        area.setAttribute('aria-label', 'Contenido para copiar');
+        host.append(area);
+        area.select();
+        try { if (!document.execCommand('copy')) throw new Error('copy_failed'); }
+        finally { area.remove(); }
+      }
+      notify('Contenido copiado al portapapeles.');
+    } catch (error) {
+      notify('No se pudo copiar. Seleccioná el contenido del modal y copialo manualmente.');
+    } finally { button.disabled = false; button.focus(); }
+  };
   document.querySelector('#close-result').onclick = () => document.querySelector('#result-dialog').close();
   document.querySelector('#logout').onclick = async () => {
     abort?.abort();

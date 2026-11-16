@@ -85,9 +85,8 @@ class ConfiguredTaskManager:
                 save_task_schedule(self.conn,principal,agent,row,schedule)
         task = public_task(row, agent_id)
         task['schedules'] = schedules_for_task(self.conn,agent,task_id)
-        task['configuration'] = params.get(CONFIG_KEY) or dict(name=task['name'], description='',
-            instructions=agent['instructions'], timezone=agent['timezone'], capabilities=self.repository.capabilities(agent),
-            limits=agent['limits'], tool_parameters=agent['search_parameters'])
+        task['configuration'] = params.get(CONFIG_KEY) or task_editor_configuration(
+            self.conn, row, agent, self.registry, self.repository.capabilities(agent))
         return task
 
     def update_schedule(self, agent_id, task_id, command, *, administrative=False):
@@ -130,3 +129,33 @@ class ConfiguredTaskManager:
             if len(items) > limit:
                 break
         return dict(items=items[:limit], next_cursor=items[limit-1]['id'] if len(items)>limit else None)
+
+
+def task_editor_configuration(conn, row, agent, registry, capabilities):
+    """Project a B2B task into the editor without copying another task's defaults."""
+    from .task_schedules import execution_agent
+    from .task_sources import allowed_tools
+    params = row['parametros'] or {}
+    context = params.get('query_context') or {}
+    effective = execution_agent(row, agent)
+    allowed = allowed_tools(conn, effective, registry)
+    if allowed is not None:
+        capabilities = sorted(allowed)
+    tool_parameters = agent['search_parameters']
+    if context:
+        # Provider parameters belong to this query, never the initial agent query.
+        tool_parameters = {}
+        if 'dpia.amazon.search' in capabilities:
+            search = {key:params[key] for key in ('country', 'city', 'language') if params.get(key)}
+            for key, values in (('scope_id', params.get('scope_ids', [])),
+                                ('category_id', params.get('category_ids', []))):
+                if len(values) == 1: search[key] = values[0]
+            if context.get('postal_id'): search['postal_id'] = context['postal_id']
+            search['query'] = context.get('prompt', '')[:500]
+            tool_parameters['dpia.amazon.search'] = search
+        if 'openai.analysis' in capabilities:
+            tool_parameters['openai.analysis'] = {'instructions': context.get('prompt', '')}
+    return dict(name=row['nombre'] or row['tipo'], description='',
+        instructions=context.get('summary') or effective['instructions'],
+        timezone=agent['timezone'], capabilities=capabilities,
+        limits=agent['limits'], tool_parameters=tool_parameters)
