@@ -12,7 +12,7 @@ from model.usuario import Usuario
 from . import models as m
 from .auth import now_utc
 from .dispatcher import Dispatcher
-from .errors import EngineError
+from .errors import EngineError, LOCAL_NON_RETRYABLE
 from .state_store import transition_job
 from .tools import default_registry
 
@@ -336,9 +336,20 @@ class TaskBox:
 
     def _retry_or_block(self, conn, job, task, *, recovery=False, error_code=None):
         uncertain = task['provider_submission_state'] != 'NOT_SUBMITTED'
+        if not uncertain and error_code in LOCAL_NON_RETRYABLE:
+            self._fail(conn,job,error_code)
+            return
         if not uncertain and task['attempt_count'] >= self.policy.max_attempts:
             self._fail(conn, job, 'TASK_ATTEMPTS_EXHAUSTED')
             return
+        if not uncertain:
+            used = conn.execute(select(func.sum(m.tasks.c.attempt_count)).where(
+                m.tasks.c.owner_id==job['owner_id'], m.tasks.c.job_id==job['id'])).scalar() or 0
+            if used >= job['request_snapshot']['limits']['max_tool_calls']:
+                # No retry can be admitted. Keep the technical cause instead of
+                # rearming a task only to overwrite it with budget exhaustion.
+                self._fail(conn,job,error_code or 'TASK_ATTEMPT_BUDGET_EXCEEDED')
+                return
         delay = min(60, 2**min(task['attempt_count'], 6))
         due = self.now()+timedelta(seconds=delay)
         conn.execute(update(m.tasks).where(m.tasks.c.owner_id == task['owner_id'], m.tasks.c.id == task['id'])

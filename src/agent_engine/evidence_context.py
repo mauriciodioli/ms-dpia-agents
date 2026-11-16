@@ -6,7 +6,10 @@ from .errors import EngineError
 
 
 def encoded(value):
-    return json.dumps(value,ensure_ascii=False,sort_keys=True,separators=(',',':'),allow_nan=False).encode('utf-8')
+    try:
+        return json.dumps(value,ensure_ascii=False,sort_keys=True,separators=(',',':'),allow_nan=False).encode('utf-8')
+    except (TypeError,ValueError,OverflowError,UnicodeError):
+        raise EngineError('invalid_evidence_json',500) from None
 
 
 def compact(objective, outputs, *, max_bytes=24000):

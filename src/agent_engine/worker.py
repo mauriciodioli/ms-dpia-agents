@@ -132,7 +132,7 @@ class Worker:
             try:
                 code=error.code if isinstance(error,EngineError) else 'HANDLER_FAILED'
                 frames=[f'{Path(frame.filename).name}:{frame.lineno}:{frame.name}' for frame in traceback.extract_tb(error.__traceback__)]
-                logging.getLogger(__name__).error('Task handler failed job=%s task=%s error_type=%s frames=%s',lease.job_id,lease.task_id,type(error).__name__,frames)
+                logging.getLogger(__name__).error('Task handler failed job=%s task=%s error_type=%s code=%s frames=%s',lease.job_id,lease.task_id,type(error).__name__,code,frames)
                 self.box.failed(lease,error_code=code)  # Safe retries only before external submission.
             except EngineError as error:
                 if error.code == 'lease_lost':

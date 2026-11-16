@@ -12,7 +12,7 @@ from . import models as m
 from .contracts import RESULT, validate, iso
 from .errors import EngineError
 from .integrations import IntegrationService, require_enabled
-from .provider_transport import OPENAI_BASE
+from .provider_transport import OPENAI_BASE, token_count, serialize_body
 from .worker import Handler, HandlerRegistry
 
 COUNTRIES = {'Argentina': 'argentina', 'Italia': 'italia', 'España': 'espana',
@@ -114,7 +114,7 @@ class ProviderHandlers:
             used = conn.execute(select(func.coalesce(func.sum(m.usage.c.output_tokens), 0)).where(
                 m.usage.c.owner_id == job['owner_id'], m.usage.c.job_id == job['id'],
                 m.usage.c.verified.is_(True))).scalar_one()
-            remaining = job['request_snapshot']['limits']['max_output_tokens'] - used
+            remaining = job['request_snapshot']['limits']['max_output_tokens'] - token_count(used)
             return row, self.service.decrypt(row), remaining, {
                 'agent_instructions': job['configuration_snapshot'].get('instructions', ''),
                 'request_instructions': job['request_snapshot'].get('instructions', '')}
@@ -137,6 +137,7 @@ class ProviderHandlers:
         payload = {'marketplace': 'amazon', 'pais_defecto': country, 'batch_size': 1,
                    'registros': [{'Producto': parameters['query'], 'País': country}],
                    'idempotency_key': 'agents:' + context.lease.task_id}
+        serialize_body(payload)
         context.mark_submitting(row['revision'])
         data = self.service.http.request('POST', row['config']['base_url'] + '/base44/scraping', secret,
             timeout=row['config']['timeout_seconds'], body=payload)
@@ -157,6 +158,9 @@ class ProviderHandlers:
         if budget < 16:
             raise EngineError('output_token_budget_exceeded', 409)
         from .evidence_context import compact
+        if any(not isinstance(value,str) for value in (instructions['agent_instructions'],
+                instructions['request_instructions'],parameters.get('instructions',''))):
+            raise EngineError('provider_invalid_json',500)
         analysis_instructions = 'Analizá solo los datos suministrados. No inventes fuentes, precios ni verificaciones. ' + instructions['agent_instructions'] + '\n' + parameters.get('instructions', '')
         token_bound=self.service.config.get('OPENAI_ANALYSIS_MAX_INPUT_TOKENS',32000)
         if type(token_bound) is not int:raise EngineError('analysis_input_limit',409)
@@ -171,6 +175,7 @@ class ProviderHandlers:
         body = {'model': row['config']['model'], 'store': False,
                 'instructions': analysis_instructions,
                 'input': inputs, 'max_output_tokens': budget}
+        serialize_body(body)
         context.mark_submitting(row['revision'])
         data = self.service.http.request('POST', OPENAI_BASE + '/responses', secret,
             timeout=row['config']['timeout_seconds'], body=body)

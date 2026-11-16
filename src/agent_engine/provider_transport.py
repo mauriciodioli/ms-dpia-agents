@@ -4,6 +4,8 @@ Never return/log response bodies or exception text on failure. No redirects,
 ambient proxy credentials, automatic POST retries, or calls at import time.
 """
 import json
+import logging
+from decimal import Decimal
 import time
 from urllib.parse import urlsplit, quote
 import requests
@@ -32,15 +34,48 @@ def validate_scraper_url(url, allowed_hosts=('api.dpia.site',)):
         raise EngineError('invalid_provider_url') from None
 
 
+def token_count(value):
+    """SUM(integer) is DECIMAL on MySQL. Keep integral token counts as int.
+
+    Never round a fractional value, accept bool/float, or stringify numeric JSON.
+    """
+    if type(value) is int and value >= 0:
+        return value
+    if isinstance(value, Decimal) and value.is_finite() and value >= 0 and value == value.to_integral_value():
+        return int(value)
+    raise EngineError('invalid_token_usage', 500)
+
+
+def serialize_body(body):
+    """Fail locally before submission; log fixed field names, never values."""
+    if body is None:
+        return None
+    try:
+        return json.dumps(body, allow_nan=False, ensure_ascii=False).encode('utf-8')
+    except (TypeError, ValueError, OverflowError, UnicodeError):
+        fields = []
+        if isinstance(body, dict):
+            for name in ('model', 'store', 'instructions', 'input', 'max_output_tokens', 'text'):
+                if name not in body:
+                    continue
+                try:
+                    json.dumps(body[name], allow_nan=False, ensure_ascii=False).encode('utf-8')
+                except (TypeError, ValueError, OverflowError, UnicodeError):
+                    fields.append(name)
+        logging.getLogger(__name__).warning('Provider request rejected locally code=provider_invalid_json fields=%s', fields)
+        raise EngineError('provider_invalid_json', 500) from None
+
+
 class ProviderHTTP:
     def request(self, method, url, secret, *, timeout, params=None, body=None, max_bytes=1048576):
+        serialized = serialize_body(body)
         started = time.monotonic()
         try:
             with requests.Session() as session:
                 session.trust_env = False
                 with session.request(method, url, headers={'Authorization': 'Bearer ' + secret,
                         'Accept': 'application/json', 'Content-Type': 'application/json'},
-                        params=params, json=body, timeout=(min(5, timeout), timeout),
+                        params=params, data=serialized, timeout=(min(5, timeout), timeout),
                         allow_redirects=False, stream=True) as response:
                     if response.status_code != 200:
                         raise EngineError(HTTP_ERRORS.get(response.status_code, 'provider_unavailable'), 502)

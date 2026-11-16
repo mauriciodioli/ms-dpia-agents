@@ -3,7 +3,7 @@ import re
 from flask import current_app
 from .planner import Planner
 from .integrations import IntegrationService
-from .errors import EngineError
+from .errors import EngineError, LOCAL_NON_RETRYABLE
 
 
 def automatic_request(agent, body):
@@ -168,22 +168,22 @@ class ExecutionManager:
 
     def handle_failure(self, box, conn, job, task, error_code):
         # Keep the established safe-retry/uncertain-submission policy intact.
-        from sqlalchemy import update
+        from sqlalchemy import update, select, func
         from . import models as m
         snapshot = dict(job['configuration_snapshot'])
         history = list(snapshot.get('manager_failures', []))
+        used = conn.execute(select(func.sum(m.tasks.c.attempt_count)).where(
+            m.tasks.c.owner_id==job['owner_id'],m.tasks.c.job_id==job['id'])).scalar() or 0
+        cannot_retry = (error_code in LOCAL_NON_RETRYABLE or task['attempt_count'] >= box.policy.max_attempts
+            or used >= job['request_snapshot']['limits']['max_tool_calls'])
         history.append({'task_id':task['id'],'attempt':task['attempt_count'],
                         'reason':error_code or 'HANDLER_FAILED',
-                        'decision':'REJECT' if task['attempt_count'] >= box.policy.max_attempts else
+                        'decision':'REJECT' if (task['provider_submission_state']=='NOT_SUBMITTED' and
+                            cannot_retry) else
                                    'RECOVER_UNCERTAIN' if task['provider_submission_state'] != 'NOT_SUBMITTED' else 'CORRECT'})
         snapshot['manager_failures'] = history[-100:]
         conn.execute(update(m.jobs).where(m.jobs.c.id==job['id'],m.jobs.c.owner_id==job['owner_id'])
             .values(configuration_snapshot=snapshot))
-        if error_code in ('analysis_input_limit','commercial_request_mismatch','output_token_budget_exceeded',
-                'commercial_integration_unavailable','provider_deadline_insufficient') and task['provider_submission_state']=='NOT_SUBMITTED':
-            from .dispatcher import Dispatcher
-            Dispatcher(conn,now=box.now(),registry=self.registry)._fail(job,error_code)
-            return
         box._retry_or_block(conn, job, task, error_code=error_code)
 
     def _plan(self, agent, body, *, permitted_tools=None):

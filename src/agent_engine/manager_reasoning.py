@@ -17,7 +17,7 @@ from .contracts import validate
 from .errors import EngineError
 from .evidence_context import compact, encoded
 from .integrations import IntegrationService
-from .provider_transport import OPENAI_BASE
+from .provider_transport import OPENAI_BASE, token_count
 
 SCHEMA={'type':'object','additionalProperties':False,
     'required':['schema_version','decision','reason','objective_satisfied','evidence_urls','next_action','missing_information'],
@@ -112,7 +112,7 @@ def resume(box, owner, job_id):
                 secret=service.decrypt(row)
                 used=conn.execute(select(func.coalesce(func.sum(m.usage.c.output_tokens),0)).where(
                     m.usage.c.job_id==job_id,m.usage.c.owner_id==owner,m.usage.c.verified.is_(True))).scalar_one()
-                budget=min(row['config']['max_output_tokens'],job['request_snapshot']['limits']['max_output_tokens']-used)
+                budget=min(row['config']['max_output_tokens'],job['request_snapshot']['limits']['max_output_tokens']-token_count(used))
                 if budget<16:raise EngineError('MANAGER_REASONING_BUDGET_EXCEEDED',409)
                 if (job['deadline_at']-box.now()).total_seconds()<row['config']['timeout_seconds']+5:
                     raise EngineError('MANAGER_REASONING_DEADLINE_INSUFFICIENT',409)
