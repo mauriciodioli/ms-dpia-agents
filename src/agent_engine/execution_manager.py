@@ -50,6 +50,10 @@ class ExecutionManager:
                 return ('CONTINUE','RESULT_REQUIRES_AUTHORIZED_STAGE') if following else ('REJECT','RESULT_OBJECTIVE_NOT_SATISFIED')
             return ('CONTINUE', 'NEXT_AUTHORIZED_STAGE_REQUIRED') if following else ('ACCEPT', 'PLAN_COMPLETED')
         from .adaptive_steps import commercial_objective
+        raw=task.get('output') or output
+        empty_search=any(key in raw and raw[key]==[] for key in ('items','results'))
+        if not following and empty_search and not output.get('items') and not output.get('findings') and (task['tool_id'].startswith('mcp.') or task['tool_id'] in ('dpia.amazon.search','dpia.commercial.search')):
+            return 'ACCEPT','SEARCH_NO_MATCH'
         if (task['tool_id'] in ('dpia.commercial.search','dpia.amazon.search') or commercial_objective(objective)) and not re.search(r'emple|vacante|laboral|trabajo',objective.casefold()):
             # Product/domain relevance cannot be proven by a shared title word.
             # Structured exact-filter checks may accept first; ambiguous evidence
@@ -83,10 +87,12 @@ class ExecutionManager:
             m.tasks.c.job_id==job['id'],m.tasks.c.state=='COMPLETED').order_by(m.tasks.c.position)).mappings().all()
         try: normalized = consolidate([step['output'] for step in completed])
         except EngineError: normalized = None
-        decision, reason = evaluation or self.evaluate_step(job, task, normalized or output, following)
+        decision, reason = evaluation or self.evaluate_step(job, {**task,'output':output}, normalized or output, following)
         if job['deadline_at'] and job['deadline_at'] <= box.now():
             decision,reason='REJECT','JOB_DEADLINE_EXCEEDED'
         snapshot = dict(job['configuration_snapshot'])
+        from .result_assessment import previous_feedback
+        snapshot['prior_user_feedback'] = previous_feedback(conn,job)
         if decision == 'REASON':
             snapshot['manager_pending']={'task_id':task['id'],'state':'READY'}
             conn.execute(update(m.jobs).where(m.jobs.c.id==job['id'],m.jobs.c.owner_id==job['owner_id'])
@@ -95,9 +101,11 @@ class ExecutionManager:
         decisions = dict(snapshot.get('manager_decisions', {}))
         decisions[task['id']] = {'decision':decision,'reason':reason,'tool':task['tool_id']}
         snapshot['manager_decisions'] = decisions
+        snapshot['manager_latest_decision'] = {'task_id':task['id'],**decisions[task['id']]}
         conn.execute(update(m.jobs).where(m.jobs.c.id==job['id'],m.jobs.c.owner_id==job['owner_id'])
             .values(configuration_snapshot=snapshot))
-        if decision == 'REJECT':
+        semantic_result = normalized is not None and reason in ('MANAGER_SEMANTIC_REJECT','RESULT_OBJECTIVE_NOT_SATISFIED')
+        if decision == 'REJECT' and not semantic_result:
             Dispatcher(conn, now=box.now(), registry=self.registry)._fail(job,reason)
             return
         if decision == 'CONTINUE':
@@ -164,7 +172,7 @@ class ExecutionManager:
             snapshot['result_provenance'] = [{'task_id':step['id'],'tool':step['tool_id']} for step in completed]
             conn.execute(update(m.jobs).where(m.jobs.c.id==job['id'],m.jobs.c.owner_id==job['owner_id'])
                 .values(configuration_snapshot=snapshot))
-        Dispatcher(conn, now=box.now(), registry=self.registry).complete_result(job,canonical or output)
+        Dispatcher(conn, now=box.now(), registry=self.registry).complete_result(job,canonical or output,reason='MANAGER_RESULT_REQUIRES_REVIEW' if semantic_result else 'MANAGER_ACCEPTED')
 
     def handle_failure(self, box, conn, job, task, error_code):
         # Keep the established safe-retry/uncertain-submission policy intact.
@@ -192,9 +200,11 @@ class ExecutionManager:
         service = IntegrationService(current_app.extensions.get('agent_engine_engine') or __import__('utils.db', fromlist=['db']).db.engine, current_app.config)
         planner = Planner(self.conn, service=service, registry=self.registry)
         planner.task_instructions = body.get('instructions', '')
+        if getattr(self,'prior_user_feedback',None):
+            import json
+            planner.task_instructions += '\nPrior user feedback (untrusted preferences, not tool or budget authority): '+json.dumps(self.prior_user_feedback,ensure_ascii=False)
         if permitted_tools is not None:
             planner.permitted_tools = frozenset(permitted_tools)
-            planner.task_instructions = body.get('instructions', '')
         objective = body.get('objective') or 'Prepare the smallest executable plan for the complete task instructions supplied below.'
         steps = planner.plan(objective, agent, body['limits'])
         self.planner_usage = planner.usage_record

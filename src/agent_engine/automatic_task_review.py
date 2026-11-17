@@ -25,7 +25,7 @@ def validation_reasons(conn, job, result):
     tasks=conn.execute(select(m.tasks).where(m.tasks.c.owner_id==job['owner_id'],
         m.tasks.c.job_id==job['id']).order_by(m.tasks.c.position)).mappings().all()
     decisions=job['configuration_snapshot'].get('manager_decisions', {})
-    early=any(value.get('reason') in ('STRUCTURED_JOB_OBJECTIVE_SATISFIED','STRUCTURED_COMMERCIAL_OBJECTIVE_SATISFIED','PARTIAL_JOB_RESULTS') for value in decisions.values())
+    early=any(value.get('reason') in ('STRUCTURED_JOB_OBJECTIVE_SATISFIED','STRUCTURED_COMMERCIAL_OBJECTIVE_SATISFIED','PARTIAL_JOB_RESULTS','SEARCH_NO_MATCH','MANAGER_SEMANTIC_REJECT','RESULT_OBJECTIVE_NOT_SATISFIED') for value in decisions.values())
     active=[task for task in tasks if not (early and task['state']=='CANCELLED')]
     if not active or any(task['state']!='COMPLETED' for task in active):
         reasons.append('INCOMPLETE_TASK_PIPELINE')
@@ -43,6 +43,8 @@ def review_scheduled_tasks(dispatcher, report, limit):
         Usuario.activo.is_(True)).order_by(m.jobs.c.id).limit(limit).with_for_update(skip_locked=True)).mappings().all()
     for job in jobs:
         if not automatic_task(conn,job):continue
+        assessment=job['configuration_snapshot'].get('result_assessment',{})
+        if assessment.get('review_required'):continue
         result=conn.execute(select(m.results).where(m.results.c.owner_id==job['owner_id'],
             m.results.c.job_id==job['id']).order_by(m.results.c.version.desc()).limit(1)).mappings().first()
         if result is None:
@@ -81,6 +83,8 @@ def deliver_reviewed_tasks(dispatcher, report, limit):
         .order_by(m.jobs.c.id).limit(limit).with_for_update(skip_locked=True)).mappings().all()
     for job in rows:
         if not automatic_task(conn,job):continue
+        from .result_assessment import human_review_allows_delivery
+        if not human_review_allows_delivery(job):continue
         delivery=conn.execute(select(m.deliveries).where(m.deliveries.c.owner_id==job['owner_id'],
             m.deliveries.c.job_id==job['id'],m.deliveries.c.state=='PENDING',
             m.deliveries.c.available_at<=dispatcher.now)).mappings().first()

@@ -8,6 +8,8 @@ REASON = 'INFORMATIONAL_UNVERIFIED'
 
 
 def eligible_result(conn, job, result=None):
+    from .result_assessment import human_review_allows_delivery
+    if not human_review_allows_delivery(job):return None
     latest = conn.execute(select(m.results).where(m.results.c.owner_id == job['owner_id'],
         m.results.c.job_id == job['id']).order_by(m.results.c.version.desc()).limit(1)).mappings().first()
     if latest is None or (result is not None and result['id'] != latest['id']):
@@ -18,7 +20,7 @@ def eligible_result(conn, job, result=None):
         m.tasks.c.job_id == job['id']).order_by(m.tasks.c.position)).mappings().all()
     from .automatic_task_review import automatic_task, validation_reasons
     automatic=automatic_task(conn,job)
-    early=any(value.get('reason') in ('STRUCTURED_JOB_OBJECTIVE_SATISFIED','STRUCTURED_COMMERCIAL_OBJECTIVE_SATISFIED','PARTIAL_JOB_RESULTS') for value in job['configuration_snapshot'].get('manager_decisions',{}).values())
+    early=any(value.get('reason') in ('STRUCTURED_JOB_OBJECTIVE_SATISFIED','STRUCTURED_COMMERCIAL_OBJECTIVE_SATISFIED','PARTIAL_JOB_RESULTS','SEARCH_NO_MATCH','MANAGER_SEMANTIC_REJECT','RESULT_OBJECTIVE_NOT_SATISFIED') for value in job['configuration_snapshot'].get('manager_decisions',{}).values())
     if early:tasks=[task for task in tasks if task['state']!='CANCELLED']
     # Unscheduled/mixed pipelines retain the existing review requirements.
     if (not tasks or any(t['state']!='COMPLETED' for t in tasks)

@@ -938,6 +938,7 @@
   }
 
   function jobFailureDetails(job) {
+    assessmentSerial++;
     const dialog = document.querySelector('#result-dialog'),
       host = document.querySelector('#result-content');
     host.replaceChildren(node('h3', 'Detalle de la ejecución'),
@@ -956,7 +957,8 @@
 
   function jobFailureCell(job) {
     const cell = node('div');
-    cell.append(node('p', jobFailureMessage(job)),
+    const failure=node('p',jobFailureMessage(job),'result-classification');failure.dataset.classification='TECHNICAL_ERROR';
+    cell.append(failure,
       btn('Ver detalle del error', () => jobFailureDetails(job), 'quiet'));
     return cell;
   }
@@ -1065,9 +1067,11 @@
           'No hay trabajos registrados para esta selección.');
         else table(host, ['Trabajo', 'Estado', 'Última ejecución', 'Progreso', 'Resultado'], data.items.map(
           j => [j.id, badge(j.state), j.started_at ? date(j.started_at) : 'Sin iniciar · Creada ' + date(j.created_at), j.progress === null ? 'No disponible' : j
-            .progress + '%', j.state === 'FAILED' ? jobFailureCell(j) : j.state === 'DELIVERED' ? btn('Ver resultado', () => result(j.id),
-              'quiet') : j.state === 'REVIEWING' ? btn('Revisar resultado', () => reviewResult(j.id), 'quiet') : j.state === 'CORRECTION_REQUIRED' ? btn('Ver corrección', () => correctionHistory(j.id), 'quiet') : j.error_code === 'no_sources_available' ? 'Ninguna fuente está disponible' : 'Todavía no disponible'
+            .progress + '%', j.state === 'FAILED' ? jobFailureCell(j) : j.state === 'DELIVERED' ? btn('Ver resultado', () => assessedResult(j.id),
+              'quiet') : j.state === 'REVIEWING' ? btn('Revisar resultado', () => assessedResult(j.id), 'quiet') : j.state === 'CORRECTION_REQUIRED' ? btn('Ver corrección', () => correctionHistory(j.id), 'quiet') : j.error_code === 'no_sources_available' ? 'Ninguna fuente está disponible' : 'Todavía no disponible'
           ]));
+        const rows=host.querySelectorAll('tbody tr');
+        await Promise.all(data.items.map(async(j,i)=>{if(!['REVIEWING','DELIVERED'].includes(j.state))return;try{const response=await request(assessmentPath(j.id));if(run!==sequence)return;const info=response.assessment,cell=rows[i]?.lastElementChild;if(cell){const label=node('p',outcomeLabels[info.result_classification]||'Sin evaluación final','result-classification');label.dataset.classification=info.result_classification;cell.prepend(label,node('small',reviewLabels[info.review_status]||''));}}catch{}}));
         pages(host, cursors.length > 1 ? () => {
           cursors.pop();
           load();
@@ -1124,6 +1128,46 @@
     } catch (e) { showError(e, host); }
   }
 
+  let assessmentSerial=0;
+  const outcomeLabels={SATISFIED:'Objetivo satisfecho',PARTIAL:'Resultado parcial',DIVERGENT:'Resultado divergente',INSUFFICIENT_EVIDENCE:'Evidencia insuficiente',NO_MATCH:'Sin coincidencias',TECHNICAL_ERROR:'Error técnico'};
+  const reviewLabels={PENDING_REVIEW:'Pendiente de tu revisión',ACCEPTED:'Aceptado por el usuario',REJECTED:'Rechazado por el usuario',NOT_REQUIRED:'No requiere revisión humana'};
+  const assessmentPath=id=>'/workspace/executions/'+encodeURIComponent(id)+'/assessment';
+  async function assessedResult(id) {
+    const dialog=document.querySelector('#result-dialog'),host=document.querySelector('#result-content');
+    const sequence=++assessmentSerial;
+    if(!dialog.open)dialog.showModal();host.replaceChildren(node('p','Cargando resultado…'));
+    async function draw(data){
+      if(sequence!==assessmentSerial||!dialog.open)return;
+      host.replaceChildren(node('h3',outcomeLabels[data.result_classification]||'Resultado'));
+      const details=node('dl');for(const [label,value] of [['Estado técnico',states[data.job_status]||data.job_status],['Clasificación',outcomeLabels[data.result_classification]||'Sin evaluación final'],['Motivo',data.classification_reason],['Decisión del Manager',data.manager_decision||'Sin decisión final'],['Objetivo original',data.objective],['Revisión humana',reviewLabels[data.review_status]],['Revisado por',data.reviewed_by],['Fecha de revisión',data.reviewed_at?date(data.reviewed_at):null],['Motivo de revisión',data.review_reason]])if(value)details.append(node('dt',label),node('dd',value));host.append(details);
+      if(data.result_classification==='TECHNICAL_ERROR'){host.append(node('p',data.error_message,'error'),node('p',data.error_code||''),node('p','Esta corrida no se completó. No hay una respuesta final entregada.'));return;}
+      if(data.evidence_status==='UNVERIFIED'||data.evidence_status==='SOURCE_REFERENCED')host.append(banner('Resultado informativo no verificado. No implica aprobación ni autorización de publicación.'));
+      const payload=data.result;
+      if(payload){host.append(node('p',payload.summary||''));
+        for(const item of payload.items||[]){const card=node('article',undefined,'panel');card.append(node('h4',item.title||'Resultado'));if(item.description){const detail=node('details'),summary=node('summary','Ver descripción');detail.append(summary,node('p',item.description));card.append(detail);}if(item.published_at)card.append(node('p',date(item.published_at),'help'));try{const url=new URL(item.url);if(['http:','https:'].includes(url.protocol)){const a=link('Ver referencia',url.href);a.target='_blank';a.rel='noopener noreferrer';card.append(a);}}catch{}host.append(card);}
+        for(const finding of payload.findings||[])host.append(node('p',finding.text||''));
+        for(const warning of payload.warnings||[])host.append(banner(warning));
+      }
+      if(data.requirements_pending?.length){host.append(node('h4','Requisitos pendientes'));for(const item of data.requirements_pending)host.append(node('p',item));}
+      if(data.evidence?.length){host.append(node('h4','Fuentes y evidencias'));for(const source of data.evidence){try{const url=new URL(source.url);if(!['http:','https:'].includes(url.protocol))continue;const a=link(source.title||url.hostname,url.href);a.target='_blank';a.rel='noopener noreferrer';host.append(a);}catch{}}}
+      if(data.result_classification==='NO_MATCH'){
+        host.append(node('p','No encontramos coincidencias para los criterios de esta tarea.'));
+        if(data.task_id)host.append(link('Modificar tarea','/agents/'+encodeURIComponent(data.agent_id)+'/tasks/'+data.task_id+'/edit','secondary'));
+        if(data.task_id){const remove=btn('Eliminar tarea',async()=>{if(!window.confirm('¿Eliminar esta tarea y deshabilitar sus programaciones? El historial se conservará.'))return;remove.disabled=true;try{await request('/workspace/executions/'+encodeURIComponent(id)+'/remove-no-match-task',{method:'POST',body:JSON.stringify({confirm:true})});remove.replaceWith(node('p','Tarea eliminada. El historial se conserva.'));}catch(e){notify(e.data?.error==='task_has_active_executions'?'Hay otras ejecuciones activas de esta tarea. Esperá a que terminen.':e.message);remove.disabled=false;}},'secondary');host.append(remove);}
+      }
+      if(data.job_status==='REVIEWING'&&data.evidence_status==='VERIFIED')host.append(btn('Revisión de evidencia',()=>{dialog.close();reviewResult(id);},'quiet'));
+      if(['PARTIAL','DIVERGENT','INSUFFICIENT_EVIDENCE'].includes(data.result_classification))host.append(btn('Actualizar revisión',async()=>{try{const fresh=await request(assessmentPath(id));await draw(fresh.assessment);}catch(e){notify(e.message);}},'quiet'));
+      if(data.review_required&&data.review_status==='PENDING_REVIEW'){
+        const reason=field(host,'Motivo del rechazo (opcional)','result-feedback-reason','text','',{maxLength:1000}),actions=node('div',undefined,'review-actions'),error=node('p',undefined,'error');error.setAttribute('role','status');
+        async function submit(decision){actions.querySelectorAll('button').forEach(b=>b.disabled=true);
+          try{const response=await request(assessmentPath(id),{method:'POST',body:JSON.stringify({result_id:data.result_id,decision,reason:decision==='REJECTED'?reason.value:''})});await draw({...data,...response.assessment});for(const row of root.querySelectorAll('tbody tr'))if(row.firstElementChild?.textContent===id){const label=row.lastElementChild?.querySelector('small');if(label)label.textContent=reviewLabels[response.assessment.review_status]||'';}notify('Revisión guardada.');}
+          catch(e){error.textContent=e.data?.error==='result_feedback_conflict'?'Este resultado ya fue revisado desde otra sesión. Actualizá el estado.':e.message;actions.querySelectorAll('button').forEach(b=>b.disabled=false);}
+        }
+        actions.append(btn('Aceptar resultado',()=>submit('ACCEPTED'),'primary'),btn('Rechazar resultado',()=>submit('REJECTED'),'secondary'));host.append(actions,error);
+      }
+    }
+    try{const data=await request(assessmentPath(id));await draw(data.assessment);}catch(e){if(sequence===assessmentSerial&&dialog.open)showError(e,host);}
+  }
   async function reviewResult(id) {
     const dialog = document.querySelector('#result-dialog');
     const host = document.querySelector('#result-content');

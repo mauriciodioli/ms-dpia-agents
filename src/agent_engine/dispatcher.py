@@ -80,7 +80,7 @@ class Dispatcher:
             pipeline.append(effective)
         return {**body, 'pipeline': pipeline}, allowed
 
-    def complete_result(self, job, output):
+    def complete_result(self, job, output, *, reason='MANAGER_ACCEPTED'):
         """Single finalization path, called after the Manager accepts a stage."""
         version = (self.conn.execute(select(func.max(m.results.c.version)).where(
             m.results.c.owner_id==job['owner_id'],m.results.c.job_id==job['id'])).scalar() or 0)+1
@@ -88,9 +88,11 @@ class Dispatcher:
         self.conn.execute(insert(m.results).values(id=result_id,owner_id=job['owner_id'],
             job_id=job['id'],version=version,schema_version='agents.task-output.v1',payload=output,
             evidence_status='UNVERIFIED',created_at=self.now,approved_at=None))
+        from .result_assessment import persist
+        persist(self.conn,job,result_id,output)
         from .recurring_results import record_success
         record_success(self.conn,job,result_id,output,self.now)
-        revision = self._transition(job,'REVIEWING',reason='MANAGER_ACCEPTED')
+        revision = self._transition(job,'REVIEWING',reason=reason)
         self.conn.execute(update(m.jobs).where(m.jobs.c.owner_id==job['owner_id'],
             m.jobs.c.id==job['id'],m.jobs.c.revision==revision).values(progress=100))
 
@@ -149,6 +151,8 @@ class Dispatcher:
         # Generate job_id early for planner token tracking
         job_id = str(uuid4())
         manager = ExecutionManager(self.conn, self.registry)
+        from .result_assessment import previous_feedback
+        manager.prior_user_feedback = previous_feedback(self.conn, dict(id=job_id,owner_id=principal.owner_id,agent_id=agent_id,legacy_task_id=legacy_task_id,schedule_id=schedule_id,created_at=self.now))
         agent, context_match = manager.resolve_context(agent, body)
         automatic = legacy_task_id is not None
         effective_body = manager.prepare(agent, body, job_id=job_id, automatic=automatic)
@@ -179,6 +183,7 @@ class Dispatcher:
             request_snapshot=prepared, configuration_snapshot={
                 'name': agent['name'], 'instructions': agent['instructions'], 'limits': agent['limits'],
                 'execution_sources': agent.get('_execution_sources'),
+                'prior_user_feedback':manager.prior_user_feedback,
                 'context_matching': {**context_match, 'tool_contexts': prepared['pipeline']},
                 'plan_omissions':getattr(manager,'plan_omissions',[]),
                 'capabilities': sorted(allowed), 'revision': agent['revision'], 'mcp_tools':mcp_versions},
@@ -421,6 +426,8 @@ class Dispatcher:
             .order_by(m.jobs.c.priority.desc(), m.jobs.c.id).limit(limit)
             .with_for_update(skip_locked=True)).mappings().all()
         for row in approved:
+            from .result_assessment import human_review_allows_delivery
+            if not human_review_allows_delivery(row):continue
             reviewed = select(m.reviews.c.id).where(m.reviews.c.owner_id == m.results.c.owner_id,
                 m.reviews.c.job_id == m.results.c.job_id, m.reviews.c.result_id == m.results.c.id,
                 m.reviews.c.decision == 'APPROVED').exists()

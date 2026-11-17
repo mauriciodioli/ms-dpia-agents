@@ -1109,3 +1109,12 @@ button.agent-delete:hover { background:#fce8ec; }
 .schedule-weekdays{border:0;padding:0;margin:0;min-width:0}.schedule-weekdays legend{font-weight:600;margin-bottom:10px}.schedule-weekday-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
 .schedule-weekday-options label{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer}.schedule-weekday-options label:has(input:checked){border-color:var(--primary,#7952e8);background:#7952e81a}.schedule-weekday-options input{width:18px;height:18px;accent-color:#7952e8;margin:0}.task-schedule-dialog [hidden]{display:none!important}.task-schedule-dialog [role=alert]:empty{display:none}
 @media(max-width:520px){.task-schedule-dialog{padding:22px 18px}.task-schedule-dialog .form-grid{grid-template-columns:1fr}}
+
+/* Classification is distinct from technical state and human acceptance. */
+.result-classification{font-weight:600;border-inline-start:4px solid;padding-inline-start:8px}
+.result-classification[data-classification=SATISFIED]{border-color:#258e60}
+.result-classification[data-classification=PARTIAL]{border-color:#d4771b}
+.result-classification[data-classification=DIVERGENT]{border-color:#9874d9}
+.result-classification[data-classification=INSUFFICIENT_EVIDENCE]{border-color:#b49123}
+.result-classification[data-classification=NO_MATCH]{border-color:#888}
+.result-classification[data-classification=TECHNICAL_ERROR]{border-color:#d34e58}
