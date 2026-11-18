@@ -1375,6 +1375,40 @@
     }
   }
 
+  async function restProvidersSection(){
+    const section=node('section',undefined,'panel'),list=node('div',undefined,'cards'),formHost=node('div'),resultHost=node('div'),status=node('p',undefined,'help');
+    section.id='rest-providers';status.setAttribute('role','status');section.append(node('h2','Proveedores API REST'),node('p','Conexiones con API Key. El catálogo lo define cada adaptador; no se descubren endpoints automáticamente.','help'),btn('Agregar proveedor',()=>edit()),status,formHost,list,resultHost);root.append(section);
+    let adapters=[],busy=false;
+    const call=(path,method='GET',body)=>api('/rest/providers'+path,{method,...(body!==undefined?{body:JSON.stringify(body),headers:{'X-DPIA-Action':'manage-rest-providers'}}:{})});
+    const messages={rest_storage_not_initialized:'Falta aplicar la migración de proveedores REST. Consultá al administrador.',rest_unauthorized:'API Key inválida o vencida.',rest_forbidden:'La API Key no tiene permiso para esta operación.',rest_rate_limited:'El proveedor limitó las consultas. Intentá más tarde.',rest_upstream_error:'El proveedor está temporalmente fuera de servicio.',rest_timeout:'El proveedor no respondió dentro del tiempo configurado.',rest_transport_error:'No se pudo contactar al proveedor.',rest_provider_not_ready:'Primero guardá una API Key y probá la conexión.',rest_credential_required:'Guardá una API Key antes de probar la conexión.',rest_credential_origin_changed:'Cambiaste el dominio. Reemplazá la API Key para autorizar su uso allí.',rest_invalid_url:'Ingresá una URL base HTTPS pública, sin rutas ni parámetros.',rest_redirect_blocked:'El proveedor intentó redirigir la consulta; no se envió la clave a otro destino.'};
+    Object.assign(errors,messages);
+    async function run(fn){if(busy)return;busy=true;status.textContent='Procesando…';section.setAttribute('aria-busy','true');section.querySelectorAll('button').forEach(b=>b.disabled=true);
+      try{const data=await fn();await load();status.textContent=data?.success===false?(messages[data.provider.error_code]||data.provider.error_code):'Cambio confirmado.';status.className=data?.success===false?'error':'help';}
+      catch(e){status.textContent=e.message;status.className='error';}
+      finally{busy=false;section.removeAttribute('aria-busy');section.querySelectorAll('button').forEach(b=>b.disabled=false);}}
+    async function load(){const data=await call('');adapters=data.adapters;list.replaceChildren();
+      if(!data.items.length)list.append(node('p','No hay proveedores REST configurados.'));
+      for(const provider of data.items){const card=node('article',undefined,'agent-card'),actions=node('div',undefined,'agent-actions');card.dataset.restProvider=provider.id;
+        card.append(node('h3',provider.name),node('p',provider.description||'Sin descripción'),node('p',provider.base_url,'help'),node('p',provider.auth_header+' · '+(provider.has_credential?'API Key guardada':'Sin API Key'),'help'),node('p',(provider.enabled?'Habilitado':'Deshabilitado')+' · '+({UNKNOWN:'Sin comprobar',HEALTHY:'Conectado',ERROR:'Error',DISCONNECTED:'Desconectado'}[provider.health]||provider.health)),node('p','Última comprobación: '+date(provider.checked_at),'help'));
+        if(provider.error_code)card.append(node('p',messages[provider.error_code]||provider.error_code,'error'));
+        if(provider.has_credential&&!provider.credential_bound)card.append(node('p',messages.rest_credential_origin_changed,'error'));
+        actions.append(btn('Editar proveedor / API Key',()=>edit(provider)),btn('Probar conexión',()=>run(()=>call('/'+provider.id+'/test','POST',{expected_revision:provider.revision}))),btn(provider.enabled?'Deshabilitar proveedor':'Habilitar proveedor',()=>run(()=>call('/'+provider.id+'/status','PATCH',{expected_revision:provider.revision,enabled:!provider.enabled}))),btn('Desconectar y quitar API Key',()=>{if(confirm('¿Desconectar y eliminar la API Key guardada? No se elimina la clave en el sitio del proveedor.'))run(()=>call('/'+provider.id+'/disconnect','POST',{expected_revision:provider.revision}));}));card.append(actions);
+        const details=node('details'),host=node('div');details.append(node('summary','Endpoints soportados'),host);card.append(details);
+        details.addEventListener('toggle',async()=>{if(!details.open)return;host.replaceChildren(node('p','Consultando catálogo…'));try{const catalog=await call('/'+provider.id+'/operations');host.replaceChildren();for(const operation of catalog.items){const row=node('section');row.append(node('strong',operation.label),node('p',operation.method+' '+operation.path,'help'));const documentation=link('Documentación oficial',operation.documentation);delete documentation.dataset.nav;documentation.target='_blank';documentation.rel='noopener noreferrer';row.append(documentation);
+          if(operation.available)row.append(btn('Consultar '+operation.label.toLowerCase(),()=>run(async()=>{const result=await call('/'+provider.id+'/read/'+operation.id,'POST',{});const output=node('pre',JSON.stringify(result.data,null,2));resultHost.replaceChildren(node('h3',operation.label),output);return result;})));
+          else row.append(node('p','Envío no habilitado en esta etapa.','help'));host.append(row);}}catch(e){host.replaceChildren(node('p',e.message,'error'));}});list.append(card);
+      }
+    }
+    function edit(provider=null){if(!adapters.length){status.textContent='No se pudo cargar el catálogo REST. Actualizá la página después de configurar el servicio.';return;}const form=node('form',undefined,'panel'),grid=node('div',undefined,'form-grid');form.append(node('h3',provider?'Editar proveedor REST':'Agregar proveedor REST'),grid);
+      const kind=field(grid,'Adaptador REST','rest-adapter','select',provider?.adapter||'heygen',{values:adapters.map(a=>a.id)});kind.disabled=Boolean(provider);
+      const initial=adapters.find(a=>a.id===kind.value)||adapters[0],name=field(grid,'Nombre del proveedor REST','rest-name','text',provider?.name||initial.name,{required:true,maxLength:150}),description=field(grid,'Descripción del proveedor REST','rest-description','textarea',provider?.description||'',{maxLength:4000}),url=field(grid,'URL base HTTPS REST','rest-url','url',provider?.base_url||initial.base_url,{required:true,maxLength:2048}),key=field(grid,'API Key (vacía conserva la actual)','rest-key','password','',{maxLength:8192,autocomplete:'new-password'}),timeout=field(grid,'Timeout REST (segundos)','rest-timeout','number',provider?.timeout_seconds||15,{min:1,max:120,required:true});
+      form.append(node('p','Autenticación: '+initial.auth_header+'. Se guarda deshabilitado; probá la conexión antes de habilitarlo. Si cambiás de dominio, reemplazá la clave para autorizar su uso.','help'));
+      const save=node('button','Guardar proveedor','primary');save.type='submit';form.append(save,btn('Cancelar',()=>{key.value='';formHost.replaceChildren();}));
+      form.onsubmit=event=>{event.preventDefault();const body={adapter:kind.value,name:name.value,description:description.value,base_url:url.value,timeout_seconds:Number(timeout.value),...(provider?{expected_revision:provider.revision}:{})};if(key.value)body.credential=key.value;key.value='';run(async()=>{const saved=await call(provider?'/'+provider.id:'',provider?'PATCH':'POST',body);delete body.credential;formHost.replaceChildren();return saved;});};formHost.replaceChildren(form);name.focus();
+    }
+    try{await load();}catch(e){status.textContent=e.message;status.className='error';}
+  }
+
   async function integrationsPage() {
     heading('Integraciones', 'Configuración, conexión y habilitación independiente de proveedores.');
     const dev = node('section', undefined, 'panel');
@@ -1383,6 +1417,7 @@
     dev.append(node('h2', 'API / Desarrolladores'), node('p', 'Endpoints, clientes API y permisos.'), portalLink);
     root.append(dev);
     if(context.session.mcp_manage)await mcpSection();
+    if(context.session.scopes.includes('rest:read')&&context.session.mcp_manage)await restProvidersSection();
     if (!context.session.admin) {
       await ownProviderAccess();
       root.append(banner('Las credenciales y la configuración global son administradas por DPIA.'));

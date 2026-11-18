@@ -11,6 +11,7 @@ def init_app(app):
     from . import deletion_api
     from . import configured_task_api
     from . import mcp_api
+    from .rest_providers import api as rest_provider_api
     from .mcp_oauth import api as mcp_oauth_api
     from . import integration_api  # Register routes before blueprint registration.
     app.register_blueprint(api)
