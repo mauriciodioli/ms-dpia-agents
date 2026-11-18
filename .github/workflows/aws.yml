@@ -204,9 +204,11 @@ jobs:
             deploy_process ms202612agents-worker-local "$@"
             COMMAND=agent-worker EXTRA='--providers --capability search --capability analysis --capability mcp'
             deploy_process ms202612agents-worker-scraper "$@"
+            COMMAND=agent-worker EXTRA='--providers --capability video'
+            deploy_process ms202612agents-worker-video "$@"
 
             sleep 8
-            for name in ms202612agents-dispatcher ms202612agents-outbox ms202612agents-worker-local ms202612agents-worker-scraper; do
+            for name in ms202612agents-dispatcher ms202612agents-outbox ms202612agents-worker-local ms202612agents-worker-scraper ms202612agents-worker-video; do
               test "$(docker inspect --format '{{.State.Running}}' "$name")" = true
               test "$(docker inspect --format '{{.RestartCount}}' "$name")" = 0
               echo "RUNNING: $name"

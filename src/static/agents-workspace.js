@@ -160,8 +160,23 @@
       copy = node('div');
     copy.append(node('p', 'DPIA AGENTS', 'eyebrow'), node('h1', title), node('p', subtitle, 'subheading'));
     row.append(copy);
-    if (action) row.append(action);
+    const actions=node('div',undefined,'actions');
+    if (action) actions.append(action);
+    const livePages=['/','/agents','/schedules','/executions','/integrations','/administration','/admin/agents'];
+    let refresh;
+    if(livePages.includes(location.pathname)){
+      refresh=btn('↻ Actualizar',async()=>{
+        if(refresh.disabled)return;
+        refresh.disabled=true;refresh.textContent='Actualizando…';
+        try{await (refresh.reload || render)();}
+        catch(e){showError(e);}
+        finally{refresh.disabled=false;refresh.textContent='↻ Actualizar';}
+      },'secondary');
+      refresh.setAttribute('aria-label','Actualizar estado');actions.append(refresh);
+    }
+    if(actions.childNodes.length)row.append(actions);
     root.append(row);
+    return refresh;
   }
 
   function empty(host, title, description, action) {
@@ -457,8 +472,9 @@
       ));
   }
   async function agentsPage() {
-    heading('Mis agentes', 'Configuraciones propias, con estados informados por el motor.', link(
+    const refresh=heading('Mis agentes', 'Configuraciones propias, con estados informados por el motor.', link(
       '+ Crear agente', '/agents/new'));
+    refresh.reload=()=>load();
     const host = node('section');
     root.append(host);
     const cursors = [null];
@@ -1003,7 +1019,8 @@
   }
 
   async function executionsPage() {
-    heading('Ejecuciones', 'Historial real de los trabajos de tu cuenta.');
+    const refresh=heading('Ejecuciones', 'Historial real de los trabajos de tu cuenta.');
+    refresh.reload=()=>load();
     const launch = node('section', undefined, 'panel');
     launch.append(node('h2', 'Ejecutar prueba interna'),
       node('p', 'Solo usa el adaptador local. No llama a OpenAI ni a Apify. El resultado queda sin verificar.', 'help'));
@@ -1685,7 +1702,7 @@
       return;
     }
     const data = await api('/admin/overview');
-    heading('Administración', 'Supervisión global de agentes, trabajos y workers.',btn('Actualizar estado',render,'secondary'));
+    heading('Administración', 'Supervisión global de agentes, trabajos y workers.');
     root.append(banner(
       'La gestión de usuarios y roles está pendiente: todavía no existe una API de administración de usuarios.'
       ));
