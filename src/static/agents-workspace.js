@@ -511,9 +511,46 @@
     host.append(wrap);
     return input;
   }
+  async function videoEditor(task, taskPath, administrative) {
+    const data=await api(taskPath+'/video/settings');let revision=data.task.revision;
+    const values=data.task.settings,back=administrative?'/administration':'/agents';
+    heading('Configurar video','Tarea VIDEO_GENERAR · DPIA Agents',link('Volver a mis agentes',back,'secondary'));
+    const form=node('form'),controls={},feedback=node('p',undefined,'help');feedback.setAttribute('role','status');
+    function section(title){const panel=node('section',undefined,'panel'),grid=node('div',undefined,'form-grid');panel.append(node('h2',title),grid);form.append(panel);return grid;}
+    function input(grid,label,key,type='text',options){const el=field(grid,label,key,type,values[key],{...(options?{values:options}:{}),required:!['script'].includes(key)});controls[key]=el;return el;}
+    function choice(grid,label,key,options){const el=input(grid,label,key,'select',options.map(x=>x[0]));for(let i=0;i<options.length;i++)el.options[i].textContent=options[i][1];return el;}
+    let grid=section('01 — Contenido del video');
+    input(grid,'Nombre de la tarea','name').maxLength=120;
+    input(grid,'¿Qué video querés generar?','objective','textarea').maxLength=4000;
+    choice(grid,'Tipo de video','kind',[['news','Noticiero'],['explanatory','Explicativo'],['promotional','Promocional'],['summary','Resumen']]);
+    const duration=input(grid,'Duración objetivo (segundos)','duration_seconds','number');duration.min=1;duration.max=3600;
+    input(grid,'Idioma','language');choice(grid,'Formato','aspect_ratio',[['16:9','Horizontal · 16:9'],['9:16','Vertical · 9:16'],['1:1','Cuadrado · 1:1']]);
+    grid=section('02 — Guion y fuentes');
+    choice(grid,'Origen del contenido','content_source',[['agent','Resultados e investigaciones del agente'],['user','Solo instrucciones del usuario']]);
+    const mode=choice(grid,'Generación del guion','script_mode',[['automatic','Generar automáticamente con IA'],['custom','Escribir mi propio guion']]);
+    const script=input(grid,'Guion personalizado','script','textarea');script.maxLength=20000;
+    const updateScript=()=>{script.parentElement.hidden=mode.value!=='custom';script.required=mode.value==='custom';};mode.onchange=updateScript;updateScript();
+    choice(grid,'Estilo narrativo','tone',[['professional','Profesional'],['friendly','Cercano'],['informative','Informativo'],['enthusiastic','Entusiasta']]);
+    grid=section('03 — Producción audiovisual');
+    const provider=field(grid,'Proveedor de video','video-provider','text','HeyGen Video AI');provider.readOnly=true;
+    const avatar=choice(grid,'Presentador','avatar',[[values.avatar||'auto',values.avatar==='auto'?'Automático':values.avatar]]);
+    const voice=choice(grid,'Voz','voice',[[values.voice||'auto',values.voice==='auto'?'Automática':values.voice]]);
+    grid.append(node('p','La selección automática se resolverá con el catálogo autorizado al preparar la producción. Guardar no consulta proveedores.','help'));
+    grid=section('04 — Ejecución y presupuesto');
+    choice(grid,'Programación','schedule',[['manual','Manual']]);input(grid,'Hora','time','time');input(grid,'Zona horaria IANA','timezone');
+    choice(grid,'Autorización de producción','approval',[['manual','Revisar y aprobar antes de generar'],['automatic','Automática, dentro del presupuesto autorizado']]);
+    const budget=input(grid,'Límite de gasto por ejecución (créditos DPIA)','max_cost','number');budget.min=0;budget.max=1000000;budget.step=1;
+    grid.append(node('p','0 significa que no se autoriza consumo de créditos. La producción de video todavía no está habilitada; guardar no inicia ni cambia programaciones existentes.','help'));
+    function payload(){return Object.fromEntries(Object.entries(controls).map(([k,v])=>[k,k==='duration_seconds'?Number(v.value):v.value]));}
+    const actions=node('div',undefined,'actions'),copy=btn('Copiar configuración JSON',async()=>{try{await navigator.clipboard.writeText(JSON.stringify(payload(),null,2));feedback.textContent='Configuración copiada.';}catch(e){feedback.textContent='No se pudo copiar al portapapeles.';}}),save=node('button','Guardar configuración','primary');save.type='submit';
+    actions.append(link('Cancelar',back,'secondary'),copy,save);form.append(feedback,actions);root.append(form);
+    form.onsubmit=async event=>{event.preventDefault();save.disabled=true;try{const result=await api(taskPath+'/video/settings',{method:'PATCH',headers:{'X-DPIA-Action':'manage-agents'},body:JSON.stringify({...payload(),expected_revision:revision})});revision=result.task.revision;feedback.textContent='Configuración guardada. No se inició la producción.';}catch(e){feedback.textContent=e.message;}finally{save.disabled=false;}};
+  }
+
   async function editor(id, taskId=null, administrative=false) {
     const taskPath=taskId?(administrative?'/admin':'')+'/agents/'+encodeURIComponent(id)+'/configured-tasks/'+taskId:null;
     const task=taskPath?(await api(taskPath)).task:null;
+    if(task?.type==='VIDEO_GENERAR')return videoEditor(task,taskPath,administrative);
     const a=task?{...task.configuration,id,revision:task.revision,search_parameters:task.configuration.tool_parameters}:
       id?(await api('/agents/'+encodeURIComponent(id))).agent:null;
     const tasks=id&&!taskId?(await api('/agents/'+encodeURIComponent(id)+'/configured-tasks')).items:[];

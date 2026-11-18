@@ -67,6 +67,7 @@ def update_configured_task_schedule(conn, principal, repo, agent_id, task_id):
 
 
 @api.route('/agents/<agent_id>/configured-tasks/<int:task_id>/video/<section>', methods=['GET', 'PATCH'])
+@api.route('/admin/agents/<agent_id>/configured-tasks/<int:task_id>/video/<section>', methods=['GET', 'PATCH'])
 @endpoint('agents:read', write=True)
 def configured_task_video(conn, principal, repo, agent_id, task_id, section):
     from flask import request
@@ -76,4 +77,5 @@ def configured_task_video(conn, principal, repo, agent_id, task_id, section):
     if request.method == 'PATCH':
         engine_write(principal)
         body = json_body()
-    return {'task': edit(ConfiguredTaskManager(conn, principal), identifier(agent_id), task_id, section, body)}
+    return {'task': edit(ConfiguredTaskManager(conn, principal), identifier(agent_id), task_id, section, body,
+        administrative=request.path.startswith('/api/agents/v1/admin/'))}
