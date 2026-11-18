@@ -73,7 +73,7 @@ def edit(manager, agent_id, task_id, section, body=None, administrative=False):
         if body['expected_revision'] != revision:
             raise EngineError('revision_conflict', 409)
         if section == 'settings':
-            video['editor'] = values
+            video['editor'] = {k:v for k,v in values.items() if k not in ('schedule','time','timezone')}
             video['script']['custom_script'] = values['script'] if values['script_mode']=='custom' else ''
             video['production'].update(video_type=KINDS[values['kind']], duration_seconds=values['duration_seconds'],
                 language=values['language'], format=values['aspect_ratio'],
@@ -108,7 +108,7 @@ def editor_values(row, video):
         'script_mode':'custom' if script['custom_script'] else 'automatic',
         'script':script['custom_script'], 'content_source':'agent', 'schedule':'manual',
         'time':((row.get('parametros') or {}).get('schedule') or {}).get('time','00:00'), 'timezone':((row.get('parametros') or {}).get('schedule') or {}).get('timezone','UTC'), 'approval':'automatic' if production['automatic_production'] else 'manual',
-        'max_cost':str(production['budget_credits'])}, **{k:v for k,v in video.get('editor',{}).items() if k in ('objective','tone','content_source','schedule','time','timezone')},
+        'max_cost':str(production['budget_credits'])}, **{k:v for k,v in video.get('editor',{}).items() if k in ('objective','tone','content_source')},
         'name':row['nombre']}
 
 
