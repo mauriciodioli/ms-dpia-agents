@@ -47,6 +47,9 @@ def execution_agent(task, agent):
 
 
 def task_request(task, agent, fallback=None):
+    if task['tipo'] == 'VIDEO_GENERAR':
+        # Never run a copied parent search as a video production.
+        raise EngineError('video_execution_not_available', 409)
     parameters=task['parametros'] or {}
     configuration=parameters.get('_agent_configuration')
     if configuration:

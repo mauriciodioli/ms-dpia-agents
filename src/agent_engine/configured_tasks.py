@@ -85,6 +85,9 @@ class ConfiguredTaskManager:
                 save_task_schedule(self.conn,principal,agent,row,schedule)
         task = public_task(row, agent_id)
         task['schedules'] = schedules_for_task(self.conn,agent,task_id)
+        if row['tipo'] == 'VIDEO_GENERAR':
+            from .video_configuration import configuration
+            task['video_configuration'] = configuration(params)
         task['configuration'] = params.get(CONFIG_KEY) or task_editor_configuration(
             self.conn, row, agent, self.registry, self.repository.capabilities(agent))
         return task
