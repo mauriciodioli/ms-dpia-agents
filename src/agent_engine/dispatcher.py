@@ -97,10 +97,14 @@ class Dispatcher:
             m.jobs.c.id==job['id'],m.jobs.c.revision==revision).values(progress=100))
 
     def _transition(self, row, target, principal=None, reason=None):
-        return transition_job(self.conn, owner_id=row['owner_id'], job_id=row['id'],
+        revision = transition_job(self.conn, owner_id=row['owner_id'], job_id=row['id'],
             expected_revision=row['revision'], target=target,
             actor_id=principal.actor_id if principal else 'dispatcher',
             actor_type=principal.kind if principal else 'SYSTEM', reason_code=reason, now=self.now)
+        if target == 'DELIVERED':
+            from .product_reconciliation.service import reconcile_delivered
+            reconcile_delivered(self.conn,row['owner_id'],row['agent_id'],row['id'])
+        return revision
 
     def _queue(self, row):
         task = self.conn.execute(select(m.tasks).where(m.tasks.c.owner_id == row['owner_id'],

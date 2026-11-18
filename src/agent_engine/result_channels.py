@@ -26,7 +26,7 @@ def task_action(conn,principal,repo,job,action,configuration=None):
     from .configured_tasks import ConfiguredTaskManager
     from .result_assessment import remove_no_match
     data=project(conn,repo,job)
-    if data['result_classification']!='NO_MATCH' or not job['legacy_task_id']:raise EngineError('no_match_task_required',409)
+    if data['result_classification'] not in {'PARTIAL','DIVERGENT','INSUFFICIENT_EVIDENCE','NO_MATCH','TECHNICAL_ERROR'} or not job['legacy_task_id']:raise EngineError('no_match_task_required',409)
     if action not in ('inspect','update','remove') or (action!='update' and configuration is not None):raise EngineError('invalid_contract')
     principal.require('agents:read')
     if action=='remove':return remove_no_match(conn,principal,job)

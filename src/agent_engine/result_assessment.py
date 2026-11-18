@@ -144,7 +144,7 @@ def remove_no_match(conn,principal,job):
     from .contracts import iso
     from .configured_tasks import ConfiguredTaskManager
     from .management import audit_agent
-    if inspect(conn,job)['result_classification']!='NO_MATCH' or not job['legacy_task_id']:
+    if inspect(conn,job)['result_classification'] not in {'PARTIAL','DIVERGENT','INSUFFICIENT_EVIDENCE','NO_MATCH','TECHNICAL_ERROR'} or not job['legacy_task_id']:
         raise EngineError('no_match_task_required',409)
     service=ConfiguredTaskManager(conn,principal);_,agent=service.access(job['agent_id'])
     rows=service.repository.rows(agent,job['legacy_task_id'])
@@ -161,5 +161,5 @@ def remove_no_match(conn,principal,job):
     conn.execute(update(table).where(table.c.id==row['id'],table.c.agente_id==row['agente_id']).values(habilitada=False))
     conn.execute(update(m.schedules).where(m.schedules.c.owner_id==principal.owner_id,
         m.schedules.c.agent_id==job['agent_id'],m.schedules.c.legacy_task_id==row['id']).values(enabled=False))
-    audit_agent(conn,principal,agent,'TASK_DELETED_NO_MATCH',{'task_id':row['id'],'job_id':job['id']})
+    audit_agent(conn,principal,agent,'TASK_DELETED_NO_MATCH' if inspect(conn,job)['result_classification']=='NO_MATCH' else 'TASK_DELETED_FROM_RESULT',{'task_id':row['id'],'job_id':job['id']})
     return {'removed':True}
