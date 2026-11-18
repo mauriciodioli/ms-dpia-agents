@@ -93,7 +93,7 @@ class VideoHandlers:
 
     def request(self,row,secret,path,params=None,full=False):
         status,data=self.rest.http.get(row['base_url'],path,secret,'X-Api-Key',row['timeout_seconds'],**({'params':params} if params is not None else {}))
-        if status!=200:raise EngineError({401:'rest_unauthorized',403:'rest_forbidden',429:'rest_rate_limited'}.get(status,'rest_upstream_error'),502)
+        if status!=200:raise EngineError({404:'VIDEO_RESOURCE_NOT_FOUND',401:'rest_unauthorized',403:'rest_forbidden',429:'rest_rate_limited'}.get(status,'rest_upstream_error'),502)
         if secret and secret in json.dumps(data,ensure_ascii=False):raise EngineError('VIDEO_PROVIDER_INVALID_RESPONSE',502)
         return data if full else data.get('data')
 
@@ -125,26 +125,16 @@ class VideoHandlers:
             if task['provider_submission_state']!='NOT_SUBMITTED':raise EngineError('VIDEO_SUBMISSION_UNCERTAIN',409)
             if not production['automatic_production']:raise EngineError('VIDEO_PRODUCTION_APPROVAL_REQUIRED',409)
             if production['budget_credits']<=0:raise EngineError('VIDEO_BUDGET_INSUFFICIENT',409)
-            from .heygen_resources import catalog
-            read_catalog=lambda path,params=None:catalog(lambda p,q:self.request(row,secret,p,q,full=True),path,params)
-            avatars=read_catalog('/v3/avatars/looks')
-            voices=read_catalog('/v3/models/audio/voices')
-            try:avatar=select_resource(avatars,'avatar_id',production['avatar_id'])
-            except EngineError as error:
-                if error.code not in ('VIDEO_AVATAR_UNAVAILABLE','VIDEO_VOICE_UNAVAILABLE'):raise
-                avatar=select_resource(read_catalog('/v3/avatars/looks',{'ownership':'public'}),'avatar_id',production['avatar_id'])
-            try:voice=select_resource(voices,'voice_id',production['voice_id'],production['language'])
-            except EngineError as error:
-                if error.code not in ('VIDEO_AVATAR_UNAVAILABLE','VIDEO_VOICE_UNAVAILABLE'):raise
-                voices=read_catalog('/v3/models/audio/voices',{'type':'public','language':production['language']})
-                voice=select_resource(voices,'voice_id',production['voice_id'])
+            from .heygen_resources import resolve_resource
+            read=lambda path,params=None:self.request(row,secret,path,params,full=True)
+            avatar,_=resolve_resource(read,'avatar_id',production['avatar_id'],production['language'])
+            voice,voice_row=resolve_resource(read,'voice_id',production['voice_id'],production['language'])
             body={'type':'avatar','avatar_id':avatar,'voice_id':voice,
                   'script':'\n'.join(s['narration'] for s in script['scenes']),
                   'title':script['title'],'aspect_ratio':production['format'],'engine':{'type':'avatar_iv'},'resolution':'720p'}
             capabilities=self.request(row,secret,'/v3/videos/voice-capabilities')
             body['voice_settings']=voice_settings(capabilities,production['language'])
-            voice_rows=voices if isinstance(voices,list) else voices.get('voices',voices.get('items',[]))
-            if any(r.get('voice_id')==voice and r.get('mode')=='professional' for r in voice_rows if isinstance(r,dict)):
+            if voice_row.get('mode')=='professional':
                 body['voice_settings']['engine_settings'].pop('model',None)
             from .provider_transport import serialize_body
             from .heygen_video_contract import validate_video_body

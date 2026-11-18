@@ -89,7 +89,7 @@ def configured_task_video_resources(conn,principal,repo,agent_id,task_id):
     from .errors import EngineError
     arguments();engine_write(principal)
     command=json_body()
-    if not isinstance(command,dict) or set(command)!={'language'}:raise EngineError('invalid_contract',422)
+    if not isinstance(command,dict) or ('language' not in command or set(command)-{'language','avatar_id','voice_id'}):raise EngineError('invalid_contract',422)
     manager=ConfiguredTaskManager(conn,principal)
     effective,agent=manager.access(identifier(agent_id),request.path.startswith('/api/agents/v1/admin/'))
     rows=manager.repository.rows(agent,task_id)
@@ -98,4 +98,4 @@ def configured_task_video_resources(conn,principal,repo,agent_id,task_id):
     rest=service()
     candidates=[p for p in rest.listing(effective)['items'] if p['adapter']=='heygen' and p['enabled']]
     if len(candidates)!=1:raise EngineError('VIDEO_PROVIDER_SELECTION_REQUIRED',409)
-    return rest.video_resources(effective,candidates[0]['id'],command['language'])
+    return rest.video_resources(effective,candidates[0]['id'],command['language'],command.get('avatar_id',''),command.get('voice_id',''))

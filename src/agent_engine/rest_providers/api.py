@@ -72,5 +72,5 @@ def rest_prepare(conn,principal,repo,provider_id):
 @endpoint()
 def rest_video_resources(conn,principal,repo,provider_id):
  arguments();write(principal);command=body()
- if not isinstance(command,dict) or set(command)!={'language'}:raise EngineError('invalid_contract',422)
- return service().video_resources(principal,identifier(provider_id),command['language'])
+ if not isinstance(command,dict) or ('language' not in command or set(command)-{'language','avatar_id','voice_id'}):raise EngineError('invalid_contract',422)
+ return service().video_resources(principal,identifier(provider_id),command['language'],command.get('avatar_id',''),command.get('voice_id',''))
