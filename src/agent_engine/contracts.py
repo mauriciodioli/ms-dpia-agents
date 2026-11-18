@@ -98,6 +98,11 @@ RESULT = {
     'properties': {
         'schema_version': {'const': 'agents.result.v1'},
         'summary': {'type': 'string', 'maxLength': 20000},
+        'video_script':{'type':'object'},
+        'video': {'type':'object','additionalProperties':False,'required':['url','provider','remote_id','state','script','cost'],
+                  'properties':{'url':{'type':'string','maxLength':2000,'format':'uri'},'provider':{'const':'heygen'},
+                    'remote_id':{'type':'string','maxLength':160},'state':{'const':'COMPLETED'},
+                    'script':{'type':'object'},'cost':{'type':'object'}}},
         'items': {'type':'array','maxItems':100,'items':{'type':'object','additionalProperties':False,
             'required':['title','url','description'],'properties':{
                 'title':{'type':'string','minLength':1,'maxLength':1000},

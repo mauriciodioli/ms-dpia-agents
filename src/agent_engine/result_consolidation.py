@@ -11,6 +11,8 @@ def normalize(output):
     payload = {key:output.get(key, default) for key,default in
                (('summary',''),('findings',[]),('sources',[]),('warnings',[]))}
     payload['schema_version'] = 'agents.result.v1'
+    if output.get('video'):payload['video']=output['video']
+    if output.get('video_script'):payload['video_script']=output['video_script']
     items = []; seen = set()
     for row in rows:
         item = card(row)

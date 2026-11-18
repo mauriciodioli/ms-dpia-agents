@@ -84,6 +84,18 @@ class TaskBox:
         require_unpaused(conn,agent)
         if agent['configuration_state'] != 'ENABLED':
             raise EngineError('agent_paused', 409)
+        from .video_plan import TOOLS,SCRIPT,authorize
+        if task['tool_id'] in TOOLS:
+            if task['tool_id'] not in job['configuration_snapshot'].get('capabilities',[]):raise EngineError('tool_authorization_revoked',403)
+            parameters=task['input_snapshot'].get('parameters',{})
+            if job.get('legacy_task_id')!=parameters.get('task_id'):raise EngineError('VIDEO_TASK_NOT_AUTHORIZED',403)
+            row=authorize(conn,agent,parameters['task_id'],parameters.get('revision'))
+            from .rest_providers.service import access
+            access(conn,principal,'rest:write')
+            if not row['habilitada']:raise EngineError('VIDEO_TASK_NOT_AUTHORIZED',403)
+            if task['tool_id']==SCRIPT and not ((row['parametros'] or {}).get('video') or {}).get('script',{}).get('custom_script','').strip():
+                self.authorized(conn,job,{**task,'tool_id':'openai.analysis'},require_provider=True,check_integration=check_integration)
+            return (self.registry.using(conn) if hasattr(self.registry,'using') else self.registry).tools[task['tool_id']]
         from .commercial import TOOL, DEPENDENCIES, configured
         if task['tool_id'] == TOOL:
             if not configured() or TOOL not in job['configuration_snapshot'].get('capabilities', []):
@@ -202,7 +214,8 @@ class TaskBox:
             if task['state'] in ('COMPLETED', 'FAILED', 'CANCELLED'):
                 return 'ACK', None
             if (task['state'] != 'PENDING' or (task['next_attempt_at'] and task['next_attempt_at'] > self.now())
-                    or task['provider_submission_state'] != 'NOT_SUBMITTED'):
+                    or (task['provider_submission_state'] != 'NOT_SUBMITTED' and not
+                        (task['tool_id']=='dpia.video.produce' and task['provider_job_id']))):
                 return 'DEFER', None
             if job['deadline_at'] and job['deadline_at'] <= self.now():
                 self._fail(conn, job, 'JOB_DEADLINE_EXCEEDED')
@@ -278,6 +291,15 @@ class TaskBox:
         with self.engine.begin() as conn:
             job, task = self._owned(conn, lease)
             spec = self.authorized(conn, job, task, require_provider=lease.tool_id != 'dpia.test.echo')
+            if task['tool_id']=='dpia.video.produce':
+                other=conn.execute(select(m.tasks.c.id).join(m.jobs,
+                    (m.tasks.c.job_id==m.jobs.c.id)&(m.tasks.c.owner_id==m.jobs.c.owner_id)).where(
+                    m.jobs.c.owner_id==job['owner_id'],m.jobs.c.agent_id==job['agent_id'],
+                    m.jobs.c.legacy_task_id==job['legacy_task_id'],m.tasks.c.tool_id=='dpia.video.produce',
+                    m.tasks.c.id!=task['id'],m.tasks.c.state!='COMPLETED',
+                    ((m.tasks.c.provider_submission_state!='NOT_SUBMITTED') |
+                     ((m.tasks.c.state=='RUNNING') & m.tasks.c.output.is_not(None)))).limit(1)).first()
+                if other:raise EngineError('VIDEO_PREVIOUS_OPERATION_UNRESOLVED',409)
             if expected_integration_revision is not None:
                 from .integrations import BY_PROVIDER
                 from .integration_models import integrations
@@ -336,6 +358,25 @@ class TaskBox:
 
     def _retry_or_block(self, conn, job, task, *, recovery=False, error_code=None):
         uncertain = task['provider_submission_state'] != 'NOT_SUBMITTED'
+        if uncertain and task['tool_id']=='dpia.video.script' and task['provider_job_id'] and error_code in ('VIDEO_SCRIPT_INVALID_RESPONSE','VIDEO_SCRIPT_INVALID_REFERENCE','VIDEO_SCRIPT_DURATION_EXCEEDED','VIDEO_SCRIPT_SOURCE_LIMIT','invalid_token_usage','invalid_task_output','invalid_contract'):
+            self._fail(conn,job,error_code);return
+        if uncertain and task['tool_id']=='dpia.video.produce' and task['provider_job_id']:
+            # A confirmed remote ID permits GET-only monitoring, never another POST.
+            used=conn.execute(select(func.sum(m.tasks.c.attempt_count)).where(
+                m.tasks.c.owner_id==job['owner_id'],m.tasks.c.job_id==job['id'])).scalar() or 0
+            if (error_code in ('VIDEO_PROVIDER_GENERATION_FAILED','VIDEO_PROVIDER_INVALID_RESPONSE','VIDEO_CONFIGURATION_CHANGED')
+                    or task['attempt_count']>=self.policy.max_attempts or used>=job['request_snapshot']['limits']['max_tool_calls']):
+                self._fail(conn,job,error_code or 'TASK_ATTEMPT_BUDGET_EXCEEDED');return
+            due=self.now()+timedelta(seconds=2)
+            conn.execute(update(m.tasks).where(m.tasks.c.id==task['id'],m.tasks.c.owner_id==job['owner_id']).values(
+                state='PENDING',lease_token=None,lease_until=None,lease_version=task['lease_version']+1,
+                next_attempt_at=due))
+            conn.execute(update(m.attempts).where(m.attempts.c.task_id==task['id'],m.attempts.c.owner_id==job['owner_id'],
+                m.attempts.c.state=='RUNNING').values(state='RETRYABLE_ERROR',error_code=error_code or 'LEASE_EXPIRED',finished_at=self.now()))
+            conn.execute(update(m.workers).where(m.workers.c.current_task_id==task['id']).values(current_task_id=None,reported_state='AVAILABLE'))
+            self._rearm(conn,job,task,due)
+            self._event(conn,job,'TASK_RETRY_SCHEDULED')
+            return
         if not uncertain and error_code in LOCAL_NON_RETRYABLE:
             self._fail(conn,job,error_code)
             return
@@ -403,7 +444,7 @@ class TaskBox:
                 m.tasks.c.owner_id == m.outbox.c.owner_id, m.tasks.c.id == m.outbox.c.task_id)).where(
                     m.outbox.c.owner_id == m.jobs.c.owner_id, m.outbox.c.job_id == m.jobs.c.id,
                     m.outbox.c.published_at <= self.now()-timedelta(seconds=self.policy.republish_seconds),
-                    m.tasks.c.state == 'PENDING', m.tasks.c.provider_submission_state == 'NOT_SUBMITTED').exists()
+                    m.tasks.c.state == 'PENDING', ((m.tasks.c.provider_submission_state == 'NOT_SUBMITTED') | ((m.tasks.c.tool_id=='dpia.video.produce') & m.tasks.c.provider_job_id.is_not(None)))).exists()
             rows = conn.execute(select(m.jobs).where(m.jobs.c.state.in_(['QUEUED', 'RUNNING']))
                 .where((m.jobs.c.deadline_at <= self.now()) | expired_task | lost_distribution)
                 .order_by(m.jobs.c.updated_at, m.jobs.c.id).limit(limit)
@@ -424,7 +465,7 @@ class TaskBox:
                 # strand ready MySQL work. Duplicates remain fenced by claim().
                 ready = conn.execute(select(m.tasks).where(m.tasks.c.owner_id == job['owner_id'],
                     m.tasks.c.job_id == job['id'], m.tasks.c.state == 'PENDING',
-                    m.tasks.c.provider_submission_state == 'NOT_SUBMITTED').with_for_update()).mappings().all()
+                    ((m.tasks.c.provider_submission_state == 'NOT_SUBMITTED') | ((m.tasks.c.tool_id=='dpia.video.produce') & m.tasks.c.provider_job_id.is_not(None)))).with_for_update()).mappings().all()
                 for task in ready:
                     old = conn.execute(select(m.outbox).where(m.outbox.c.owner_id == job['owner_id'],
                         m.outbox.c.task_id == task['id']).with_for_update()).mappings().first()

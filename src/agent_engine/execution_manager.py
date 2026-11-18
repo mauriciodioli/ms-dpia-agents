@@ -14,6 +14,10 @@ def automatic_request(agent, body):
     """
     limits = dict(body['limits'])
     ceiling = agent['limits']['max_tool_calls']
+    from .video_plan import is_plan
+    if is_plan(body):
+        limits['max_tool_calls']=min(limits['max_tool_calls'],ceiling)
+        return {**body,'limits':limits}
     steps = len(body.get('pipeline', []))
     limits['max_corrections'] = min(limits['max_corrections'], agent['limits']['max_corrections'])
     if steps:
@@ -39,6 +43,17 @@ class ExecutionManager:
     def evaluate_step(self, job, task, output, following):
         """Authorize advancement; sufficiency never implies factual verification."""
         from .contracts import RESULT, validate
+        from .video_plan import SCRIPT,PRODUCE
+        if task['tool_id']==SCRIPT:
+            from .video_worker import prior_script
+            try:prior_script([task.get('output') or output])
+            except EngineError:return 'REJECT','VIDEO_SCRIPT_NOT_PERSISTED'
+            return ('CONTINUE','VIDEO_SCRIPT_READY') if following else ('REJECT','VIDEO_PRODUCTION_STAGE_MISSING')
+        if task['tool_id']==PRODUCE:
+            video=output.get('video')
+            if isinstance(video,dict) and video.get('state')=='COMPLETED' and video.get('remote_id') and video.get('url'):
+                return 'ACCEPT','VIDEO_COMPLETED'
+            return 'REJECT','VIDEO_PROVIDER_INVALID_RESPONSE'
         objective = job['request_snapshot'].get('objective') or job['request_snapshot'].get('instructions', '')
         try:
             validate(RESULT, output)
@@ -237,6 +252,10 @@ class ExecutionManager:
 
     def finalize(self, agent, body, *, scheduled=False, automatic=False):
         """Called after authorization/schema checks, before any job reaches a worker."""
+        from .video_plan import is_plan
+        if is_plan(body):
+            if body['limits']['max_tool_calls']<2:raise EngineError('video_execution_not_available',409)
+            return body
         if scheduled:
             from .connection_preflight import ConnectionPreflight
             available, self.skipped = ConnectionPreflight(self.conn, self.registry).prepare(agent, body['pipeline'])

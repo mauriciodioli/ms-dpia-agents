@@ -90,8 +90,9 @@ def edit(manager, agent_id, task_id, section, body=None, administrative=False):
         audit_agent(manager.conn, principal, agent, 'TASK_VIDEO_CONFIGURATION_UPDATED',
                     {'task_id': task_id, 'section': section, 'task_revision': revision})
     if body is not None and section=='settings':row={**row,'nombre':values['name'].strip()}
+    from .video_plan import EXECUTION_AVAILABLE
     return {'settings':editor_values(row,video), 'id': task_id, 'revision': revision, 'video_configuration': video,
-            'execution_available': False}
+            'execution_available': EXECUTION_AVAILABLE}
 
 
 KINDS = {'news':'Noticiero','explanatory':'Explicativo','promotional':'Promocional','summary':'Resumen'}

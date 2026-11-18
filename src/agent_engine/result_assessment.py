@@ -12,7 +12,7 @@ REVIEWABLE = frozenset({'PARTIAL', 'DIVERGENT', 'INSUFFICIENT_EVIDENCE'})
 LABELS = {'SATISFIED':'Objetivo satisfecho', 'PARTIAL':'Resultado parcial',
           'DIVERGENT':'Resultado divergente', 'INSUFFICIENT_EVIDENCE':'Evidencia insuficiente',
           'NO_MATCH':'Sin coincidencias', 'TECHNICAL_ERROR':'Error técnico'}
-REASONS = {'STRUCTURED_JOB_OBJECTIVE_SATISFIED':'Los resultados satisfacen los criterios laborales solicitados.',
+REASONS = {'VIDEO_COMPLETED':'El proveedor completó el video solicitado; el contenido conserva su estado de verificación.','STRUCTURED_JOB_OBJECTIVE_SATISFIED':'Los resultados satisfacen los criterios laborales solicitados.',
            'STRUCTURED_COMMERCIAL_OBJECTIVE_SATISFIED':'Los resultados satisfacen los criterios comerciales solicitados.',
            'PARTIAL_JOB_RESULTS':'Hay resultados útiles, pero no cumplen todos los requisitos solicitados.',
            'SEARCH_NO_MATCH':'La búsqueda terminó sin coincidencias para los criterios solicitados.',
@@ -33,7 +33,7 @@ def classification(job, payload):
     explanation = semantic.get('reason') if reason.startswith('MANAGER_SEMANTIC_') else None
     if reason == 'PARTIAL_JOB_RESULTS': category = 'PARTIAL'
     elif reason == 'SEARCH_NO_MATCH': category = 'NO_MATCH'
-    elif reason in ('STRUCTURED_JOB_OBJECTIVE_SATISFIED','STRUCTURED_COMMERCIAL_OBJECTIVE_SATISFIED'):
+    elif reason in ('STRUCTURED_JOB_OBJECTIVE_SATISFIED','STRUCTURED_COMMERCIAL_OBJECTIVE_SATISFIED','VIDEO_COMPLETED'):
         category = 'SATISFIED'
     elif reason == 'MANAGER_SEMANTIC_REJECT':
         category = 'INSUFFICIENT_EVIDENCE' if semantic.get('missing_information') else 'DIVERGENT'

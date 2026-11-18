@@ -89,10 +89,14 @@ def worker_command(capability, watch, interval, local_test, providers):
     from .streams import RedisStreams
     handlers = current_app.extensions.get('agent_engine_handlers')
     if providers:
-        if local_test or not set(capability).issubset({'search', 'analysis', 'mcp', 'commercial'}):
+        if local_test or not set(capability).issubset({'search', 'analysis', 'mcp', 'commercial', 'video'}):
             raise click.ClickException('invalid_provider_worker_capability')
         from .provider_handlers import provider_handlers
         handlers = provider_handlers(engine(), current_app.config)
+        if 'video' in capability:
+            if set(capability)!={'video'}:raise click.ClickException('video_requires_dedicated_worker')
+            from .video_worker import video_handlers
+            handlers=video_handlers(engine(),current_app.config)
         if 'commercial' in capability:
             if set(capability) != {'commercial'}:
                 raise click.ClickException('commercial_requires_dedicated_worker')
@@ -128,3 +132,17 @@ def inbox_command(watch, interval, batch_size):
         with engine().begin() as conn:
             return tick(conn, batch_size)
     _repeat_queue_operation(cycle, watch, interval)
+
+
+@click.command('agent-video-check')
+@with_appcontext
+def video_check_command():
+    """Read-only verification of the real MySQL shared credit ledger; no DDL."""
+    from .video_costs import validate_storage
+    try:
+        with engine().connect() as conn:
+            if conn.dialect.name!='mysql':raise EngineError('video_mysql_validation_required',503)
+            validate_storage(conn)
+    except (EngineError,SQLAlchemyError) as error:
+        raise click.ClickException(error.code if isinstance(error,EngineError) else 'engine_storage_unavailable') from None
+    click.echo('VIDEO_LEDGER_SCHEMA_COMPATIBLE')

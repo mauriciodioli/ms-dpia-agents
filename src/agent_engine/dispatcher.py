@@ -66,6 +66,13 @@ class Dispatcher:
             allowed.intersection_update(selected)
         if check_budget:
             validate_request_budget(agent,body)
+        from .video_plan import is_plan,TOOLS,authorize
+        if any(step['tool'] in TOOLS for step in body['pipeline']):
+            if not is_plan(body) or not agent.get('_video_task_id'):raise EngineError('VIDEO_TASK_NOT_AUTHORIZED',403)
+            for step in body['pipeline']:
+                if step['parameters'].get('task_id')!=agent['_video_task_id']:raise EngineError('VIDEO_TASK_NOT_AUTHORIZED',403)
+                authorize(self.conn,agent,agent['_video_task_id'],step['parameters'].get('revision'))
+            allowed.update(TOOLS)
         pipeline = []
         for step in body['pipeline']:
             effective = {'tool': step['tool'], 'parameters': {
@@ -161,6 +168,8 @@ class Dispatcher:
         automatic = legacy_task_id is not None
         effective_body = manager.prepare(agent, body, job_id=job_id, automatic=automatic)
         if any(step['tool'].startswith('mcp.') for step in effective_body['pipeline']):principal.require('mcp:execute')
+        from .video_plan import is_plan
+        if is_plan(effective_body):principal.require('rest:write')
         prepared, allowed = self._prepare(agent, effective_body, check_budget=schedule_id is None)
         prepared = manager.finalize(agent, prepared, scheduled=schedule_id is not None, automatic=automatic)
         skipped, no_sources = manager.skipped, manager.no_sources

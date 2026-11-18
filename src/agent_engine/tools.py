@@ -79,6 +79,10 @@ def default_registry(*, conn=None, engine=None, owner=None) -> ToolRegistry:
         input_schema={'type': 'object', 'additionalProperties': False,
                       'properties': {'instructions': {'type': 'string', 'maxLength': 8000}}},
     ))
+    from .video_plan import SCRIPT,PRODUCE,INPUT
+    for identifier,provider in ((SCRIPT,'openai.responses'),(PRODUCE,'heygen.rest')):
+        registry.register(ToolSpec(id=identifier,provider=provider,capability='video',
+            input_schema=INPUT,implementation_status='IMPLEMENTED',contract_reference='agent_engine.video_worker'))
     # Composite capability: execution requires BOTH existing provider grants.
     from .commercial import TOOL, INPUT_SCHEMA
     registry.register(ToolSpec(id=TOOL, provider='dpia.scraper', capability='commercial',

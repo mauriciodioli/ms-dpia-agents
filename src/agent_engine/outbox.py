@@ -23,7 +23,8 @@ class OutboxPublisher:
                 .join(Usuario.__table__, Usuario.id == m.jobs.c.owner_id).where(
                     m.outbox.c.published_at.is_(None), m.outbox.c.available_at <= self.box.now(),
                     m.jobs.c.state.in_(['QUEUED', 'RUNNING']), m.tasks.c.state == 'PENDING',
-                    m.tasks.c.provider_submission_state == 'NOT_SUBMITTED',
+                    ((m.tasks.c.provider_submission_state == 'NOT_SUBMITTED') |
+                     ((m.tasks.c.tool_id=='dpia.video.produce') & m.tasks.c.provider_job_id.is_not(None))),
                     m.agents.c.configuration_state == 'ENABLED', Usuario.activo.is_(True))
                 .order_by(m.jobs.c.priority.desc(), m.outbox.c.available_at, m.outbox.c.id)
                 .limit(limit).with_for_update(skip_locked=True)).mappings().all()

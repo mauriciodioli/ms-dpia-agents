@@ -82,7 +82,12 @@ def settle(conn,job,task,now,state):
 
 def settle_job(conn,job,now):
     tasks=conn.execute(select(m.tasks).where(m.tasks.c.owner_id==job['owner_id'],m.tasks.c.job_id==job['id']).with_for_update()).mappings().all()
-    for task in tasks:settle(conn,job,task,now,'released' if task['provider_submission_state']=='NOT_SUBMITTED' else 'pending')
+    for task in tasks:
+        settle(conn,job,task,now,'released' if task['provider_submission_state']=='NOT_SUBMITTED' else 'pending')
+        if task['tool_id']=='dpia.video.produce' and (task['output'] or {}).get('reservation'):
+            from .video_costs import transition
+            transition(conn,job['owner_id'],task['output']['reservation'],
+                'released' if task['provider_submission_state']=='NOT_SUBMITTED' else 'pending',now)
 
 
 def blocked(conn,job,reason,now):
