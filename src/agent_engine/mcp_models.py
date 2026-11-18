@@ -40,7 +40,7 @@ audit = Table('ae_mcp_audit', metadata,
 from sqlalchemy.dialects.mysql import INTEGER, SMALLINT, DATETIME
 tools.append_constraint(UniqueConstraint('server_id','tool_name',name='uq_ae_mcp_tools_server_name'))
 servers.append_constraint(CheckConstraint("transport = 'streamable_http'",name='ck_ae_mcp_servers_transport'))
-servers.append_constraint(CheckConstraint("auth_type IN ('none','bearer','header')",name='ck_ae_mcp_servers_auth'))
+servers.append_constraint(CheckConstraint("auth_type IN ('none','bearer','header','oauth')",name='ck_ae_mcp_servers_auth'))
 servers.append_constraint(CheckConstraint('revision >= 1',name='ck_ae_mcp_servers_revision'))
 servers.append_constraint(CheckConstraint('timeout_seconds BETWEEN 1 AND 120',name='ck_ae_mcp_servers_timeout'))
 tools.append_constraint(CheckConstraint("risk_level IN ('LOW','MEDIUM','HIGH','CRITICAL')",name='ck_ae_mcp_tools_risk'))

@@ -1,6 +1,7 @@
 """Shared MCP business layer. No network inside database transactions."""
 import json
 import re
+from sqlalchemy import update
 from hashlib import sha256
 from uuid import uuid4, uuid5, NAMESPACE_URL
 from jsonschema import Draft202012Validator
@@ -131,7 +132,10 @@ class MCPService:
         else:raise EngineError('invalid_contract')
         return self.secrets.cipher().encrypt(json.dumps(credential).encode()).decode()
 
-    def credential(self, server):
+    def credential(self, server, owner_id=None):
+        if server['auth_type']=='oauth':
+            from .mcp_oauth.service import OAuthService
+            return OAuthService(self.engine,self.config).credential(server,owner_id if owner_id is not None else server.get('_oauth_owner_id'))
         if server['auth_type']=='none':return None
         try:return json.loads(self.secrets.decrypt(server))
         except (ValueError,TypeError):raise EngineError('integration_encryption_unavailable',503) from None
@@ -153,7 +157,7 @@ class MCPService:
         if set(body)-allowed or required-set(body):raise EngineError('invalid_contract')
         if (not isinstance(body['name'],str) or not 1<=len(body['name'].strip())<=150
             or not isinstance(body.get('description',''),str) or len(body.get('description',''))>4000
-            or body['transport']!='streamable_http' or body['auth_type'] not in ('none','bearer','header')
+            or body['transport']!='streamable_http' or body['auth_type'] not in ('none','bearer','header','oauth')
             or body['enabled'] is not False or type(body['priority']) is not int or not -32768<=body['priority']<=32767
             or type(body['timeout_seconds']) is not int or not 1<=body['timeout_seconds']<=120):raise EngineError('invalid_contract')
         template=body.get('connection_template')
@@ -167,7 +171,10 @@ class MCPService:
             previous=repo.server(identifier,principal,lock=True) if identifier else None
             if previous and previous['revision']!=self.revision(body):raise EngineError('revision_conflict',409)
             credential=previous['credential_ciphertext'] if previous else None
-            if 'credential' in body:credential=self.encrypt(body['auth_type'],body['credential'])
+            if body['auth_type']=='oauth':
+                if 'credential' in body:raise EngineError('invalid_contract')
+                credential=None
+            elif 'credential' in body:credential=self.encrypt(body['auth_type'],body['credential'])
             elif body['auth_type']=='none':credential=None
             elif not previous or previous['auth_type']!=body['auth_type'] or not credential:raise EngineError('mcp_credential_required',422)
             if 'connection_template' not in body and previous:
@@ -195,7 +202,12 @@ class MCPService:
             enabled=False if delete else body['enabled']
             if enabled and (row['last_health_status']!='HEALTHY' or not row['last_discovered_at']):raise EngineError('mcp_not_ready',409)
             row=repo.change_server(row,principal.actor_id,enabled=enabled,**({'deleted_at':now_utc()} if delete else {}))
-            if delete:repo.revoke_server(identifier)
+            if delete:
+                repo.revoke_server(identifier)
+                if row['auth_type']=='oauth':
+                    from .mcp_oauth.models import connections,flows
+                    conn.execute(update(connections).where(connections.c.server_id==identifier).values(status='DISCONNECTED',tokens_ciphertext=None,client_ciphertext=None,active_flow=None,refresh_operation=None,expires_at=None,updated_at=now_utc()))
+                    conn.execute(update(flows).where(flows.c.server_id==identifier).values(secret_ciphertext=None,used_at=now_utc()))
             repo.event(identifier,principal.actor_id,'SERVER_DELETED' if delete else 'SERVER_ENABLED' if enabled else 'SERVER_PAUSED')
             return public_server(row)
 
@@ -206,7 +218,7 @@ class MCPService:
             if row['revision']!=self.revision(body):raise EngineError('revision_conflict',409)
         result=None;error=None
         try:
-            client=self.client_factory(row,self.credential(row)).initialize()
+            client=self.client_factory(row,self.credential(row,principal.owner_id)).initialize()
             if discover:result=self.validate_discovery(client.discover())
             else:client.rpc('ping')
         except EngineError as exc:error=exc

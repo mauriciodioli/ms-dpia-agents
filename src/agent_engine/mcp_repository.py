@@ -80,6 +80,13 @@ class MCPRepository:
         if not inspect(self.conn).has_table('ae_mcp_servers'):return []
         q=select(m.tools,m.servers.c.revision.label('server_revision'),m.servers.c.priority).join(m.servers).where(
             m.servers.c.deleted_at.is_(None),m.servers.c.enabled.is_(True),m.tools.c.enabled.is_(True))
+        if owner is not None:
+            if inspect(self.conn).has_table('ae_mcp_oauth_connections'):
+                from .mcp_oauth.models import connections
+                q=q.where((m.servers.c.auth_type!='oauth') | select(connections.c.server_id).where(
+                    connections.c.owner_id==owner,connections.c.server_id==m.servers.c.id,
+                    connections.c.resource_url==m.servers.c.endpoint_url,connections.c.status=='CONNECTED').exists())
+            else:q=q.where(m.servers.c.auth_type!='oauth')
         # Central LOW catalog is shared across agents; higher-risk tools still require explicit grants.
         if owner is not None:q=q.where(((m.tools.c.risk_level=='LOW') & m.tools.c.tool_name.in_(['web_search_exa', 'web_fetch_exa'])) | select(m.grants.c.tool_id).where(m.grants.c.owner_id==owner,
             m.grants.c.tool_id==m.tools.c.id,m.grants.c.enabled.is_(True)).exists())
@@ -94,6 +101,13 @@ class MCPRepository:
             m.grants.c.tool_id==tool_uuid,m.grants.c.enabled.is_(True)).with_for_update()).mappings().first()
         if not server['enabled'] or not tool['enabled'] or (not (tool['risk_level']=='LOW' and tool['tool_name'] in ('web_search_exa','web_fetch_exa')) and not grant):
             raise EngineError('mcp_tool_revoked',403)
+        if server['auth_type']=='oauth':
+            from .mcp_oauth.models import connections
+            authorized=self.conn.execute(select(connections.c.server_id).where(
+                connections.c.owner_id==owner,connections.c.server_id==server['id'],
+                connections.c.resource_url==server['endpoint_url'],connections.c.status=='CONNECTED')).first()
+            if not authorized:raise EngineError('mcp_oauth_not_connected',403)
+            server={**server,'_oauth_owner_id':owner}
         return server,tool
 
     def execution(self, identifier, **values):

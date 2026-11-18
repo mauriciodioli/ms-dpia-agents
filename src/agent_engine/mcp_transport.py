@@ -116,7 +116,7 @@ class MCPClient:
         self.session_id=None
         self.version=None
         self.headers={'Accept':'application/json, text/event-stream','Content-Type':'application/json'}
-        if server['auth_type']=='bearer':self.headers['Authorization']='Bearer '+credential
+        if server['auth_type'] in ('bearer','oauth'):self.headers['Authorization']='Bearer '+credential
         elif server['auth_type']=='header':self.headers[credential['name']]=credential['value']
 
     def rpc(self, method, params=None, *, notification=False):

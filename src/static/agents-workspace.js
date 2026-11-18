@@ -1292,6 +1292,20 @@
     revision_conflict: 'La configuración cambió. Actualizá los datos antes de repetir la acción.'
   };
   Object.assign(errors, integrationErrors);
+  Object.assign(errors,{
+    mcp_oauth_callback_not_configured:'El callback OAuth no está configurado. Consultá al administrador.',
+    mcp_oauth_not_connected:'Conectá tu cuenta con el proveedor antes de descubrir herramientas.',
+    mcp_oauth_reconnect_required:'La autorización venció o no pudo renovarse. Volvé a conectar.',
+    mcp_oauth_client_configuration_required:'Este proveedor requiere configurar un cliente OAuth previamente.',
+    mcp_oauth_resource_metadata_invalid:'No se pudieron validar los metadatos OAuth del servidor.',
+    mcp_oauth_registration_failed:'El proveedor no pudo registrar el cliente OAuth.',
+    mcp_oauth_access_denied:'No autorizaste la conexión. Podés volver a conectarla cuando quieras.',
+    mcp_oauth_authorization_expired:'La solicitud de autorización venció. Volvé a conectar.',
+    mcp_oauth_token_exchange_failed:'El proveedor no confirmó la autorización. Volvé a conectar.',
+    mcp_oauth_pkce_required:'El proveedor no anuncia soporte PKCE S256.',
+    mcp_oauth_endpoint_origin_mismatch:'Los endpoints OAuth no pertenecen al emisor autorizado.',
+    mcp_oauth_transport_error:'No se pudo contactar al proveedor OAuth. Reintentá la conexión.'
+  });
 
   async function mcpSection(){
     const section=node('section',undefined,'panel'),list=node('div'),formHost=node('div'),status=node('p',undefined,'help');
@@ -1311,6 +1325,11 @@
         toggle.setAttribute('aria-label','Activar / Desactivar MCP '+server.name);
         toggle.addEventListener('change',()=>{const enabled=toggle.checked;toggle.checked=server.enabled;run(()=>action('/servers/'+server.id+'/status','PATCH',{expected_revision:server.revision,enabled}));});
         label.append(toggle,node('span','Activar / Desactivar MCP'));card.append(label);
+        if(server.auth_type==='oauth'){
+          const state=node('p','Consultando conexión OAuth…','help');state.setAttribute('role','status');card.append(state);
+          try{const value=await api('/mcp/servers/'+server.id+'/oauth/status');state.textContent=({DISCONNECTED:'No conectado',CONNECTING:'Conectando',CONNECTED:'Conectado',REFRESHING:'Conectando',ERROR:'Error'})[value.status]||'Error';if(value.error_code)state.textContent+=' · '+(errors[value.error_code]||'Volvé a conectar con el proveedor.');}catch(e){state.textContent=e.message;}
+          actions.append(btn('Conectar con proveedor',()=>run(async()=>{const result=await action('/servers/'+server.id+'/oauth/authorize','POST',{});window.location.assign(result.authorization_url);})),btn('Desconectar',()=>run(()=>action('/servers/'+server.id+'/oauth/disconnect','POST',{}))));
+        }
         actions.append(btn('Editar configuración',()=>edit(server)),btn('Probar conexión',()=>run(()=>action('/servers/'+server.id+'/test','POST',{expected_revision:server.revision}))),btn('Descubrir herramientas',()=>run(()=>action('/servers/'+server.id+'/discover','POST',{expected_revision:server.revision}))),btn('Eliminar MCP',()=>{if(window.confirm('¿Eliminar este servidor MCP? Se revocarán sus herramientas y se conservará el historial.'))run(()=>action('/servers/'+server.id,'DELETE',{expected_revision:server.revision,confirm:true}));},'agent-delete'));
         card.append(actions);const details=node('details'),summary=node('summary','Herramientas y permisos'),host=node('div');details.append(summary,host);card.append(details);list.append(card);
         details.addEventListener('toggle',async()=>{if(!details.open)return;host.replaceChildren(node('p','Cargando herramientas…'));try{const data=await api('/mcp/servers/'+server.id+'/tools');host.replaceChildren();
@@ -1324,16 +1343,19 @@
     }
     function edit(server=null){
       const form=node('form',undefined,'panel'),grid=node('div',undefined,'form-grid');form.append(node('h3',server?'Editar servidor MCP':'Agregar servidor MCP'),grid);
-      const name=field(grid,'Nombre MCP','mcp-name','text',server?.name,{required:true,maxLength:150}),description=field(grid,'Descripción MCP','mcp-description','textarea',server?.description,{maxLength:4000}),url=field(grid,'URL HTTPS del MCP','mcp-url','url',server?.endpoint_url,{required:true,maxLength:2048}),auth=field(grid,'Autenticación MCP','mcp-auth','select',server?.auth_type||'none',{values:['none','bearer','header']}),credential=field(grid,'Credencial MCP (vacía conserva la actual)','mcp-credential','password','',{maxLength:8192,autocomplete:'new-password'}),timeout=field(grid,'Timeout MCP (segundos)','mcp-timeout','number',server?.timeout_seconds||15,{min:1,max:120,required:true}),priority=field(grid,'Prioridad MCP','mcp-priority','number',server?.priority??100,{min:-32768,max:32767,required:true});
+      const name=field(grid,'Nombre MCP','mcp-name','text',server?.name,{required:true,maxLength:150}),description=field(grid,'Descripción MCP','mcp-description','textarea',server?.description,{maxLength:4000}),url=field(grid,'URL HTTPS del MCP','mcp-url','url',server?.endpoint_url,{required:true,maxLength:2048}),auth=field(grid,'Autenticación MCP','mcp-auth','select',server?.auth_type||'none',{values:['none','bearer','header','oauth']}),credential=field(grid,'Credencial MCP (vacía conserva la actual)','mcp-credential','password','',{maxLength:8192,autocomplete:'new-password'}),timeout=field(grid,'Timeout MCP (segundos)','mcp-timeout','number',server?.timeout_seconds||15,{min:1,max:120,required:true}),priority=field(grid,'Prioridad MCP','mcp-priority','number',server?.priority??100,{min:-32768,max:32767,required:true});
+      const oauthState=node('p',server?'Consultando conexión OAuth…':'No conectado','help'),connect=btn('Conectar con proveedor',()=>{connectRequested=true;form.requestSubmit();});let connectRequested=false;
+      const updateAuth=()=>{const oauth=auth.value==='oauth';credential.parentElement.hidden=oauth;credential.disabled=oauth;connect.hidden=!oauth;oauthState.hidden=!oauth;};auth.addEventListener('change',updateAuth);form.append(oauthState,connect);updateAuth();
+      if(server?.auth_type==='oauth')api('/mcp/servers/'+server.id+'/oauth/status').then(value=>{oauthState.textContent=({DISCONNECTED:'No conectado',CONNECTING:'Conectando',CONNECTED:'Conectado',REFRESHING:'Conectando',ERROR:'Error'})[value.status]||'Error';}).catch(e=>{oauthState.textContent=e.message;});
       const template=field(grid,'Plantillas JSON por herramienta (nombre MCP → argumentos)','mcp-template','textarea',JSON.stringify(server?.connection_template || {},null,2),{maxLength:65536});
       template.parentElement.className='full';
       form.append(node('p','Se guarda pausado. El registro prueba la conexión y descubre herramientas, sin invocarlas. Autenticación header utiliza X-API-Key.','help'));const save=node('button','Guardar MCP','primary');save.type='submit';form.append(save,btn('Cancelar',()=>formHost.replaceChildren()));
       form.onsubmit=event=>{event.preventDefault();const body={name:name.value,description:description.value,endpoint_url:url.value,transport:'streamable_http',auth_type:auth.value,enabled:false,timeout_seconds:Number(timeout.value),priority:Number(priority.value)};
-        if(credential.value)body.credential=auth.value==='header'?{name:'X-API-Key',value:credential.value}:credential.value;
+        if(auth.value!=='oauth'&&credential.value)body.credential=auth.value==='header'?{name:'X-API-Key',value:credential.value}:credential.value;
         try { body.connection_template=JSON.parse(template.value); if(!body.connection_template || Array.isArray(body.connection_template) || typeof body.connection_template!=='object' || Object.values(body.connection_template).some(v=>!v || Array.isArray(v) || typeof v!=='object')) throw Error(); }
         catch (_) { status.textContent='La plantilla debe ser un objeto JSON que asocie nombres de herramientas con objetos de argumentos.'; status.className='error'; return; }
         if(server)body.expected_revision=server.revision;
-        run(async()=>{await action('/servers'+(server?'/'+server.id:''),server?'PATCH':'POST',body);credential.value='';formHost.replaceChildren();});};formHost.replaceChildren(form);name.focus();
+        run(async()=>{const saved=await action('/servers'+(server?'/'+server.id:''),server?'PATCH':'POST',body);credential.value='';if(auth.value==='oauth'&&connectRequested){const result=await action('/servers/'+saved.server.id+'/oauth/authorize','POST',{});window.location.assign(result.authorization_url);}formHost.replaceChildren();});};formHost.replaceChildren(form);name.focus();
     }
     await load();
   }

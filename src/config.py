@@ -116,3 +116,7 @@ PWA_ACTIVATION_SECRET = os.environ.get('PWA_ACTIVATION_SECRET', '')
 
 # Disabled until an administrator supplies the trusted B2B service URL.
 B2B_INTERNAL_URL = os.environ.get('B2B_INTERNAL_URL', '')
+
+# OAuth callback is deployment-configured; browser Host/return URLs are never used.
+MCP_OAUTH_CALLBACK_URL = os.getenv('MCP_OAUTH_CALLBACK_URL', '')
+MCP_OAUTH_CLIENTS_JSON = os.getenv('MCP_OAUTH_CLIENTS_JSON', '{}')

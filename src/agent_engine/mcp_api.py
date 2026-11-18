@@ -21,6 +21,7 @@ def mcp_servers(conn,principal,repo):
         return service().listing(principal,limit,after)
     arguments();write(principal)
     manager=service();server=manager.save(principal,json_body())
+    if server['auth_type']=='oauth':return {'server':server,'tools':[],'diagnostic_status':None},201
     diagnostic,status=manager.probe(principal,server['id'],{'expected_revision':server['revision']},discover=True)
     return {**diagnostic,'diagnostic_status':status},201
 

@@ -60,7 +60,7 @@ def input_schema(op):
         else:properties[key]={'type':'boolean' if type(value) is bool else 'integer' if type(value) is int else 'string'}
     for key,limits in {'expected_revision':{'minimum':1},'timeout_seconds':{'minimum':1,'maximum':120},'priority':{'minimum':-32768,'maximum':32767},'name':{'minLength':1,'maxLength':150},'description':{'maxLength':4000},'endpoint_url':{'format':'uri','maxLength':2048}}.items():
         if key in properties:properties[key].update(limits)
-    for key,enum in {'transport':['streamable_http'],'auth_type':['none','bearer','header'],'risk_level':['LOW','MEDIUM','HIGH','CRITICAL']}.items():
+    for key,enum in {'transport':['streamable_http'],'auth_type':['none','bearer','header','oauth'],'risk_level':['LOW','MEDIUM','HIGH','CRITICAL']}.items():
         if key in properties:properties[key]['enum']=enum
     required=[key for key in properties if key not in ('credential','description')]
     return {'type':'object','additionalProperties':False,'required':required,'properties':properties}
