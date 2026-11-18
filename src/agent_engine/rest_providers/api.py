@@ -67,3 +67,10 @@ def rest_read_operation(conn,principal,repo,provider_id,operation):
 @endpoint()
 def rest_prepare(conn,principal,repo,provider_id):
  arguments();write(principal);return service().prepare(principal,identifier(provider_id),body())
+
+@api.post('/rest/providers/<provider_id>/video-resources')
+@endpoint()
+def rest_video_resources(conn,principal,repo,provider_id):
+ arguments();write(principal);command=body()
+ if not isinstance(command,dict) or set(command)!={'language'}:raise EngineError('invalid_contract',422)
+ return service().video_resources(principal,identifier(provider_id),command['language'])

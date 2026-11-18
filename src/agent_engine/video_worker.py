@@ -91,11 +91,11 @@ class VideoHandlers:
             raise EngineError('rest_provider_not_ready',409)
         return row
 
-    def request(self,row,secret,path,params=None):
+    def request(self,row,secret,path,params=None,full=False):
         status,data=self.rest.http.get(row['base_url'],path,secret,'X-Api-Key',row['timeout_seconds'],**({'params':params} if params is not None else {}))
         if status!=200:raise EngineError({401:'rest_unauthorized',403:'rest_forbidden',429:'rest_rate_limited'}.get(status,'rest_upstream_error'),502)
         if secret and secret in json.dumps(data,ensure_ascii=False):raise EngineError('VIDEO_PROVIDER_INVALID_RESPONSE',502)
-        return data.get('data')
+        return data if full else data.get('data')
 
     def checkpoint(self,context,value):
         from .provider_transport import serialize_body
@@ -125,16 +125,18 @@ class VideoHandlers:
             if task['provider_submission_state']!='NOT_SUBMITTED':raise EngineError('VIDEO_SUBMISSION_UNCERTAIN',409)
             if not production['automatic_production']:raise EngineError('VIDEO_PRODUCTION_APPROVAL_REQUIRED',409)
             if production['budget_credits']<=0:raise EngineError('VIDEO_BUDGET_INSUFFICIENT',409)
-            avatars=self.request(row,secret,'/v3/avatars/looks')
-            voices=self.request(row,secret,'/v3/models/audio/voices')
+            from .heygen_resources import catalog
+            read_catalog=lambda path,params=None:catalog(lambda p,q:self.request(row,secret,p,q,full=True),path,params)
+            avatars=read_catalog('/v3/avatars/looks')
+            voices=read_catalog('/v3/models/audio/voices')
             try:avatar=select_resource(avatars,'avatar_id',production['avatar_id'])
             except EngineError as error:
-                if error.code!='VIDEO_RESOURCE_UNAVAILABLE':raise
-                avatar=select_resource(self.request(row,secret,'/v3/avatars/looks',{'ownership':'public'}),'avatar_id',production['avatar_id'])
+                if error.code not in ('VIDEO_AVATAR_UNAVAILABLE','VIDEO_VOICE_UNAVAILABLE'):raise
+                avatar=select_resource(read_catalog('/v3/avatars/looks',{'ownership':'public'}),'avatar_id',production['avatar_id'])
             try:voice=select_resource(voices,'voice_id',production['voice_id'],production['language'])
             except EngineError as error:
-                if error.code!='VIDEO_RESOURCE_UNAVAILABLE':raise
-                voices=self.request(row,secret,'/v3/models/audio/voices',{'type':'public','language':production['language']})
+                if error.code not in ('VIDEO_AVATAR_UNAVAILABLE','VIDEO_VOICE_UNAVAILABLE'):raise
+                voices=read_catalog('/v3/models/audio/voices',{'type':'public','language':production['language']})
                 voice=select_resource(voices,'voice_id',production['voice_id'])
             body={'type':'avatar','avatar_id':avatar,'voice_id':voice,
                   'script':'\n'.join(s['narration'] for s in script['scenes']),
@@ -145,7 +147,8 @@ class VideoHandlers:
             if any(r.get('voice_id')==voice and r.get('mode')=='professional' for r in voice_rows if isinstance(r,dict)):
                 body['voice_settings']['engine_settings'].pop('model',None)
             from .provider_transport import serialize_body
-            serialize_body(body)
+            from .heygen_video_contract import validate_video_body
+            validate_video_body(body)
             account=self.request(row,secret,'/v3/users/me')
             from .video_estimates import estimate
             from .video_cost_api import load
@@ -234,7 +237,7 @@ def select_resource(data,key,selected,language=None):
                 and r.get('status','ACTIVE')=='ACTIVE' and (not language or r.get('language')==language)]
     if selected:
         candidates=[r for r in candidates if r[key]==selected]
-    if not candidates:raise EngineError('VIDEO_RESOURCE_UNAVAILABLE',409)
+    if not candidates:raise EngineError('VIDEO_AVATAR_UNAVAILABLE' if key=='avatar_id' else 'VIDEO_VOICE_UNAVAILABLE',409)
     return sorted(candidates,key=lambda r:r[key])[0][key]
 
 
@@ -258,4 +261,4 @@ def voice_settings(data,language):
                     if 'heygen-voice-1' not in models:continue
                     settings['model']='heygen-voice-1'
                 return {'engine_settings':settings}
-    raise EngineError('VIDEO_RESOURCE_UNAVAILABLE',409)
+    raise EngineError('VIDEO_VOICE_LANGUAGE_UNSUPPORTED',409)

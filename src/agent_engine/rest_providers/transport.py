@@ -23,6 +23,8 @@ class RESTHTTP:
   return self._request(base,path,key,header,timeout)
  def post_video(self,base,key,timeout,body,operation,before_send=None):
   import re
+  from ..heygen_video_contract import validate_video_body
+  validate_video_body(body)
   from ..provider_transport import serialize_body
   if not isinstance(operation,str) or not re.fullmatch(r'[A-Za-z0-9_:.-]{1,255}',operation):raise EngineError('rest_operation_not_allowed',403)
   return self._request(base,'/v3/videos',key,'X-Api-Key',timeout,serialize_body(body),operation,before_send=before_send)

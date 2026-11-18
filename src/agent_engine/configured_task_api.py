@@ -79,3 +79,23 @@ def configured_task_video(conn, principal, repo, agent_id, task_id, section):
         body = json_body()
     return {'task': edit(ConfiguredTaskManager(conn, principal), identifier(agent_id), task_id, section, body,
         administrative=request.path.startswith('/api/agents/v1/admin/'))}
+
+@api.post('/agents/<agent_id>/configured-tasks/<int:task_id>/video-resources')
+@api.post('/admin/agents/<agent_id>/configured-tasks/<int:task_id>/video-resources')
+@endpoint('agents:read', write=True)
+def configured_task_video_resources(conn,principal,repo,agent_id,task_id):
+    from flask import request
+    from .rest_providers.api import service
+    from .errors import EngineError
+    arguments();engine_write(principal)
+    command=json_body()
+    if not isinstance(command,dict) or set(command)!={'language'}:raise EngineError('invalid_contract',422)
+    manager=ConfiguredTaskManager(conn,principal)
+    effective,agent=manager.access(identifier(agent_id),request.path.startswith('/api/agents/v1/admin/'))
+    rows=manager.repository.rows(agent,task_id)
+    if not rows or rows[0]['tipo']!='VIDEO_GENERAR' or (rows[0]['parametros'] or {}).get('_deleted_at'):
+        raise EngineError('task_not_found',404)
+    rest=service()
+    candidates=[p for p in rest.listing(effective)['items'] if p['adapter']=='heygen' and p['enabled']]
+    if len(candidates)!=1:raise EngineError('VIDEO_PROVIDER_SELECTION_REQUIRED',409)
+    return rest.video_resources(effective,candidates[0]['id'],command['language'])

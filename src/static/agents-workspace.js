@@ -527,6 +527,9 @@
     host.append(wrap);
     return input;
   }
+  const videoResourceMessages={VIDEO_AVATAR_UNAVAILABLE:'No hay un avatar disponible compatible con Avatar IV.',VIDEO_VOICE_UNAVAILABLE:'No hay una voz disponible para el idioma seleccionado.',VIDEO_VOICE_LANGUAGE_UNSUPPORTED:'HeyGen Voice no ofrece una configuración compatible con este idioma.',VIDEO_CATALOG_PAGE_LIMIT:'El catálogo supera el límite de consulta; requiere revisión.',VIDEO_PROVIDER_INVALID_REQUEST:'La configuración no cumple el contrato de generación de HeyGen.'};
+  Object.assign(errors,videoResourceMessages);
+  function resourceSummary(data){return data.ready?'Recursos compatibles disponibles. No se generó ningún video.':data.errors.map(code=>videoResourceMessages[code]||code).join(' ');}
   async function videoEditor(task, taskPath, administrative) {
     const data=await api(taskPath+'/video/settings');let revision=data.task.revision;
     const values=data.task.settings,back=administrative?'/administration':'/agents';
@@ -552,6 +555,20 @@
     const avatar=choice(grid,'Presentador','avatar',[[values.avatar||'auto',values.avatar==='auto'?'Automático':values.avatar]]);
     const voice=choice(grid,'Voz','voice',[[values.voice||'auto',values.voice==='auto'?'Automática':values.voice]]);
     grid.append(node('p','La selección automática se resolverá con el catálogo autorizado al preparar la producción. Guardar no consulta proveedores.','help'));
+    const resourceStatus=node('p',undefined,'help');resourceStatus.setAttribute('role','status');
+    const resourceButton=btn('Comprobar avatares y voces',async()=>{
+      resourceButton.disabled=true;resourceStatus.textContent='Consultando recursos de HeyGen…';
+      try{
+        const data=await api(taskPath+'/video-resources',{method:'POST',headers:{'X-DPIA-Action':'manage-agents'},body:JSON.stringify({language:controls.language.value.trim()})});
+        for(const [control,rows,label] of [[avatar,data.avatars,'Automático'],[voice,data.voices,'Automática']]){
+          const selected=control.value;control.replaceChildren(new Option(label,'auto'));
+          rows.forEach(row=>control.append(new Option(row.name,row.id)));
+          if(selected!=='auto'&&!rows.some(row=>row.id===selected))control.append(new Option(selected+' · No disponible',selected));
+          control.value=selected;
+        }
+        resourceStatus.textContent=resourceSummary(data);
+      }catch(e){resourceStatus.textContent=e.message;}finally{resourceButton.disabled=false;}
+    },'secondary');grid.append(resourceButton,resourceStatus);
     grid=section('04 — Ejecución y presupuesto');
     const scheduleHost=node('div',undefined,'video-task-schedule');
     scheduleHost.append(...taskScheduleCell(task).childNodes,btn('Editar programación',()=>editTaskSchedule(scheduleHost,task,taskPath.split('/agents/')[1].split('/')[0],administrative),'secondary'));
@@ -1454,6 +1471,11 @@
         toggle.onchange=()=>{const enabled=toggle.checked;toggle.checked=provider.enabled;run(()=>call('/'+provider.id+'/status','PATCH',{expected_revision:provider.revision,enabled}));};
         label.append(toggle,node('span','Activar / Desactivar API'));card.append(label);
         actions.append(btn('Editar proveedor / API Key',()=>edit(provider)),btn('Probar conexión',()=>run(()=>call('/'+provider.id+'/test','POST',{expected_revision:provider.revision}))),btn('Desconectar y quitar API Key',()=>{if(confirm('¿Desconectar y eliminar la API Key guardada? No se elimina la clave en el sitio del proveedor.'))run(()=>call('/'+provider.id+'/disconnect','POST',{expected_revision:provider.revision}));}));card.append(actions);
+        if(provider.adapter==='heygen'){
+          const diagnostic=node('div'),language=field(diagnostic,'Idioma para comprobar recursos','rest-video-language-'+provider.id,'text','es');
+          const check=btn('Comprobar recursos de video',async()=>{check.disabled=true;try{const data=await call('/'+provider.id+'/video-resources','POST',{language:language.value.trim()});diagnostic.querySelector('[role=status]').textContent=resourceSummary(data)+' Avatares: '+data.avatars.length+'. Voces: '+data.voices.length+'.';}catch(e){diagnostic.querySelector('[role=status]').textContent=e.message;}finally{check.disabled=false;}});
+          const result=node('p');result.setAttribute('role','status');diagnostic.append(check,result);card.append(diagnostic);
+        }
         const details=node('details'),host=node('div');details.append(node('summary','Endpoints soportados'),host);card.append(details);
         details.addEventListener('toggle',async()=>{if(!details.open)return;host.replaceChildren(node('p','Consultando catálogo…'));try{const catalog=await call('/'+provider.id+'/operations');host.replaceChildren();for(const operation of catalog.items){const row=node('section');row.append(node('strong',operation.label),node('p',operation.method+' '+operation.path,'help'));const documentation=link('Documentación oficial',operation.documentation);delete documentation.dataset.nav;documentation.target='_blank';documentation.rel='noopener noreferrer';row.append(documentation);
           if(operation.available)row.append(btn('Consultar '+operation.label.toLowerCase(),()=>run(async()=>{const result=await call('/'+provider.id+'/read/'+operation.id,'POST',{});const output=node('pre',JSON.stringify(result.data,null,2));resultHost.replaceChildren(node('h3',operation.label),output);return result;})));

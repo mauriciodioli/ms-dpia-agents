@@ -110,3 +110,23 @@ class Service:
   output=data['data']
   if operation=='quota':output={k:output[k] for k in ('billing_type','wallet','subscription','usage_based') if k in output} if isinstance(output,dict) else {}
   return {'operation':operation,'data':redact(output),'provider':result}
+ def video_resources(self,principal,identifier,language):
+  from ..heygen_resources import resources
+  import re
+  if not isinstance(language,str) or not re.fullmatch(r'[A-Za-z]{2,20}(?:-[A-Za-z0-9]{2,8})?',language):raise EngineError('invalid_contract',422)
+  with self.engine.connect() as c:
+   access(c,principal,'rest:read');row=dict(self.row(c,principal,identifier))
+   if row['adapter']!='heygen' or not row['enabled']:raise EngineError('rest_provider_disabled',409)
+   if not row['credential_ciphertext'] or row['credential_origin']!=row['base_url']:raise EngineError('rest_credential_required',409)
+  secret=json.loads(self.secrets.decrypt(row))
+  if not isinstance(secret,str) or not secret:raise EngineError('integration_encryption_unavailable',503)
+  def request(path,params):
+   status,data=self.http.get(row['base_url'],path,secret,row['auth_header'],row['timeout_seconds'],**({'params':params} if params else {}))
+   if status!=200:raise EngineError({401:'rest_unauthorized',403:'rest_forbidden',429:'rest_rate_limited'}.get(status,'rest_upstream_error'),502)
+   if not isinstance(data,dict) or secret in json.dumps(data):raise EngineError('VIDEO_CATALOG_INVALID',502)
+   return data
+  result=resources(request,language)
+  with self.engine.connect() as c:
+   access(c,principal,'rest:read');current=self.row(c,principal,identifier)
+   if current['revision']!=row['revision']:raise EngineError('revision_conflict',409)
+  return result
