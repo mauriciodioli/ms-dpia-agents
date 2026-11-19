@@ -397,8 +397,10 @@
     c.append(top, node('h3', a.name), node('p', a.description || 'Sin descripción'), meta);
     if(a.points){
       const p=a.points,summary=node('div',undefined,'agent-point-summary'),status=node('span',undefined,'agent-point-status'),dot=node('span',undefined,'agent-point-dot');
-      dot.dataset.color=p.color;dot.setAttribute('aria-hidden','true');status.append(dot,node('span',p.effective_remaining+' puntos restantes'));
-      summary.append(status,node('small','Asignados: '+p.budget+' · Gastados: '+p.budget_consumed+' · Reservados: '+p.budget_reserved));c.append(summary);
+      const amount=value=>new Intl.NumberFormat('es',{maximumFractionDigits:3}).format(Number(value));
+      dot.dataset.color=p.color;dot.setAttribute('aria-hidden','true');status.append(dot,node('span',amount(p.effective_remaining)+' puntos disponibles para este agente'));
+      summary.append(status,node('small','Saldo disponible de la cuenta: '+amount(p.user_available)+' · Límite del agente: '+amount(p.budget)),
+        node('small','Gastados por el agente: '+amount(p.budget_consumed)+' · Reservados por el agente: '+amount(p.budget_reserved)));c.append(summary);
     }
     const tasks=node('details',undefined,'configured-task-list'),summary=node('summary','Tareas configuradas'),host=node('div');tasks.append(summary,host);
     let loaded=false;
