@@ -5,6 +5,7 @@ import os
 import re
 import secrets
 import smtplib
+from time import perf_counter
 from email.message import EmailMessage
 from flask import current_app, jsonify, request, session
 from model.usuario import Usuario
@@ -74,34 +75,54 @@ def start():
     email=body.get('email','').strip().lower() if isinstance(body,dict) and isinstance(body.get('email'),str) else ''
     if len(email)>120 or not EMAIL.fullmatch(email):return jsonify(error='Ingresá un correo válido.'),400
     stage='database'
+    redis_total=0.0
+    redis_attempted=False
+    def redis_operation(name, method, *args, **kwargs):
+        nonlocal redis_total,redis_attempted
+        redis_attempted=True
+        started=perf_counter()
+        try:
+            result=method(*args, **kwargs)
+        except Exception as exc:
+            elapsed=(perf_counter()-started)*1000
+            redis_total+=elapsed
+            current_app.logger.warning('Email login redis operation=%s duration_ms=%.3f exception=%s',
+                name,elapsed,type(exc).__name__)
+            raise
+        elapsed=(perf_counter()-started)*1000
+        redis_total+=elapsed
+        current_app.logger.warning('Email login redis operation=%s duration_ms=%.3f',name,elapsed)
+        return result
     try:
         user=Usuario.query.filter_by(correo_electronico=email,activo=True).one_or_none()
         stage='configuration'
         redis,secret,host,sender=setup()
         stage='redis'
         ip=request.remote_addr or 'unknown'
-        for name,limit in [('email:'+email,4),('ip:'+ip,20)]:
+        for label,name,limit in [('email','email:'+email,4),('ip','ip:'+ip,20)]:
             key='dpia:email-login:limit:'+digest(secret,name)
-            count=redis.incr(key)
-            if count==1:redis.expire(key,600)
+            count=redis_operation('incr_'+label,redis.incr,key)
+            if count==1:redis_operation('expire_'+label,redis.expire,key,600)
             if count>limit:return jsonify(error='Demasiados intentos. Probá más tarde.'),429
         challenge=secrets.token_urlsafe(32);code=str(secrets.randbelow(100000000)).zfill(8)
         session.pop('email_login_challenge',None)
         if user:
             key='dpia:email-login:code:'+digest(secret,challenge)
-            redis.hset(key,mapping={'digest':digest(secret,challenge,code),'user_id':str(user.id),'attempts':'0'})
-            redis.expire(key,600)
+            redis_operation('hset_challenge',redis.hset,key,mapping={'digest':digest(secret,challenge,code),'user_id':str(user.id),'attempts':'0'})
+            redis_operation('expire_challenge',redis.expire,key,600)
             try:
                 stage='smtp'
                 send_mail(host,sender,email,code)
             except Exception:
-                redis.delete(key);raise
+                redis_operation('delete_challenge',redis.delete,key);raise
             session['email_login_challenge']=challenge
         return jsonify(message='Si la cuenta está activa, recibirás un código por correo.')
     except Exception as exc:
         reason=str(exc) if stage=='configuration' and isinstance(exc,RuntimeError) and (str(exc)=='redis_dependency_missing' or str(exc).startswith('missing_config:')) else type(exc).__name__
-        current_app.logger.warning('Email login unavailable at stage=%s reason=%s',stage,reason)
+        if stage!='redis':current_app.logger.warning('Email login unavailable at stage=%s reason=%s',stage,reason)
         return jsonify(error='El acceso por correo no está disponible. Intentá más tarde.'),503
+    finally:
+        if redis_attempted:current_app.logger.warning('Email login redis total_duration_ms=%.3f',redis_total)
 
 
 def verify():
