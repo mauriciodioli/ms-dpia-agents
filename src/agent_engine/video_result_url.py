@@ -2,9 +2,7 @@
 import json
 import re
 from urllib.parse import urlsplit
-from sqlalchemy import select
 from flask import current_app
-from .rest_providers.models import providers
 from .rest_providers.service import Service
 
 
@@ -14,10 +12,9 @@ def refresh(conn, job, projection):
     if not isinstance(video,dict) or video.get('provider')!='heygen' or video.get('state')!='COMPLETED':return projection
     remote=video.get('remote_id')
     if not isinstance(remote,str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,160}',remote):return projection
-    rows=conn.execute(select(providers).where(providers.c.owner_id==job['owner_id'],providers.c.adapter=='heygen',
-        providers.c.enabled.is_(True))).mappings().all()
-    if len(rows)!=1:return projection
-    row=dict(rows[0])
+    from .shared_video_provider import resolve
+    try:row=resolve(conn,job['owner_id'])
+    except Exception:return projection
     if not row['credential_ciphertext'] or row['credential_origin']!=row['base_url']:return projection
     try:
         service=Service(conn.engine,current_app.config);secret=json.loads(service.secrets.decrypt(row))

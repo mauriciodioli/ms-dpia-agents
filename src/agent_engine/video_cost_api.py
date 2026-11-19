@@ -11,6 +11,39 @@ from .errors import EngineError
 KEY='video-cost-policy'
 
 
+@api.route('/admin/shared-video-provider', methods=['GET','PUT'])
+@endpoint(admin_only=True, write=True)
+def shared_video_provider(conn, principal, repo):
+    from .shared_video_provider import KEY as shared_key
+    from .rest_providers.models import providers
+    from model.usuario import Usuario
+    arguments()
+    if request.method=='GET':
+        row=conn.execute(select(integrations).where(integrations.c.id==shared_key)).mappings().first()
+        return {'config':row['config'] if row else None,'revision':row['revision'] if row else 0}
+    require_session_write(principal,'manage-integrations')
+    body=json_body()
+    if (not isinstance(body,dict) or set(body)!={'expected_revision','provider_id','access'}
+            or type(body['expected_revision']) is not int or not isinstance(body['provider_id'],str)
+            or body['access']!='all_active_users'):
+        raise EngineError('invalid_contract')
+    conn.execute(select(Usuario.id).where(Usuario.id==principal.owner_id).with_for_update()).first()
+    provider=conn.execute(select(providers).where(providers.c.id==body['provider_id'],
+        providers.c.owner_id==principal.owner_id,providers.c.adapter=='heygen',providers.c.enabled.is_(True))).mappings().first()
+    if not provider or not provider['credential_ciphertext'] or provider['health']!='HEALTHY':
+        raise EngineError('rest_provider_not_ready',409)
+    row=conn.execute(select(integrations).where(integrations.c.id==shared_key).with_for_update()).mappings().first()
+    revision=row['revision'] if row else 0
+    if body['expected_revision']!=revision:raise EngineError('revision_conflict',409)
+    config={'provider_id':provider['id'],'provider_owner_id':principal.owner_id,'access':'all_active_users'}
+    values=dict(config=config,credential_ciphertext=None,enabled=True,revision=revision+1,diagnostic={},updated_at=now_utc())
+    if row:conn.execute(update(integrations).where(integrations.c.id==shared_key).values(**values))
+    else:conn.execute(insert(integrations).values(id=shared_key,**values))
+    conn.execute(insert(audit).values(id=str(uuid4()),integration_id=shared_key,actor_id=principal.actor_id,
+        action='SHARED_VIDEO_PROVIDER_UPDATED',revision=revision+1,created_at=now_utc()))
+    return {'config':config,'revision':revision+1}
+
+
 @api.get('/admin/heygen-usage')
 @endpoint(admin_only=True)
 def heygen_usage(conn, principal, repo):

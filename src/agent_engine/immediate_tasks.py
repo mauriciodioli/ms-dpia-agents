@@ -27,8 +27,10 @@ def schedule_now(conn, body):
         raise EngineError('agent_not_found',404)
     tasks=repo.table()
     task=conn.execute(select(tasks).where(tasks.c.id==body['task_id'],tasks.c.agente_id==parent['id']).with_for_update()).mappings().first()
+    existing_request=body['operation']=='run_existing_task_now'
     if (task is None or (task['parametros'] or {}).get('_deleted_at') or
-            (task['parametros'] or {}).get('immediate_request_id')!=body['request_id']):
+            (existing_request and (task['tipo']!='VIDEO_GENERAR' or not task['habilitada'])) or
+            (not existing_request and (task['parametros'] or {}).get('immediate_request_id')!=body['request_id'])):
         raise EngineError('task_not_found',404)
     principal=Principal(owner,'PWA_SERVICE','ms202611sb2b',SCOPES,True,frozenset())
     registry=default_registry(conn=conn,owner=owner)
@@ -57,6 +59,14 @@ def schedule_now(conn, body):
         if previous['legacy_task_id']!=task['id'] or previous['agent_id']!=agent['id']:
             raise EngineError('idempotency_conflict',409)
         return response(body,agent,previous,True)
+    if existing_request:
+        from datetime import timedelta
+        active=conn.execute(select(m.jobs.c.id).where(m.jobs.c.owner_id==owner,m.jobs.c.agent_id==agent['id'],
+            m.jobs.c.legacy_task_id==task['id'],m.jobs.c.state.in_(['CREATED','SCHEDULED','QUEUED','RUNNING'])).with_for_update()).first()
+        nearby=conn.execute(select(m.schedules.c.id).where(m.schedules.c.owner_id==owner,
+            m.schedules.c.agent_id==agent['id'],m.schedules.c.legacy_task_id==task['id'],m.schedules.c.enabled.is_(True),
+            m.schedules.c.next_run_at.is_not(None),m.schedules.c.next_run_at<=now+timedelta(minutes=5)).with_for_update()).first()
+        if active or nearby:raise EngineError('VIDEO_EXECUTION_ALREADY_PENDING',409)
     from .pause_control import require_unpaused
     require_unpaused(conn,agent)
     if agent['configuration_state']!='ENABLED':raise EngineError('agent_disabled',409)
@@ -78,8 +88,9 @@ def schedule_now(conn, body):
     values=dict(id=identifier,owner_id=owner,agent_id=agent['id'],legacy_task_id=task['id'],timezone='UTC',
                 definition=definition,enabled=True,revision=1,next_run_at=due,created_at=now)
     conn.execute(insert(m.schedules).values(**values))
-    repo.bind_task(task,agent,dict(task['parametros'] or {}))
-    conn.execute(update(tasks).where(tasks.c.id==task['id'],tasks.c.agente_id==parent['id']).values(habilitada=True,actualizado_en=now))
+    if not existing_request:
+        repo.bind_task(task,agent,dict(task['parametros'] or {}))
+        conn.execute(update(tasks).where(tasks.c.id==task['id'],tasks.c.agente_id==parent['id']).values(habilitada=True,actualizado_en=now))
     audit_agent(conn,principal,agent,'TASK_SCHEDULE_CREATED',{'schedule_id':identifier,'legacy_task_id':task['id'],'enabled':True,'immediate':True},now)
     return response(body,agent,values,False)
 

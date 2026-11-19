@@ -36,7 +36,7 @@ def activate_pwa():
     verify_hmac(PATH)
     arguments()
     body = json_body()
-    if body.get('operation') == 'schedule_task_now':
+    if body.get('operation') in ('schedule_task_now','run_existing_task_now'):
         from .immediate_tasks import schedule_now
         with engine().begin() as conn:
             return schedule_now(conn,body),200

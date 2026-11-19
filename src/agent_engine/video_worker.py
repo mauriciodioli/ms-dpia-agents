@@ -86,11 +86,8 @@ class VideoHandlers:
         return encoded_result(build(source,generate))
 
     def provider(self,conn,owner):
-        from .rest_providers.models import providers
-        rows=conn.execute(select(providers).where(providers.c.owner_id==owner,providers.c.adapter=='heygen',
-            providers.c.enabled.is_(True))).mappings().all()
-        if len(rows)!=1:raise EngineError('VIDEO_PROVIDER_SELECTION_REQUIRED',409)
-        row=dict(rows[0])
+        from .shared_video_provider import resolve
+        row=resolve(conn,owner)
         if not row['credential_ciphertext'] or row['credential_origin']!=row['base_url'] or row['health']!='HEALTHY':
             raise EngineError('rest_provider_not_ready',409)
         return row
