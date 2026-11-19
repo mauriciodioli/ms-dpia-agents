@@ -21,14 +21,21 @@ redis.call('DEL',KEYS[1]); return 1
 
 
 def setup():
-    import redis
+    try:
+        import redis
+    except ImportError:
+        raise RuntimeError('redis_dependency_missing') from None
     url=os.getenv('DPIA_LOGIN_REDIS_URL','').strip()
     secret=os.getenv('DPIA_LOGIN_CODE_SECRET','').strip()
     host=os.getenv('DPIA_LOGIN_SMTP_HOST','').strip()
     sender=os.getenv('DPIA_LOGIN_SMTP_FROM','').strip()
     redis_host=current_app.config.get('REDIS_HOST') or os.getenv('REDIS_HOST','').strip()
-    if (not url and not redis_host) or len(secret)<32 or not host or not sender:
-        raise RuntimeError('email_login_not_configured')
+    missing=[]
+    if not url and not redis_host:missing.append('REDIS_HOST_or_DPIA_LOGIN_REDIS_URL')
+    if len(secret)<32:missing.append('DPIA_LOGIN_CODE_SECRET')
+    if not host:missing.append('DPIA_LOGIN_SMTP_HOST')
+    if not sender:missing.append('DPIA_LOGIN_SMTP_FROM')
+    if missing:raise RuntimeError('missing_config:'+','.join(missing))
     if url:
         client=redis.Redis.from_url(url, socket_connect_timeout=3, socket_timeout=3)
     else:
@@ -91,8 +98,9 @@ def start():
                 redis.delete(key);raise
             session['email_login_challenge']=challenge
         return jsonify(message='Si la cuenta está activa, recibirás un código por correo.')
-    except Exception:
-        current_app.logger.warning('Email login unavailable at stage=%s',stage)
+    except Exception as exc:
+        reason=str(exc) if stage=='configuration' and isinstance(exc,RuntimeError) and (str(exc)=='redis_dependency_missing' or str(exc).startswith('missing_config:')) else type(exc).__name__
+        current_app.logger.warning('Email login unavailable at stage=%s reason=%s',stage,reason)
         return jsonify(error='El acceso por correo no está disponible. Intentá más tarde.'),503
 
 
