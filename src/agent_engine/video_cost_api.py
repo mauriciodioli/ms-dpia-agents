@@ -11,6 +11,56 @@ from .errors import EngineError
 KEY='video-cost-policy'
 
 
+@api.get('/admin/heygen-usage')
+@endpoint(admin_only=True)
+def heygen_usage(conn, principal, repo):
+    """Read the administrator's own HeyGen account; never expose credentials."""
+    import json
+    from datetime import datetime, timezone, timedelta
+    from decimal import Decimal, InvalidOperation
+    from flask import current_app
+    from .rest_providers.models import providers
+    from .rest_providers.service import Service
+    arguments()
+    rows=conn.execute(select(providers).where(providers.c.owner_id==principal.owner_id,
+        providers.c.adapter=='heygen',providers.c.enabled.is_(True))).mappings().all()
+    if len(rows)!=1:raise EngineError('VIDEO_PROVIDER_SELECTION_REQUIRED',409)
+    row=dict(rows[0])
+    if not row['credential_ciphertext'] or row['credential_origin']!=row['base_url'] or row['health']!='HEALTHY':
+        raise EngineError('rest_provider_not_ready',409)
+    service=Service(conn.engine,current_app.config)
+    try:secret=json.loads(service.secrets.decrypt(row))
+    except (ValueError,TypeError):raise EngineError('integration_encryption_unavailable',503) from None
+    if not isinstance(secret,str) or not secret:raise EngineError('integration_encryption_unavailable',503)
+    status,data=service.http.get(row['base_url'],'/v3/users/me',secret,'X-Api-Key',row['timeout_seconds'])
+    if status!=200 or not isinstance(data.get('data'),dict):raise EngineError('rest_upstream_error',502)
+    wallet=data['data'].get('wallet') or {};balance=wallet.get('remaining_balance');currency=wallet.get('currency')
+    try:
+        if isinstance(balance,bool) or balance is None:raise InvalidOperation()
+        value=Decimal(str(balance))
+        if not value.is_finite() or value<0:raise InvalidOperation()
+        balance=str(value)
+    except (InvalidOperation,ValueError,TypeError):balance=None
+    if not isinstance(currency,str) or len(currency)>8:currency=None
+    end=datetime.now(timezone.utc).replace(hour=0,minute=0,second=0,microsecond=0)+timedelta(days=1)
+    start=end-timedelta(days=30)
+    status,usage=service.http.get(row['base_url'],'/v3/usage',secret,'X-Api-Key',row['timeout_seconds'],params={
+        'start_time':int(start.timestamp()),'end_time':int(end.timestamp()),'group_by':'product','limit':100})
+    items=[]
+    if status==200 and isinstance(usage.get('data'),list):
+        for group in usage['data']:
+            if not isinstance(group,dict):continue
+            for pool in group.get('pools',[]):
+                if not isinstance(pool,dict):continue
+                item=({key:pool.get(key) for key in ('pool','unit','charged','refunded','charge_count')} |
+                    {'product':group.get('label') or group.get('tag')})
+                items.append({key:value.replace(secret,'[redacted]') if isinstance(value,str) else value
+                              for key,value in item.items() if value is None or isinstance(value,(str,int,float))})
+    return {'balance':balance,'currency':currency,'usage_available':status==200 and isinstance(usage.get('data'),list),
+            'usage':items,'has_more':bool(usage.get('has_more')) if status==200 else False,
+            'start':start.isoformat(),'end':end.isoformat()}
+
+
 @api.route('/admin/video-operations', methods=['GET','PUT'])
 @endpoint(admin_only=True, write=True)
 def video_operations(conn, principal, repo):

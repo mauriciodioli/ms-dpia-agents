@@ -17,7 +17,10 @@ class RESTHTTP:
  def get(self,base,path,key,header,timeout,params=None):
   if params is not None:
    from urllib.parse import urlencode
-   if path not in ('/v3/models/audio/voices','/v3/avatars/looks') or set(params)-{'type','language','token','limit','ownership'}:raise EngineError('rest_operation_not_allowed',403)
+   allowed = {'/v3/models/audio/voices':{'type','language','token','limit','ownership'},
+              '/v3/avatars/looks':{'type','language','token','limit','ownership'},
+              '/v3/usage':{'start_time','end_time','group_by','limit','token'}}
+   if path not in allowed or set(params)-allowed[path]:raise EngineError('rest_operation_not_allowed',403)
    if any(not isinstance(v,(str,int)) for v in params.values()):raise EngineError('rest_operation_not_allowed',403)
    return self._request(base,path,key,header,timeout,query=urlencode(params))
   return self._request(base,path,key,header,timeout)

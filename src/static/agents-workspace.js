@@ -1756,6 +1756,16 @@
     const save=node('button','Guardar valor','primary');save.type='submit';form.append(label,save);
     form.onsubmit=async event=>{event.preventDefault();save.disabled=true;try{await api('/admin/video-cost-policy',{method:'PUT',headers:{'X-DPIA-Action':'manage-integrations'},body:JSON.stringify({expected_revision:policy.revision,usd_per_credit:input.value.trim()||null})});notify('Valor de punto guardado.');await render();}catch(e){showError(e,panel);}finally{save.disabled=false;}};
     panel.append(form);root.append(panel);
+    const heygenPanel=node('section',undefined,'panel');heygenPanel.append(node('h2','HeyGen · saldo y consumo'),node('p','Consultando HeyGen…','help'));root.append(heygenPanel);
+    try{
+      const h=await api('/admin/heygen-usage');heygenPanel.replaceChildren(node('h2','HeyGen · saldo y consumo'));
+      heygenPanel.append(node('p','Saldo de la cuenta: '+(h.balance===null?'Desconocido':h.balance+' '+(h.currency||''))),node('p','Consumo de los últimos 30 días (por producto y tipo de crédito).','help'));
+      if(!h.usage_available)heygenPanel.append(node('p','No se pudo consultar el consumo de HeyGen. Revisá los permisos de la clave, incluido usage:read.'));
+      else if(!h.usage.length)heygenPanel.append(node('p','No hay consumo registrado en este período.'));
+      else table(heygenPanel,['Producto','Fondo','Unidad','Cobrado','Reintegrado','Cargos'],h.usage.map(u=>[u.product||'Desconocido',u.pool||'Desconocido',u.unit||'Desconocido',u.charged??'Desconocido',u.refunded??'Desconocido',u.charge_count??'Desconocido']));
+      if(h.has_more)heygenPanel.append(node('p','Se muestra la primera página de resultados.','help'));
+    }catch(e){if(e.name==='AbortError')throw e;heygenPanel.replaceChildren(node('h2','HeyGen · saldo y consumo'),node('p','No se pudieron consultar los datos de HeyGen. Revisá la conexión y los permisos.'));}
+    const pricing=node('p','Las tarifas públicas por operación se consultan en HeyGen; el consumo anterior proviene de la API. ','help'),pricingLink=document.createElement('a');pricingLink.href='https://platform.heygen.com/pricing';pricingLink.target='_blank';pricingLink.rel='noopener noreferrer';pricingLink.textContent='Ver tarifas de HeyGen';pricing.append(pricingLink);heygenPanel.append(pricing);
     const tariffPanel=node('section',undefined,'panel'), tariffForm=node('form'), grid=node('div',undefined,'form-grid'), tariffFields={};
     tariffPanel.append(node('h2','Agregar tarifa HeyGen'),node('p','Una tarifa provisional es una estimación, no un costo confirmado. Por ahora puede guardarse para revisión, pero no habilita ejecuciones.','help'));
     for(const [key,title,initial] of [['provider_id','ID de la conexión HeyGen',''],['provider_revision','Revisión de la conexión',''],['account_id','Cuenta HeyGen',''],['avatar_id','ID del avatar',''],['voice_id','ID de la voz',''],['engine','Motor de video','avatar_iv'],['resolution','Resolución','720p'],['aspect_ratio','Formato','16:9'],['voice_engine','Motor de voz','heygen_voice'],['voice_model','Modelo de voz','heygen-voice-1'],['usd_per_second','Tarifa estimada en USD por segundo',''],['valid_until','Válida hasta (UTC, AAAA-MM-DDTHH:MM:SSZ)',''],['reference','Fuente HTTPS','']]){
