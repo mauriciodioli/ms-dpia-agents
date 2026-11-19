@@ -56,7 +56,10 @@ class VideoHandlers:
 
     def script(self,context,parameters):
         job,task,source=self.context(context,parameters)
-        if source['video']['script'].get('custom_script','').strip():return encoded_result(build(source,None))
+        custom=bool(source['video']['script'].get('custom_script','').strip())
+        from .video_operations import require
+        with self.engine.begin() as conn:require(conn,'custom_script' if custom else 'openai_script')
+        if custom:return encoded_result(build(source,None))
         row,secret,remaining,_=self.providers.prepare(context,'openai')
         if min(row['config']['max_output_tokens'],remaining)<16:raise EngineError('output_token_budget_exceeded',409)
         ai=OpenAIScript(self.providers.service.http,row['config']['model'],secret,
@@ -67,6 +70,7 @@ class VideoHandlers:
             raw=serialize_body(request)
             bound=self.config.get('OPENAI_ANALYSIS_MAX_INPUT_TOKENS',32000)
             if type(bound) is not int or len(raw)>min(24000,bound-2048):raise EngineError('VIDEO_SCRIPT_SOURCE_LIMIT',422)
+            with self.engine.begin() as conn:require(conn,'openai_script')
             context.mark_submitting(row['revision'])
             try:
                 return ai(request,schema)
@@ -108,6 +112,8 @@ class VideoHandlers:
         job,task,source=self.context(context,parameters)
         script=prior_script(context.previous_outputs)
         production=source['video']['production']
+        from .video_operations import require
+        with self.engine.begin() as conn:require(conn,'heygen_produce')
         if production.get('format') not in ('16:9','9:16','1:1'):raise EngineError('VIDEO_CONFIGURATION_INVALID',422)
         if production.get('provider')!='heygen':raise EngineError('VIDEO_PROVIDER_SELECTION_REQUIRED',409)
         with self.engine.begin() as conn:row=self.provider(conn,job['owner_id'])
@@ -161,6 +167,7 @@ class VideoHandlers:
                 if datetime.strptime(quote['valid_until'],'%Y-%m-%dT%H:%M:%SZ')<=context.box.now():raise EngineError('VIDEO_COST_NOT_VERIFIABLE',409)
                 self.context(context,parameters)
                 with self.engine.begin() as conn:
+                    require(conn,'heygen_produce')
                     current=self.provider(conn,job['owner_id'])
                     if current['revision']!=row['revision']:raise EngineError('VIDEO_CONFIGURATION_CHANGED',409)
                 context.mark_submitting()

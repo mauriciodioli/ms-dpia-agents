@@ -131,7 +131,8 @@ def validate_storage(conn):
                 kind=columns[field]['type']
                 if getattr(kind,'enums',None) and not set(values)<=set(kind.enums):
                     raise EngineError('VIDEO_LEDGER_SCHEMA_INCOMPATIBLE',503)
-                if getattr(kind,'length',None) is not None and kind.length<max(map(len,values)):
+                minimum = 80 if field == 'origen' and not getattr(kind,'enums',None) else max(map(len,values))
+                if getattr(kind,'length',None) is not None and kind.length<minimum:
                     raise EngineError('VIDEO_LEDGER_SCHEMA_INCOMPATIBLE',503)
                 for check in inspector.get_check_constraints('pwa_scraping_operaciones'):
                     expression=check.get('sqltext','').replace('`','')

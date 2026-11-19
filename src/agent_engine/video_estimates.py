@@ -3,7 +3,7 @@
 No built-in price and no inference from changes in wallet balance.
 """
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from urllib.parse import urlsplit
 from sqlalchemy import select
 from .integration_models import integrations
@@ -43,6 +43,15 @@ def estimate(conn,provider,body,duration,now,account):
             and datetime.strptime(tariff['valid_until'],'%Y-%m-%dT%H:%M:%SZ')>now):matches.append(tariff)
     if len(matches)!=1:raise EngineError('VIDEO_COST_NOT_VERIFIABLE',409)
     tariff=matches[0]
-    return {'account_id':account['username'],'estimated_usd':str(positive(tariff['usd_per_second'],'VIDEO_COST_NOT_VERIFIABLE')*Decimal(duration)),
+    estimated=positive(tariff['usd_per_second'],'VIDEO_COST_NOT_VERIFIABLE')*Decimal(duration)
+    try:
+        balance=(account.get('wallet') or {}).get('remaining_balance')
+        if isinstance(balance,bool) or balance is None:raise InvalidOperation()
+        balance=Decimal(str(balance))
+        if not balance.is_finite() or balance<0:raise InvalidOperation()
+    except (InvalidOperation,ValueError,TypeError):
+        raise EngineError('VIDEO_COST_NOT_VERIFIABLE',409) from None
+    if balance<estimated:raise EngineError('VIDEO_PROVIDER_BALANCE_INSUFFICIENT',409)
+    return {'account_id':account['username'],'estimated_usd':str(estimated),
             'reference':tariff['reference'],'policy_revision':row['revision'],'duration_seconds':duration,
             'usd_per_second':tariff['usd_per_second'],'valid_until':tariff['valid_until'],'confirmed':False}

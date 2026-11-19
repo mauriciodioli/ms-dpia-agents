@@ -18,7 +18,7 @@ cupos = Table('pwa_scraping_cupos', metadata,
     Column('ejecuciones_habilitadas', Integer, nullable=False))
 operaciones = Table('pwa_scraping_operaciones', metadata,
     Column('operacion_id', String(36), primary_key=True), Column('usuario_id', Integer),
-    Column('solicitud_hash', String(64)), Column('origen', String(20)),
+    Column('solicitud_hash', String(64)), Column('origen', String(80)),
     Column('estado', String(20)), Column('contexto_json', Text), Column('resultado_json', Text),
     Column('proveedor_trabajo_id', String(160)), Column('creado_en', DateTime),
     Column('actualizado_en', DateTime))

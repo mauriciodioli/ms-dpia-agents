@@ -979,9 +979,13 @@
         if(!data.items.length&&!cursor)empty(list,'Sin agentes','No hay agentes disponibles para tu cuenta.');
         for(const agent of data.items){
           const card=node('details',undefined,'panel schedule-agent-card'),summary=node('summary');
-          summary.append(node('strong',agent.name),node('p','Propietario #'+agent.owner_id,'muted'));
+          summary.append(node('strong',agent.name),node('span','Agente','schedule-item-type'),node('p','Propietario #'+agent.owner_id,'muted'));
           summary.append(node('p',agent.next_run_at?'Próxima corrida: '+date(agent.next_run_at):'Sin corrida habilitada','help'));
-          for(const task of (agent.tasks||[])){summary.append(node('strong',task.name),taskScheduleCell(task));}
+          for(const task of (agent.tasks||[])){
+            const taskItem=node('div',undefined,'schedule-task');
+            taskItem.append(node('strong',task.name),node('span','Tarea','schedule-item-type'),taskScheduleCell(task));
+            summary.append(taskItem);
+          }
           agent.schedules.filter(s=>s.legacy_task_id==null).forEach(s=>summary.append(node('p','Programación heredada sin tarea asignada: '+scheduleText(s)+(s.enabled?'':' · Deshabilitada'),'help')));
           if(!agent.schedules.length)summary.append(node('p','Sin programaciones','help'));
           card.append(summary);const content=node('div');card.append(content);list.append(card);

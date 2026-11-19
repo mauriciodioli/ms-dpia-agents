@@ -11,6 +11,38 @@ from .errors import EngineError
 KEY='video-cost-policy'
 
 
+@api.route('/admin/video-operations', methods=['GET','PUT'])
+@endpoint(admin_only=True, write=True)
+def video_operations(conn, principal, repo):
+    from .video_operations import KEY as operation_key, DEFAULTS, load as load_operations
+    arguments()
+    if request.method == 'GET':
+        switches, revision = load_operations(conn)
+        return {'operations': switches, 'revision': revision}
+    require_session_write(principal, 'manage-integrations')
+    body = json_body()
+    if (not isinstance(body, dict) or set(body) != {'expected_revision', 'operations'}
+            or type(body['expected_revision']) is not int or not isinstance(body['operations'], dict)
+            or set(body['operations']) != set(DEFAULTS)
+            or any(type(value) is not bool for value in body['operations'].values())):
+        raise EngineError('invalid_contract')
+    from model.usuario import Usuario
+    conn.execute(select(Usuario.id).where(Usuario.id == principal.owner_id).with_for_update()).first()
+    row = conn.execute(select(integrations).where(integrations.c.id == operation_key).with_for_update()).mappings().first()
+    revision = row['revision'] if row else 0
+    if body['expected_revision'] != revision:
+        raise EngineError('revision_conflict', 409)
+    values = dict(config=body['operations'], credential_ciphertext=None, enabled=True,
+                  revision=revision+1, diagnostic={}, updated_at=now_utc())
+    if row:
+        conn.execute(update(integrations).where(integrations.c.id == operation_key).values(**values))
+    else:
+        conn.execute(insert(integrations).values(id=operation_key, **values))
+    conn.execute(insert(audit).values(id=str(uuid4()), integration_id=operation_key,
+        actor_id=principal.actor_id, action='VIDEO_OPERATIONS_UPDATED', revision=revision+1, created_at=now_utc()))
+    return {'operations': body['operations'], 'revision': revision+1}
+
+
 def load(conn):
     row=conn.execute(select(integrations).where(integrations.c.id==KEY)).mappings().first()
     return {'usd_per_credit':row['config'].get('usd_per_credit') if row else None,
