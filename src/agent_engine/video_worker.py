@@ -133,7 +133,7 @@ class VideoHandlers:
             if production['budget_credits']<=0:raise EngineError('VIDEO_BUDGET_INSUFFICIENT',409)
             from .heygen_resources import resolve_resource
             read=lambda path,params=None:self.request(row,secret,path,params,full=True)
-            avatar,_=resolve_resource(read,'avatar_id',production['avatar_id'],production['language'])
+            avatar,avatar_row=resolve_resource(read,'avatar_id',production['avatar_id'],production['language'])
             voice,voice_row=resolve_resource(read,'voice_id',production['voice_id'],production['language'])
             body={'type':'avatar','avatar_id':avatar,'voice_id':voice,
                   'script':'\n'.join(s['narration'] for s in script['scenes']),
@@ -153,7 +153,8 @@ class VideoHandlers:
                 current_job,current_task=context.box._owned(conn,context.lease)
                 current=self.provider(conn,job['owner_id'])
                 if current['revision']!=row['revision']:raise EngineError('VIDEO_CONFIGURATION_CHANGED',409)
-                quote=estimate(conn,row,body,production['duration_seconds'],context.box.now(),account,job_id=current_job['id'])
+                quote=estimate(conn,row,body,production['duration_seconds'],context.box.now(),account,job_id=current_job['id'],
+                    avatar_type=avatar_row.get('avatar_type'),voice_mode=voice_row.get('mode'))
                 rate=load(conn)['usd_per_credit']
                 reservation=reserve(conn,current_job,current_task,quote['estimated_usd'],
                     {'AGENTS_VIDEO_USD_PER_CREDIT':rate},production,quote['reference'],context.box.now())
