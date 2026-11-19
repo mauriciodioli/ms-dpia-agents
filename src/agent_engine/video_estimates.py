@@ -16,7 +16,8 @@ def validate_tariffs(values):
     required={'provider_id','provider_revision','engine','avatar_id','voice_id','aspect_ratio',
               'usd_per_second','valid_until','reference','account_id','resolution','voice_engine','voice_model'}
     for value in values:
-        if not isinstance(value,dict) or set(value)!=required:raise EngineError('invalid_contract')
+        if not isinstance(value,dict) or not required<=set(value) or set(value)-required-{'provisional'}:raise EngineError('invalid_contract')
+        if 'provisional' in value and type(value['provisional']) is not bool:raise EngineError('invalid_contract')
         if any(not isinstance(value[k],str) or (not value[k] and k!='voice_model') or len(value[k])>2048 for k in required-{'provider_revision'}):raise EngineError('invalid_contract')
         if type(value['provider_revision']) is not int or value['provider_revision']<1:raise EngineError('invalid_contract')
         positive(value['usd_per_second'],'VIDEO_COST_NOT_VERIFIABLE')
@@ -43,6 +44,9 @@ def estimate(conn,provider,body,duration,now,account):
             and datetime.strptime(tariff['valid_until'],'%Y-%m-%dT%H:%M:%SZ')>now):matches.append(tariff)
     if len(matches)!=1:raise EngineError('VIDEO_COST_NOT_VERIFIABLE',409)
     tariff=matches[0]
+    # A recurring schedule must not turn a provisional estimate into standing
+    # authorization. A future one-shot approval must bind it to a single job.
+    if tariff.get('provisional'):raise EngineError('VIDEO_COST_NOT_VERIFIABLE',409)
     estimated=positive(tariff['usd_per_second'],'VIDEO_COST_NOT_VERIFIABLE')*Decimal(duration)
     try:
         balance=(account.get('wallet') or {}).get('remaining_balance')
@@ -54,4 +58,5 @@ def estimate(conn,provider,body,duration,now,account):
     if balance<estimated:raise EngineError('VIDEO_PROVIDER_BALANCE_INSUFFICIENT',409)
     return {'account_id':account['username'],'estimated_usd':str(estimated),
             'reference':tariff['reference'],'policy_revision':row['revision'],'duration_seconds':duration,
-            'usd_per_second':tariff['usd_per_second'],'valid_until':tariff['valid_until'],'confirmed':False}
+            'usd_per_second':tariff['usd_per_second'],'valid_until':tariff['valid_until'],'confirmed':False,
+            'provisional':tariff.get('provisional',False)}

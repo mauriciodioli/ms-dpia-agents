@@ -157,6 +157,7 @@ class VideoHandlers:
                 rate=load(conn)['usd_per_credit']
                 reservation=reserve(conn,current_job,current_task,quote['estimated_usd'],
                     {'AGENTS_VIDEO_USD_PER_CREDIT':rate},production,quote['reference'],context.box.now())
+                reservation['provisional_estimate']=quote.get('provisional',False)
                 checkpoint={'video_script':script,'reservation':reservation,'estimate':quote,'provider_id':row['id'],
                             'provider_revision':row['revision'],'request':body,'state':'PREPARED'}
                 conn.execute(update(m.tasks).where(m.tasks.c.id==task['id'],m.tasks.c.owner_id==job['owner_id']).values(output=checkpoint))

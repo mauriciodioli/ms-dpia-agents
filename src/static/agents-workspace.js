@@ -1749,14 +1749,26 @@
     const policy=cost.policy, panel=node('section',undefined,'panel');
     panel.id='billing-costs';
     panel.append(node('h2','Costos de video'),node('p','Valor de un punto: '+(policy.usd_per_credit === null ? 'No configurado' : 'USD '+policy.usd_per_credit)),
-      node('p','Tarifas HeyGen verificadas: '+policy.heygen_tariffs.length),
+      node('p','Tarifas HeyGen verificadas: '+policy.heygen_tariffs.filter(t=>!t.provisional).length+' · Provisionales: '+policy.heygen_tariffs.filter(t=>t.provisional).length),
       node('p','Las tarifas deben corresponder a la cuenta, los recursos y la configuración seleccionados. Un costo desconocido no equivale a cero.','help'));
     const form=node('form'), label=node('label','Valor de un punto en USD'), input=document.createElement('input');
     input.type='text';input.inputMode='decimal';input.placeholder='Sin configurar';input.value=policy.usd_per_credit || '';label.append(input);
     const save=node('button','Guardar valor','primary');save.type='submit';form.append(label,save);
     form.onsubmit=async event=>{event.preventDefault();save.disabled=true;try{await api('/admin/video-cost-policy',{method:'PUT',headers:{'X-DPIA-Action':'manage-integrations'},body:JSON.stringify({expected_revision:policy.revision,usd_per_credit:input.value.trim()||null})});notify('Valor de punto guardado.');await render();}catch(e){showError(e,panel);}finally{save.disabled=false;}};
     panel.append(form);root.append(panel);
-    if(policy.heygen_tariffs.length){const section=node('section',undefined,'panel');section.append(node('h2','Tarifas HeyGen configuradas'));table(section,['Cuenta','Motor','Avatar','Tarifa USD/segundo','Válida hasta','Fuente'],policy.heygen_tariffs.map(t=>[t.account_id,t.engine,t.avatar_id,t.usd_per_second,t.valid_until,t.reference]));root.append(section);}
+    const tariffPanel=node('section',undefined,'panel'), tariffForm=node('form'), grid=node('div',undefined,'form-grid'), tariffFields={};
+    tariffPanel.append(node('h2','Agregar tarifa HeyGen'),node('p','Una tarifa provisional es una estimación, no un costo confirmado. Por ahora puede guardarse para revisión, pero no habilita ejecuciones.','help'));
+    for(const [key,title,initial] of [['provider_id','ID de la conexión HeyGen',''],['provider_revision','Revisión de la conexión',''],['account_id','Cuenta HeyGen',''],['avatar_id','ID del avatar',''],['voice_id','ID de la voz',''],['engine','Motor de video','avatar_iv'],['resolution','Resolución','720p'],['aspect_ratio','Formato','16:9'],['voice_engine','Motor de voz','heygen_voice'],['voice_model','Modelo de voz','heygen-voice-1'],['usd_per_second','Tarifa estimada en USD por segundo',''],['valid_until','Válida hasta (UTC, AAAA-MM-DDTHH:MM:SSZ)',''],['reference','Fuente HTTPS','']]){
+      const label=node('label',title),control=document.createElement('input');control.type='text';control.value=initial;control.required=key!=='voice_model';label.append(control);grid.append(label);tariffFields[key]=control;
+    }
+    const provisionalLabel=node('label'),provisional=document.createElement('input');provisional.type='checkbox';provisional.checked=true;provisionalLabel.append(provisional,document.createTextNode(' Estimación provisional; requiere conciliación posterior'));
+    const tariffSave=node('button','Guardar tarifa','primary');tariffSave.type='submit';tariffForm.append(grid,provisionalLabel,tariffSave);tariffPanel.append(tariffForm);root.append(tariffPanel);
+    tariffForm.onsubmit=async event=>{event.preventDefault();tariffSave.disabled=true;try{
+      const tariff=Object.fromEntries(Object.entries(tariffFields).map(([key,control])=>[key,control.value.trim()]));
+      tariff.provider_revision=Number(tariff.provider_revision);tariff.provisional=provisional.checked;
+      await api('/admin/video-cost-policy',{method:'PUT',headers:{'X-DPIA-Action':'manage-integrations'},body:JSON.stringify({expected_revision:policy.revision,usd_per_credit:policy.usd_per_credit,heygen_tariffs:[...policy.heygen_tariffs,tariff]})});notify('Tarifa guardada.');await render();
+    }catch(e){showError(e,tariffPanel);}finally{tariffSave.disabled=false;}};
+    if(policy.heygen_tariffs.length){const section=node('section',undefined,'panel');section.append(node('h2','Tarifas HeyGen configuradas'));table(section,['Cuenta','Motor','Avatar','Tarifa USD/segundo','Tipo','Válida hasta','Fuente'],policy.heygen_tariffs.map(t=>[t.account_id,t.engine,t.avatar_id,t.usd_per_second,t.provisional?'Provisional':'Verificada',t.valid_until,t.reference]));root.append(section);}
     const switches=node('section',undefined,'panel');switches.append(node('h2','Operaciones de video'));
     for(const [key,labelText] of [['custom_script','Guion personalizado'],['openai_script','Guion con OpenAI'],['heygen_produce','Producción con HeyGen']]) switches.append(node('p',labelText+': '+(operations.operations[key]?'Habilitada':'Deshabilitada')));
     root.append(switches);
