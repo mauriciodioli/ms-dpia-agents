@@ -414,7 +414,9 @@ class Dispatcher:
         report['informational_delivered'] = []
         rows = self.conn.execute(select(m.jobs).join(Usuario.__table__, Usuario.id == m.jobs.c.owner_id)
             .where(m.jobs.c.state == 'REVIEWING', Usuario.activo.is_(True),
-                (m.jobs.c.deliver_not_before.is_(None) | (m.jobs.c.deliver_not_before <= self.now)),
+                or_(m.jobs.c.deliver_not_before.is_(None), m.jobs.c.deliver_not_before <= self.now,
+                    (m.jobs.c.configuration_snapshot['manager_latest_decision']['reason'].as_string()=='VIDEO_COMPLETED') &
+                    (m.jobs.c.configuration_snapshot['manager_latest_decision']['decision'].as_string()=='ACCEPT')),
                 or_(
                     (m.jobs.c.schedule_id.is_not(None) & m.jobs.c.legacy_task_id.is_not(None)),
                     m.jobs.c.configuration_snapshot['canonical_result_version'].as_integer()==1,

@@ -26,9 +26,9 @@ def transition_job(conn, *, owner_id: int, job_id: str, expected_revision: int,
         now = now or now_utc()
         informational = row['state'] == 'REVIEWING' and target == 'DELIVERED'
         if informational:
-            from .informational_delivery import REASON, eligible_result
+            from .informational_delivery import REASON, eligible_result, accepted_video
             if (actor_type != 'SYSTEM' or actor_id != 'dispatcher' or reason_code != REASON or
-                    (row['deliver_not_before'] is not None and row['deliver_not_before'] > now) or
+                    (not accepted_video(row) and row['deliver_not_before'] is not None and row['deliver_not_before'] > now) or
                     eligible_result(conn, row) is None):
                 raise EngineError('invalid_transition', 409)
         require_transition(row['state'], target, informational=informational)

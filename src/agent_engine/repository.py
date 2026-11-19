@@ -116,7 +116,8 @@ class ReadRepository:
         job_id = job['id']
         if job['state'] != 'DELIVERED':
             raise EngineError('result_not_delivered', 409)
-        if job['deliver_not_before'] is not None and job['deliver_not_before'] > now_utc():
+        from .informational_delivery import accepted_video
+        if not accepted_video(job) and job['deliver_not_before'] is not None and job['deliver_not_before'] > now_utc():
             raise EngineError('result_not_delivered', 409)
         approved_review = select(m.reviews.c.id).where(
             m.reviews.c.owner_id == m.results.c.owner_id, m.reviews.c.job_id == m.results.c.job_id,

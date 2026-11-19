@@ -7,6 +7,11 @@ from .errors import EngineError
 REASON = 'INFORMATIONAL_UNVERIFIED'
 
 
+def accepted_video(job):
+    decision=(job.get('configuration_snapshot') or {}).get('manager_latest_decision') or {}
+    return decision.get('reason')=='VIDEO_COMPLETED' and decision.get('decision')=='ACCEPT'
+
+
 def eligible_result(conn, job, result=None):
     from .result_assessment import human_review_allows_delivery
     if not human_review_allows_delivery(job):return None
