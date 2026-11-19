@@ -1236,7 +1236,12 @@
       if(data.evidence_status==='UNVERIFIED'||data.evidence_status==='SOURCE_REFERENCED')host.append(banner('Resultado informativo no verificado. No implica aprobación ni autorización de publicación.'));
       const payload=data.result;
       if(payload){host.append(node('p',payload.summary||''));
-        for(const item of payload.items||[]){const card=node('article',undefined,'panel');card.append(node('h4',item.title||'Resultado'));if(item.description){const detail=node('details'),summary=node('summary','Ver descripción');detail.append(summary,node('p',item.description));card.append(detail);}if(item.published_at)card.append(node('p',date(item.published_at),'help'));try{const url=new URL(item.url);if(['http:','https:'].includes(url.protocol)){const a=link('Ver referencia',url.href);a.target='_blank';a.rel='noopener noreferrer';card.append(a);}}catch{}host.append(card);}
+        let videoUrl=null;
+        try{const url=new URL(payload.video?.url);if(url.protocol==='https:')videoUrl=url.href;}catch{}
+        if(videoUrl){const section=node('section',undefined,'video-result'),player=document.createElement('video'),a=node('a','Abrir video','secondary');
+          section.append(node('h4','Video generado'));player.controls=true;player.preload='metadata';player.playsInline=true;player.src=videoUrl;
+          a.href=videoUrl;a.target='_blank';a.rel='noopener noreferrer';section.append(player,a);host.append(section);}
+        for(const item of payload.items||[]){if(videoUrl&&item.url===videoUrl)continue;const card=node('article',undefined,'panel');card.append(node('h4',item.title||'Resultado'));if(item.description){const detail=node('details'),summary=node('summary','Ver descripción');detail.append(summary,node('p',item.description));card.append(detail);}if(item.published_at)card.append(node('p',date(item.published_at),'help'));try{const url=new URL(item.url);if(['http:','https:'].includes(url.protocol)){const a=node('a','Ver referencia','primary');a.href=url.href;a.target='_blank';a.rel='noopener noreferrer';card.append(a);}}catch{}host.append(card);}
         for(const finding of payload.findings||[])host.append(node('p',finding.text||''));
         for(const warning of payload.warnings||[])host.append(banner(warning));
       }

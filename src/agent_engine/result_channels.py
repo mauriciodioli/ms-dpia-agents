@@ -14,8 +14,11 @@ def project(conn,repo,job):
         delivered=repo.result(job['id'])
         return {**data,**delivered}
     stored=job['configuration_snapshot'].get('result_assessment',{})
+    video=(data.get('result') or {}).get('video') or {}
+    completed_video=(data['result_classification']=='SATISFIED' and isinstance(video,dict)
+                     and video.get('state')=='COMPLETED' and video.get('provider')=='heygen')
     if (job['state']!='REVIEWING' or not stored or stored.get('result_id')!=data['result_id']
-            or data['result_classification'] not in REVIEWABLE|{'NO_MATCH'}
+            or (data['result_classification'] not in REVIEWABLE|{'NO_MATCH'} and not completed_video)
             or (job['deliver_not_before'] is not None and job['deliver_not_before']>now_utc())):
         raise EngineError('result_not_delivered',409)
     validate(RESULT,data['result'])

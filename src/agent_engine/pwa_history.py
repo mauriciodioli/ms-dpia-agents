@@ -50,6 +50,8 @@ def pwa_history():
             from .result_channels import project
             from .result_assessment import review
             result=project(conn,repo,job)
+            from .video_result_url import refresh
+            result=refresh(conn,job,result)
             if 'task_action' in body:
                 from .result_channels import task_action
                 outcome=task_action(conn,principal,repo,job,body['task_action'],body.get('configuration'))
@@ -106,6 +108,7 @@ def pwa_history():
                 query='Respuesta de Agente',source='agents',state='consumed',product_count=None,
                 created_at=iso(candidate['finished_at'] or candidate['created_at']))
             item.update({key:value for key,value in projection.items() if key not in ('result','evidence','execution','review_history')})
+            if isinstance((projection.get('result') or {}).get('video'),dict):item['task_type']='VIDEO_GENERAR'
             if refresh:
                 item.update(last_checked_at=iso(refresh['last_checked_at']),
                     last_changed_at=iso(refresh['last_changed_at']),

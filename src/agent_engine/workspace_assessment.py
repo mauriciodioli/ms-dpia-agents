@@ -18,6 +18,8 @@ def execution_assessment(conn,principal,repo,job_id):
         if set(body)!={'result_id','decision','reason'}:raise EngineError('invalid_contract')
         return {'assessment':review(conn,principal,job['id'],identifier(body['result_id']),body['decision'],body['reason'])}
     data=inspect(conn,job)
+    from .video_result_url import refresh
+    data=refresh(conn,job,data)
     data['agent_id']=job['agent_id'];data['task_id']=job['legacy_task_id']
     return {'assessment':data}
 
