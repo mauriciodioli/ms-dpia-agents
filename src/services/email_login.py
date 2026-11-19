@@ -26,9 +26,16 @@ def setup():
     secret=os.getenv('DPIA_LOGIN_CODE_SECRET','').strip()
     host=os.getenv('DPIA_LOGIN_SMTP_HOST','').strip()
     sender=os.getenv('DPIA_LOGIN_SMTP_FROM','').strip()
-    if not url or len(secret)<32 or not host or not sender:
+    redis_host=current_app.config.get('REDIS_HOST') or os.getenv('REDIS_HOST','').strip()
+    if (not url and not redis_host) or len(secret)<32 or not host or not sender:
         raise RuntimeError('email_login_not_configured')
-    return redis.Redis.from_url(url, socket_connect_timeout=3, socket_timeout=3),secret.encode(),host,sender
+    if url:
+        client=redis.Redis.from_url(url, socket_connect_timeout=3, socket_timeout=3)
+    else:
+        client=redis.Redis(host=redis_host,port=int(current_app.config.get('REDIS_PORT',6379)),
+            db=int(current_app.config.get('REDIS_DB',0)),password=current_app.config.get('REDIS_PASSWORD') or None,
+            socket_connect_timeout=3,socket_timeout=3)
+    return client,secret.encode(),host,sender
 
 
 def digest(secret, *parts):
