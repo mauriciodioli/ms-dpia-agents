@@ -26,7 +26,7 @@ def preferences(section, payload):
         result[field] = value
     if section == 'production':
         duration, budget, automatic = (payload.get('duration_seconds', 60),
-                                     payload.get('budget_credits', 0),
+                                     payload.get('budget_credits', 20),
                                      payload.get('automatic_production', False))
         if (type(duration) is not int or not 1 <= duration <= 3600
                 or type(budget) is not int or not 0 <= budget <= 1000000
@@ -46,10 +46,12 @@ def configuration(parameters):
                        'language': parameters.get('language') or
                            (parameters.get('query_context') or {}).get('language') or 'es',
                        'format': '16:9', 'provider': 'heygen', 'avatar_id': '',
-                       'voice_id': '', 'budget_credits': 0, 'automatic_production': False},
+                       'voice_id': '', 'budget_credits': 20, 'automatic_production': False},
     }
     for section, values in defaults.items():
         video[section] = {**values, **video.get(section, {})}
+    if video['production']['budget_credits'] == 0:
+        video['production']['budget_credits'] = 20
     return video
 
 

@@ -590,7 +590,7 @@
     grid.append(scheduleHost);
     choice(grid,'Autorización de producción','approval',[['manual','Revisar y aprobar antes de generar'],['automatic','Automática, dentro del presupuesto autorizado']]);
     const budget=input(grid,'Límite de gasto por ejecución (créditos DPIA)','max_cost','number');budget.min=0;budget.max=1000000;budget.step=1;
-    grid.append(node('p','0 significa que no se autoriza consumo de créditos. Guardar no inicia la producción ni cambia programaciones existentes. El envío requiere autorización, proveedor y presupuesto disponibles.','help'));
+    grid.append(node('p','El límite predeterminado es de 20 puntos por ejecución. El consumo se descuenta del saldo disponible. Guardar no inicia la producción ni cambia las programaciones existentes.','help'));
     function payload(){return {schedule:'manual',time:'00:00',timezone:'UTC',...Object.fromEntries(Object.entries(controls).map(([k,v])=>[k,k==='duration_seconds'?Number(v.value):v.value]))};}
     const actions=node('div',undefined,'actions'),copy=btn('Copiar configuración JSON',async()=>{try{await navigator.clipboard.writeText(JSON.stringify(payload(),null,2));feedback.textContent='Configuración copiada.';}catch(e){feedback.textContent='No se pudo copiar al portapapeles.';}}),save=node('button','Guardar configuración','primary');save.type='submit';
     actions.append(link('Cancelar',back,'secondary'),copy,save);form.append(feedback,actions);root.append(form);
