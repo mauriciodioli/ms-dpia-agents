@@ -59,8 +59,12 @@ def start():
     body=request.get_json(silent=True)
     email=body.get('email','').strip().lower() if isinstance(body,dict) and isinstance(body.get('email'),str) else ''
     if len(email)>120 or not EMAIL.fullmatch(email):return jsonify(error='Ingresá un correo válido.'),400
+    stage='database'
     try:
+        user=Usuario.query.filter_by(correo_electronico=email,activo=True).one_or_none()
+        stage='configuration'
         redis,secret,host,sender=setup()
+        stage='redis'
         ip=request.remote_addr or 'unknown'
         for name,limit in [('email:'+email,4),('ip:'+ip,20)]:
             key='dpia:email-login:limit:'+digest(secret,name)
@@ -68,19 +72,20 @@ def start():
             if count==1:redis.expire(key,600)
             if count>limit:return jsonify(error='Demasiados intentos. Probá más tarde.'),429
         challenge=secrets.token_urlsafe(32);code=str(secrets.randbelow(100000000)).zfill(8)
-        user=Usuario.query.filter_by(correo_electronico=email,activo=True).one_or_none()
         session.pop('email_login_challenge',None)
         if user:
             key='dpia:email-login:code:'+digest(secret,challenge)
             redis.hset(key,mapping={'digest':digest(secret,challenge,code),'user_id':str(user.id),'attempts':'0'})
             redis.expire(key,600)
-            try:send_mail(host,sender,email,code)
+            try:
+                stage='smtp'
+                send_mail(host,sender,email,code)
             except Exception:
                 redis.delete(key);raise
             session['email_login_challenge']=challenge
         return jsonify(message='Si la cuenta está activa, recibirás un código por correo.')
     except Exception:
-        current_app.logger.warning('Email login unavailable')
+        current_app.logger.warning('Email login unavailable at stage=%s',stage)
         return jsonify(error='El acceso por correo no está disponible. Intentá más tarde.'),503
 
 
