@@ -7,8 +7,8 @@
   <title>DPIA Agents · Tu espacio de agentes</title>
   <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='images/LOGOS IA/favicon.ico') }}">
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/LOGOS IA/SVG/LOGO AZUL.svg') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='agents-workspace.css') }}?v=6">
-  <script src="{{ url_for('static', filename='agents-workspace.js') }}?v=33" defer></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='agents-workspace.css') }}?v=7">
+  <script src="{{ url_for('static', filename='agents-workspace.js') }}?v=34" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#content">Saltar al contenido</a>
@@ -24,7 +24,7 @@
       <a href="/developers"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m8 8-4 4 4 4m8-8 4 4-4 4M14 4l-4 16"/></svg></span>API / Desarrolladores</a>
       <a href="/administration" data-nav id="admin-nav" hidden><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 3 3 7v5c0 5 9 9 9 9s9-4 9-9V7Z"/></svg></span>Administración</a>
     </nav>
-    <div class="sidebar-bottom"><span class="small-dot"></span> Tu espacio, tus agentes<p>Configuración y seguimiento<br>en un solo lugar.</p></div>
+    <div class="sidebar-bottom"><span class="small-dot"></span> <span id="sidebar-user">Tu cuenta</span><p><a href="/billing" data-nav id="billing-nav" hidden>Billing &amp; Analytics</a></p></div>
   </aside>
   <div class="workspace">
     <header class="topbar">

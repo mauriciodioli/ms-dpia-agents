@@ -10,7 +10,8 @@
     '/schedules': 'Programaciones',
     '/executions': 'Ejecuciones',
     '/integrations': 'Integraciones',
-    '/administration': 'Administración'
+    '/administration': 'Administración',
+    '/billing': 'Billing & Analytics'
   };
   const states = {
     ENABLED: 'Habilitado',
@@ -39,6 +40,11 @@
     'dpia.test.echo': 'Prueba interna (sin APIs)'
   };
   const errors = {
+    VIDEO_COST_NOT_VERIFIABLE:'No se pudo verificar la tarifa o el saldo de HeyGen para esta cuenta y estos recursos. Revisá Billing & Analytics y la configuración del proveedor.',
+    VIDEO_COST_RATE_NOT_CONFIGURED:'Falta configurar el valor de un punto en USD.',
+    VIDEO_PROVIDER_BALANCE_INSUFFICIENT:'El saldo disponible de HeyGen no cubre el costo estimado.',
+    VIDEO_LEDGER_SCHEMA_INCOMPATIBLE:'El esquema de puntos no admite esta operación. Consultá al administrador.',
+    VIDEO_OPERATION_DISABLED:'Esta operación de video está deshabilitada.',
     selected_sources_unavailable:'Una conexión elegida para esta tarea ya no está disponible o autorizada. Revisá la selección de conexiones.',
     invalid_execution_sources:'Revisá las conexiones elegidas para esta tarea.',
     JOB_DEADLINE_EXCEEDED: 'La ejecución superó su fecha u hora límite y se detuvo antes de completarse.',
@@ -162,7 +168,7 @@
     row.append(copy);
     const actions=node('div',undefined,'actions');
     if (action) actions.append(action);
-    const livePages=['/','/agents','/schedules','/executions','/integrations','/administration','/admin/agents'];
+    const livePages=['/','/agents','/schedules','/executions','/integrations','/administration','/admin/agents','/billing'];
     let refresh;
     if(livePages.includes(location.pathname)){
       refresh=btn('↻ Actualizar',async()=>{
@@ -1731,6 +1737,39 @@
       abort.signal.addEventListener('abort', () => clearInterval(timer), {once: true});
     }
   }
+  async function billingPage() {
+    if (!context.session.admin) { heading('Acceso restringido', 'Esta sección requiere una sesión de administrador.'); return; }
+    const [overview, cost, operations] = await Promise.all([api('/admin/overview'), api('/admin/video-cost-policy'), api('/admin/video-operations')]);
+    heading('Billing & Analytics', 'Costos registrados, configuración de video y actividad de proveedores.');
+    const navigation=node('div',undefined,'billing-navigation');
+    for(const [label,id] of [['Billing','billing-costs'],['Usage','billing-usage'],['Spend','billing-spend']]){const a=node('a',label,'secondary');a.href='#'+id;navigation.append(a);}
+    root.append(navigation);
+    const policy=cost.policy, panel=node('section',undefined,'panel');
+    panel.id='billing-costs';
+    panel.append(node('h2','Costos de video'),node('p','Valor de un punto: '+(policy.usd_per_credit === null ? 'No configurado' : 'USD '+policy.usd_per_credit)),
+      node('p','Tarifas HeyGen verificadas: '+policy.heygen_tariffs.length),
+      node('p','Las tarifas deben corresponder a la cuenta, los recursos y la configuración seleccionados. Un costo desconocido no equivale a cero.','help'));
+    const form=node('form'), label=node('label','Valor de un punto en USD'), input=document.createElement('input');
+    input.type='text';input.inputMode='decimal';input.placeholder='Sin configurar';input.value=policy.usd_per_credit || '';label.append(input);
+    const save=node('button','Guardar valor','primary');save.type='submit';form.append(label,save);
+    form.onsubmit=async event=>{event.preventDefault();save.disabled=true;try{await api('/admin/video-cost-policy',{method:'PUT',headers:{'X-DPIA-Action':'manage-integrations'},body:JSON.stringify({expected_revision:policy.revision,usd_per_credit:input.value.trim()||null})});notify('Valor de punto guardado.');await render();}catch(e){showError(e,panel);}finally{save.disabled=false;}};
+    panel.append(form);root.append(panel);
+    if(policy.heygen_tariffs.length){const section=node('section',undefined,'panel');section.append(node('h2','Tarifas HeyGen configuradas'));table(section,['Cuenta','Motor','Avatar','Tarifa USD/segundo','Válida hasta','Fuente'],policy.heygen_tariffs.map(t=>[t.account_id,t.engine,t.avatar_id,t.usd_per_second,t.valid_until,t.reference]));root.append(section);}
+    const switches=node('section',undefined,'panel');switches.append(node('h2','Operaciones de video'));
+    for(const [key,labelText] of [['custom_script','Guion personalizado'],['openai_script','Guion con OpenAI'],['heygen_produce','Producción con HeyGen']]) switches.append(node('p',labelText+': '+(operations.operations[key]?'Habilitada':'Deshabilitada')));
+    root.append(switches);
+    const analytics=node('section',undefined,'panel');analytics.id='billing-usage';analytics.append(node('h2','Usage · Consumo por proveedor'),node('p','Los importes incluyen únicamente costos registrados; las operaciones sin costo informado siguen siendo desconocidas.','help'));
+    if(overview.provider_usage.length)table(analytics,['Proveedor','Llamadas','Tokens de entrada','Tokens de salida','Costo registrado'],overview.provider_usage.map(u=>[u.provider_id,u.calls??'Desconocido',u.input_tokens??'Desconocido',u.output_tokens??'Desconocido',u.cost===null?'Desconocido':u.cost+' '+u.currency]));
+    else analytics.append(node('p','No hay consumo registrado.'));
+    analytics.append(node('h3','Ejecuciones por estado'));
+    if(Object.keys(overview.jobs_by_state).length)table(analytics,['Estado','Cantidad'],Object.entries(overview.jobs_by_state).map(([state,count])=>[states[state]||state,count]));
+    else analytics.append(node('p','No hay ejecuciones registradas.'));
+    root.append(analytics);
+    const spend=node('section',undefined,'panel');spend.id='billing-spend';spend.append(node('h2','Spend · Gasto registrado'),node('p','Los importes son parciales cuando hay consumos sin costo confirmado.','help'));
+    if(overview.provider_usage.length)table(spend,['Proveedor','Gasto registrado'],overview.provider_usage.map(u=>[u.provider_id,u.cost===null?'Desconocido':u.cost+' '+u.currency]));
+    else spend.append(node('p','Sin información de gasto.'));
+    root.append(spend);
+  }
   async function administrationPage() {
     if (!context.session.admin) {
       heading('Acceso restringido', 'Esta sección requiere una sesión de administrador.');
@@ -1779,6 +1818,7 @@
     document.querySelector('#logout').hidden = true;
     document.querySelector('#account-label').textContent = 'Acceso seguro';
     document.querySelector('#admin-nav').hidden = true;
+    document.querySelector('#billing-nav').hidden = true;
     const section = node('section', undefined, 'login'),
       hero = node('div', undefined, 'hero'),
       copy = node('div');
@@ -1883,6 +1923,8 @@
       context = await api('/session');
       if (run !== version) return;
       document.querySelector('#admin-nav').hidden = !context.session.admin;
+      document.querySelector('#billing-nav').hidden = !context.session.admin;
+      document.querySelector('#sidebar-user').textContent = context.session.email || ('Usuario #'+context.session.owner_id);
       document.querySelector('#logout').hidden = false;
       document.querySelector('#account-label').textContent = context.session.admin ?
         'Sesión de administrador' : 'Mi espacio personal';
@@ -1895,6 +1937,7 @@
       else if (path === '/schedules') await schedulesPage();
       else if (path === '/executions') await executionsPage();
       else if (path === '/integrations') await integrationsPage();
+      else if (path === '/billing') await billingPage();
       else if (['/administration', '/admin/agents'].includes(path)) await administrationPage();
       else heading('Página no encontrada', 'Volvé a Mis agentes para continuar.', link('Mis agentes',
         '/agents'));

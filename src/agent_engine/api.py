@@ -416,11 +416,13 @@ def workspace_session(conn, principal, repo):
     arguments()
     if principal.kind != 'SESSION':
         raise EngineError('session_required', 403)
+    from model.usuario import Usuario
+    email = conn.execute(select(Usuario.correo_electronico).where(Usuario.id == principal.owner_id)).scalar_one_or_none()
     template_map = {}
     for entry in MCPRepository(conn).catalog(principal.owner_id):
         server = conn.execute(select(mcp_servers.c.connection_template).where(mcp_servers.c.id == entry['server_id'])).scalar_one_or_none()
         template_map[tool_id(entry['id'])] = (server or {}).get(entry['tool_name'], {})
-    return {'session': {'admin': principal.admin, 'mcp_manage': 'mcp:write' in principal.scopes, 'owner_id':principal.owner_id, 'scopes': sorted(principal.scopes)},
+    return {'session': {'admin': principal.admin, 'mcp_manage': 'mcp:write' in principal.scopes, 'owner_id':principal.owner_id, 'email':email, 'scopes': sorted(principal.scopes)},
             'tools': [{'id': tool.id, 'provider': tool.provider,
                        'input_schema': tool.input_schema,
                        'parameter_template': template_map.get(tool.id, {}),

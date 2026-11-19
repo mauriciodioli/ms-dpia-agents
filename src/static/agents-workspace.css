@@ -156,6 +156,8 @@ nav a[aria-current=page] {
   line-height: 1.8;
   color: #c9bee6
 }
+.sidebar-bottom a{color:#fff;text-decoration:underline;text-underline-offset:3px}.sidebar-bottom a:hover{color:var(--lime)}
+.billing-navigation{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px}
 
 .small-dot {
   display: inline-block;

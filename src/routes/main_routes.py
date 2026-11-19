@@ -14,6 +14,7 @@ main_bp = Blueprint("main", __name__)
 @main_bp.get("/executions")
 @main_bp.get("/integrations")
 @main_bp.get("/administration")
+@main_bp.get("/billing")
 def index(agent_id=None, task_id=None):
     response = make_response(render_template("agents_workspace.html"))
     response.headers['Cache-Control'] = 'no-store'
