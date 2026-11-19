@@ -153,7 +153,7 @@ class VideoHandlers:
                 current_job,current_task=context.box._owned(conn,context.lease)
                 current=self.provider(conn,job['owner_id'])
                 if current['revision']!=row['revision']:raise EngineError('VIDEO_CONFIGURATION_CHANGED',409)
-                quote=estimate(conn,row,body,production['duration_seconds'],context.box.now(),account)
+                quote=estimate(conn,row,body,production['duration_seconds'],context.box.now(),account,job_id=current_job['id'])
                 rate=load(conn)['usd_per_credit']
                 reservation=reserve(conn,current_job,current_task,quote['estimated_usd'],
                     {'AGENTS_VIDEO_USD_PER_CREDIT':rate},production,quote['reference'],context.box.now())
