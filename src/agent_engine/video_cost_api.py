@@ -56,7 +56,10 @@ def heygen_usage(conn, principal, repo):
                     {'product':group.get('label') or group.get('tag')})
                 items.append({key:value.replace(secret,'[redacted]') if isinstance(value,str) else value
                               for key,value in item.items() if value is None or isinstance(value,(str,int,float))})
-    return {'balance':balance,'currency':currency,'usage_available':status==200 and isinstance(usage.get('data'),list),
+    username=data['data'].get('username')
+    if not isinstance(username,str) or not username or secret in username:username=None
+    return {'balance':balance,'currency':currency,'connection':{'id':row['id'],'revision':row['revision'],'account_id':username},
+            'usage_available':status==200 and isinstance(usage.get('data'),list),
             'usage':items,'has_more':bool(usage.get('has_more')) if status==200 else False,
             'start':start.isoformat(),'end':end.isoformat()}
 
