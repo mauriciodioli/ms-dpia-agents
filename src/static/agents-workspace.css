@@ -694,6 +694,12 @@ td:first-child {
   margin: 20px 0
 }
 
+.email-login { margin-top: 18px; }
+.email-login summary { cursor: pointer; }
+.email-login form:not([hidden]) { display: grid; gap: 12px; margin-top: 16px; }
+.email-login input { box-sizing: border-box; margin: 0; }
+.email-login button { justify-self: start; }
+
 .loading {
   color: var(--muted);
   padding: 50px;

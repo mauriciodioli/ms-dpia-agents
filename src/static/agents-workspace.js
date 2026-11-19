@@ -1872,7 +1872,7 @@
     status.setAttribute('role', 'status');
     panel.append(node('h2', 'Ingresá a tu espacio'), node('p',
       'Usá tu cuenta de Google para continuar de forma segura.', 'muted'), mount, status);
-    const emailDetails=node('details'), emailSummary=node('summary','Ingresar con correo DPIA'),emailForm=node('form'),emailInput=document.createElement('input'),emailSubmit=node('button','Enviar código'),codeForm=node('form'),codeInput=document.createElement('input'),codeSubmit=node('button','Ingresar');
+    const emailDetails=node('details',undefined,'email-login'), emailSummary=node('summary','Ingresar con correo DPIA'),emailForm=node('form'),emailInput=document.createElement('input'),emailSubmit=node('button','Login','secondary'),codeForm=node('form'),codeInput=document.createElement('input'),codeSubmit=node('button','Ingresar','secondary');
     emailInput.type='email';emailInput.required=true;emailInput.maxLength=120;emailInput.placeholder='Correo electrónico';emailInput.autocomplete='email';
     codeInput.inputMode='numeric';codeInput.pattern='[0-9]{8}';codeInput.maxLength=8;codeInput.required=true;codeInput.placeholder='Código recibido';codeInput.autocomplete='one-time-code';
     emailForm.append(emailInput,emailSubmit);codeForm.append(codeInput,codeSubmit);codeForm.hidden=true;emailDetails.append(emailSummary,emailForm,codeForm);panel.append(emailDetails);
