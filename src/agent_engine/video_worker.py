@@ -108,7 +108,19 @@ class VideoHandlers:
     def produce(self,context,parameters):
         job,task,source=self.context(context,parameters)
         script=prior_script(context.previous_outputs)
-        production=source['video']['production']
+        production=dict(source['video']['production'])
+        if not production['automatic_production'] and job.get('schedule_id'):
+            # A one-off scheduled from the user's task is an explicit request to
+            # produce once; retain the separate approval for recurring schedules.
+            with self.engine.connect() as conn:
+                schedule=conn.execute(select(m.schedules).where(m.schedules.c.id==job['schedule_id'],
+                    m.schedules.c.owner_id==job['owner_id'],m.schedules.c.agent_id==job['agent_id'],
+                    m.schedules.c.legacy_task_id==job['legacy_task_id'])).mappings().first()
+            definition=(schedule['definition'] or {}) if schedule else {}
+            author=definition.get('author') or {}
+            if (definition.get('configured_task_schedule') is True and definition.get('frequency')=='ONCE'
+                    and author.get('kind') in ('SESSION','PWA_SERVICE')):
+                production['automatic_production']=True
         from .video_operations import require
         with self.engine.begin() as conn:require(conn,'heygen_produce')
         if production.get('format') not in ('16:9','9:16','1:1'):raise EngineError('VIDEO_CONFIGURATION_INVALID',422)
