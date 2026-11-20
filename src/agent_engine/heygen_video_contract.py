@@ -36,7 +36,8 @@ def validate_background(value):
  if value=={'type':'auto'}:return dict(value)
  if value.get('type')=='color' and set(value)=={'type','value'} and isinstance(value['value'],str) and re.fullmatch(r'#[0-9a-fA-F]{6}',value['value']):return dict(value)
  if value.get('type')=='image' and set(value)=={'type','url'} and isinstance(value['url'],str) and len(value['url'])<=2048:
-  try:parsed=urlsplit(value['url'])
+  try:parsed=urlsplit(value['url']);port=parsed.port
   except ValueError:raise EngineError('VIDEO_CONFIGURATION_INVALID',422) from None
-  if parsed.scheme=='https' and parsed.hostname and not parsed.username and not parsed.password:return dict(value)
+  host=(parsed.hostname or '').lower()
+  if parsed.scheme=='https' and (host=='dpia.site' or host.endswith('.dpia.site')) and not parsed.username and not parsed.password and port in (None,443):return dict(value)
  raise EngineError('VIDEO_CONFIGURATION_INVALID',422)
