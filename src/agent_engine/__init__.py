@@ -19,7 +19,7 @@ def init_app(app):
     app.register_blueprint(admin)
     from .developer_portal import portal
     app.register_blueprint(portal)
-    from .cli import dispatch_command, outbox_command, recover_command, worker_command, inbox_command, video_check_command, video_reconcile_command
+    from .cli import dispatch_command, outbox_command, recover_command, worker_command, inbox_command, video_check_command, video_reconcile_command, video_recover_command
     app.cli.add_command(dispatch_command)
     app.cli.add_command(outbox_command)
     app.cli.add_command(recover_command)
@@ -27,3 +27,4 @@ def init_app(app):
     app.cli.add_command(inbox_command)
     app.cli.add_command(video_check_command)
     app.cli.add_command(video_reconcile_command)
+    app.cli.add_command(video_recover_command)

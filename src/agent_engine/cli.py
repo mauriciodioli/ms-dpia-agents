@@ -161,3 +161,19 @@ def video_reconcile_command(job_id, dry_run):
     except (EngineError,SQLAlchemyError) as error:
         raise click.ClickException(error.code if isinstance(error,EngineError) else 'engine_storage_unavailable') from None
     click.echo(json.dumps(result,sort_keys=True))
+
+
+@click.command('agent-video-recover')
+@click.option('--job-id',required=True)
+@click.option('--dry-run',is_flag=True)
+@click.option('--apply',is_flag=True)
+@with_appcontext
+def video_recover_command(job_id,dry_run,apply):
+    """Inspect or explicitly recover an existing submitted HeyGen video."""
+    import json
+    from .video_reconcile import recover_video
+    if dry_run==apply:raise click.UsageError('Indicá exactamente una opción: --dry-run o --apply.')
+    try:result=recover_video(engine(),current_app.config,job_id,apply=apply)
+    except (EngineError,SQLAlchemyError) as error:
+        raise click.ClickException(error.code if isinstance(error,EngineError) else 'engine_storage_unavailable') from None
+    click.echo(json.dumps(result,sort_keys=True))
