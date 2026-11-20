@@ -1458,7 +1458,7 @@
   }
   async function ownProviderAccess() {
     const panel=node('section',undefined,'panel');panel.append(node('h2','Acceso de mis agentes'),node('p','El acceso es automático. Podés quitarlo por agente y proveedor.'));root.append(panel);
-    for(const [provider,label] of [['openai','OpenAI'],['dpia-scraper','DPIA Scraper']]){
+    for(const [provider,label] of [['openai','OpenAI'],['groq','Groq'],['dpia-scraper','DPIA Scraper']]){
       try{
         const data=await api('/integrations/'+provider+'/agents');
         const group=node('section');group.append(node('h3',label));panel.append(group);
@@ -1543,7 +1543,7 @@
       const card = node('article', undefined, 'agent-card integration-card');
       card.dataset.provider = initial.id;
       cards.append(card);
-      const title = initial.id === 'openai' ? 'OpenAI' : 'DPIA Scraper';
+      const title = initial.id === 'openai' ? 'OpenAI' : initial.id === 'groq' ? 'Groq' : 'DPIA Scraper';
       async function refresh() {
         const latest = (await api('/integrations/' + initial.id + '/health')).integration;
         if (latest.revision >= state.revision) state = latest;
@@ -1590,7 +1590,7 @@
           node('p', 'Última prueba: ' + (state.checked_at ? date(state.checked_at) : 'Sin registro')));
         if (state.latency_ms !== null) card.append(node('p', 'Latencia: ' + state.latency_ms + ' ms'));
         if (state.last_error) card.append(banner(integrationErrors[state.last_error] || 'Error de conexión.'));
-        card.append(buttons, node('small', initial.id === 'openai' ?
+        card.append(buttons, node('small', (initial.id === 'openai' || initial.id === 'groq') ?
           'El diagnóstico consulta el modelo; no genera contenido ni garantiza cuota o permisos de inferencia.' :
           'El diagnóstico verifica API y permisos; no ejecuta scraping ni comprueba Apify.'));
         if (state.id === 'dpia-scraper') {
@@ -1624,13 +1624,13 @@
         form.autocomplete = 'off'; dialog.append(form);
         let url, model, maxTokens, saving = false;
         if (state.id === 'dpia-scraper') url = inputField(form, 'URL de la API', 'url', state.config.base_url, {required: true});
-        const credential = inputField(form, state.id === 'openai' ? 'API Key' : 'Token Bearer', 'password', '', {
+        const credential = inputField(form, state.id !== 'dpia-scraper' ? 'API Key' : 'Token Bearer', 'password', '', {
           required: !state.credential_present, maxLength: 4096, autocomplete: 'new-password',
           placeholder: state.credential_present ? 'Dejar vacío para conservar la credencial' : ''});
         const reveal = btn('Mostrar / Ocultar', () => credential.type = credential.type === 'password' ? 'text' : 'password', 'quiet');
         form.append(reveal);
         dialog.addEventListener('close', () => credential.value = '');
-        if (state.id === 'openai') {
+        if (state.id === 'openai' || state.id === 'groq') {
           const label = node('label', 'Modelo configurado'); model = node('select'); model.required = true;
           model.append(new Option('Seleccioná un modelo', ''));
           for (const id of state.available_models) model.append(new Option(id, id));
@@ -1645,7 +1645,7 @@
         save.type = 'submit'; actions.append(save, cancel); form.append(actions);
         form.onsubmit = async event => {
           event.preventDefault(); if (saving) return; saving = true; save.disabled = cancel.disabled = true;
-          const config = state.id === 'openai' ? {model: model.value, timeout_seconds: Number(timeout.value), max_output_tokens: Number(maxTokens.value)} :
+          const config = state.id !== 'dpia-scraper' ? {model: model.value, timeout_seconds: Number(timeout.value), max_output_tokens: Number(maxTokens.value)} :
             {base_url: url.value, timeout_seconds: Number(timeout.value)};
           const body = {expected_revision: state.revision, config};
           if (credential.value) body.credential = credential.value;
