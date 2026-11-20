@@ -19,6 +19,7 @@ from .provider_transport import ProviderHTTP, probe, validate_scraper_url, SCRAP
 PROVIDERS = {
     'dpia-scraper': {'provider': 'dpia.scraper', 'tool': 'dpia.amazon.search', 'capability': 'search'},
     'openai': {'provider': 'openai.responses', 'tool': 'openai.analysis', 'capability': 'analysis'},
+    'groq': {'provider': 'groq.chat', 'tool': 'groq.video.script', 'capability': 'video'},
 }
 BY_PROVIDER = {v['provider']: k for k, v in PROVIDERS.items()}
 
@@ -64,6 +65,8 @@ class IntegrationService:
         if provider == 'dpia-scraper':
             return {'base_url': self.config.get('DPIA_SCRAPER_BASE_URL', SCRAPER_BASE),
                     'timeout_seconds': self.config.get('DPIA_SCRAPER_TIMEOUT_SECONDS', 120)}
+        if provider == 'groq':
+            return {'model': self.config.get('AGENTS_GROQ_MODEL', 'openai/gpt-oss-20b'), 'timeout_seconds': 60, 'max_output_tokens': 2000}
         return {'model': self.config.get('OPENAI_MODEL', ''), 'timeout_seconds': 60, 'max_output_tokens': 2000}
 
     def row(self, conn, provider, *, lock=False):
@@ -84,9 +87,9 @@ class IntegrationService:
             if set(config) != {'model', 'timeout_seconds', 'max_output_tokens'}:
                 raise EngineError('invalid_contract')
             model = config['model']
-            if not isinstance(model, str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.:-]{0,119}', model):
+            if not isinstance(model, str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_./:-]{0,119}', model):
                 raise EngineError('invalid_model')
-            allowed = self.config.get('AGENTS_OPENAI_MODELS', ())
+            allowed = self.config.get('AGENTS_GROQ_MODELS', ()) if provider == 'groq' else self.config.get('AGENTS_OPENAI_MODELS', ())
             if model not in allowed:
                 raise EngineError('model_not_configured')
             if type(config['max_output_tokens']) is not int or not 16 <= config['max_output_tokens'] <= 16000:
@@ -126,8 +129,8 @@ class IntegrationService:
             last_error=diag.get('error') or ready['configuration_error'],
             checked_at=iso(row['checked_at']), last_success_at=iso(row['last_success_at']),
             latency_ms=diag.get('latency_ms'), marketplaces=diag.get('marketplaces', {}))
-        if provider == 'openai':
-            result['available_models'] = list(self.config.get('AGENTS_OPENAI_MODELS', ()))
+        if provider in ('openai', 'groq'):
+            result['available_models'] = list(self.config.get('AGENTS_GROQ_MODELS', ())) if provider == 'groq' else list(self.config.get('AGENTS_OPENAI_MODELS', ()))
             result['diagnostic_scope'] = 'model_metadata_only'
         else:
             result['diagnostic_scope'] = 'scraper_auth_and_api_only'

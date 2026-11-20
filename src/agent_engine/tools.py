@@ -79,6 +79,9 @@ def default_registry(*, conn=None, engine=None, owner=None) -> ToolRegistry:
         input_schema={'type': 'object', 'additionalProperties': False,
                       'properties': {'instructions': {'type': 'string', 'maxLength': 8000}}},
     ))
+    registry.register(ToolSpec(id='groq.video.script', provider='groq.chat', capability='video',
+        implementation_status='NOT_IMPLEMENTED', contract_reference='agent_engine.groq_integration',
+        input_schema={'type':'object','additionalProperties':False,'properties':{}}))
     from .video_plan import SCRIPT,PRODUCE,INPUT
     for identifier,provider in ((SCRIPT,'openai.responses'),(PRODUCE,'heygen.rest')):
         registry.register(ToolSpec(id=identifier,provider=provider,capability='video',
