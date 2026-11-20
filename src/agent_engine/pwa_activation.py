@@ -36,6 +36,8 @@ def activate_pwa():
     verify_hmac(PATH)
     arguments()
     body = json_body()
+    if body.get('operation') == 'video_resources':
+        return video_resources_catalog(body)
     if body.get('operation') in ('schedule_task_now','run_existing_task_now'):
         from .immediate_tasks import schedule_now
         with engine().begin() as conn:
@@ -111,6 +113,28 @@ def activate_pwa():
     return {'api_version': 'agents.v1', 'agent': agent, 'owner_id': owner,
             'source_agent_id': body['source_agent_id'], 'source_revision': body['source_revision'],
             'execution_enabled': False}, 200
+
+
+def video_resources_catalog(body):
+    if (set(body)!={'operation','owner_id','source_agent_id','task_id','language'} or
+            any(type(body.get(k)) is not int or body[k]<1 for k in ('owner_id','source_agent_id','task_id')) or
+            not isinstance(body.get('language'),str)):
+        raise EngineError('invalid_contract',422)
+    from .configured_task_repository import ConfiguredTaskRepository
+    from .shared_video_provider import resolve
+    from .rest_providers.api import service
+    from .contracts import SCOPES
+    with engine().connect() as conn:
+        owner=body['owner_id'];active_user(conn,owner)
+        agent=conn.execute(select(m.agents).where(m.agents.c.owner_id==owner,
+            m.agents.c.legacy_agent_id==body['source_agent_id'])).mappings().first()
+        if not agent:raise EngineError('agent_not_found',404)
+        rows=ConfiguredTaskRepository(conn).rows(agent,body['task_id'])
+        if not rows or rows[0]['tipo']!='VIDEO_GENERAR' or (rows[0]['parametros'] or {}).get('_deleted_at'):
+            raise EngineError('task_not_found',404)
+        provider=resolve(conn,owner)
+    principal=Principal(owner,'PWA_SERVICE','ms202611sb2b',SCOPES,True,frozenset())
+    return service().video_resources(principal,provider['id'],body['language'],configured_task=True),200
 
 
 def synchronize_task_schedule(body):
