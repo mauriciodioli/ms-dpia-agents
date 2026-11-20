@@ -13,6 +13,7 @@ from .errors import EngineError
 
 SCRAPER_BASE = 'https://api.dpia.site/api/scraper/v1'
 OPENAI_BASE = 'https://api.openai.com/v1'
+GROQ_BASE = 'https://api.groq.com/openai/v1'
 REQUIRED_PERMISSIONS = frozenset({'scraper:read', 'scraper:write'})
 HTTP_ERRORS = {400: 'provider_invalid_request', 401: 'invalid_credentials',
                403: 'insufficient_permissions', 404: 'provider_resource_unavailable',
@@ -144,7 +145,8 @@ def probe(provider, config, secret, http):
                 countries = [c for c in ('argentina', 'italia', 'espana', 'polonia', 'mexico', 'uruguay') if c in domains]
                 result['marketplaces'][name] = countries
         else:
-            model = http.request('GET', OPENAI_BASE + '/models/' + quote(config['model'], safe=''), secret, timeout=timeout)
+            base = GROQ_BASE if provider == 'groq' else OPENAI_BASE
+            model = http.request('GET', base + '/models/' + quote(config['model'], safe=''), secret, timeout=timeout)
             if model.get('object') != 'model' or model.get('id') != config['model']:
                 raise EngineError('provider_invalid_response', 502)
             result.update(authenticated=True, permissions=['models:retrieve'], permissions_ok=True)
