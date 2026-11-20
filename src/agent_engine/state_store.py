@@ -11,6 +11,21 @@ from .models import jobs, events
 from .states import require_transition
 
 
+def reopen_timed_out_video(conn, job, now):
+    """One audited reconciliation transition; caller must hold and validate the job."""
+    if job['state']!='FAILED' or job['error_code']!='JOB_DEADLINE_EXCEEDED':
+        raise EngineError('video_reconciliation_not_eligible',409)
+    revision=job['revision']+1
+    changed=conn.execute(update(jobs).where(jobs.c.id==job['id'],jobs.c.owner_id==job['owner_id'],
+        jobs.c.state=='FAILED',jobs.c.revision==job['revision'],jobs.c.error_code=='JOB_DEADLINE_EXCEEDED')
+        .values(state='RUNNING',revision=revision,error_code=None,finished_at=None,updated_at=now)).rowcount
+    if changed!=1:raise EngineError('revision_conflict',409)
+    conn.execute(insert(events).values(id=str(uuid4()),owner_id=job['owner_id'],job_id=job['id'],
+        sequence=revision,type='VIDEO_RECOVERY_STARTED',actor_type='ADMIN',actor_id='agent-video-recover',
+        reason_code='PROVIDER_COMPLETED',correlation_id=job['correlation_id'],created_at=now))
+    return revision
+
+
 def transition_job(conn, *, owner_id: int, job_id: str, expected_revision: int,
                    target: str, actor_id: str, reason_code: str | None = None,
                    actor_type: str = 'SYSTEM', now=None) -> int:

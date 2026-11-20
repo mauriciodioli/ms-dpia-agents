@@ -10,7 +10,7 @@ from .rest_providers.service import Service
 from .video_worker import prior_script
 
 
-def inspect_video(engine, config, job_id, *, service=None):
+def inspect_video(engine, config, job_id, *, service=None, _internal=False):
     from uuid import UUID
     try:
         if str(UUID(job_id)) != job_id: raise ValueError()
@@ -33,7 +33,9 @@ def inspect_video(engine, config, job_id, *, service=None):
             raise EngineError('video_reconciliation_not_eligible',409)
         if not isinstance(checkpoint,dict) or checkpoint.get('remote_id')!=remote or not isinstance(checkpoint.get('reservation'),dict):
             raise EngineError('video_reconciliation_checkpoint_missing',409)
-        prior_script([script['output'] or {}])
+        script_value=prior_script([script['output'] or {}])
+        if conn.execute(select(m.results.c.id).where(m.results.c.owner_id==job['owner_id'],m.results.c.job_id==job_id)).first() or conn.execute(select(m.deliveries.c.id).where(m.deliveries.c.owner_id==job['owner_id'],m.deliveries.c.job_id==job_id)).first():
+            raise EngineError('video_reconciliation_result_exists',409)
         provider=conn.execute(select(providers).where(providers.c.id==checkpoint.get('provider_id'),
             providers.c.adapter=='heygen')).mappings().first()
         if (not provider or provider['revision']!=checkpoint.get('provider_revision')
@@ -56,5 +58,9 @@ def inspect_video(engine, config, job_id, *, service=None):
         url=value.get('video_url'); parsed=urlsplit(url) if isinstance(url,str) else None
         valid_url=bool(parsed and parsed.scheme=='https' and parsed.hostname and not parsed.username and not parsed.password and secret not in url)
         if not valid_url: raise EngineError('VIDEO_PROVIDER_INVALID_RESPONSE',502)
-    return {'job_id':job_id,'provider_status':state,'video_url_available':valid_url,
+    report={'job_id':job_id,'provider_status':state,'video_url_available':valid_url,
             'eligible':state=='completed','mode':'dry-run'}
+    if _internal and valid_url:
+        return report,{'job':dict(job),'task':dict(task),'script_task':dict(script),
+            'script':script_value,'checkpoint':checkpoint,'provider':provider,'url':url}
+    return (report,None) if _internal else report
