@@ -146,3 +146,18 @@ def video_check_command():
     except (EngineError,SQLAlchemyError) as error:
         raise click.ClickException(error.code if isinstance(error,EngineError) else 'engine_storage_unavailable') from None
     click.echo('VIDEO_LEDGER_SCHEMA_COMPATIBLE')
+
+
+@click.command('agent-video-reconcile')
+@click.option('--job-id', required=True)
+@click.option('--dry-run', is_flag=True, required=True, help='Only inspect the existing video; no changes.')
+@with_appcontext
+def video_reconcile_command(job_id, dry_run):
+    """Inspect a timed-out submitted video without changing data or sending a POST."""
+    import json
+    from .video_reconcile import inspect_video
+    try:
+        result=inspect_video(engine(),current_app.config,job_id)
+    except (EngineError,SQLAlchemyError) as error:
+        raise click.ClickException(error.code if isinstance(error,EngineError) else 'engine_storage_unavailable') from None
+    click.echo(json.dumps(result,sort_keys=True))
