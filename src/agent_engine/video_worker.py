@@ -147,6 +147,9 @@ class VideoHandlers:
             body={'type':'avatar','avatar_id':avatar,'voice_id':voice,
                   'script':'\n'.join(s['narration'] for s in script['scenes']),
                   'title':script['title'],'aspect_ratio':production['format'],'engine':{'type':'avatar_iv'},'resolution':'720p'}
+            from .heygen_video_contract import validate_background
+            background=validate_background(production.get('background',{'type':'auto'}))
+            if background['type']!='auto':body['background']=background
             capabilities=self.request(row,secret,'/v3/videos/voice-capabilities')
             body['voice_settings']=voice_settings(capabilities,production['language'])
             if voice_row.get('mode')=='professional':

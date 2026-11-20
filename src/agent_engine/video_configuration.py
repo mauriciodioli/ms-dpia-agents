@@ -14,7 +14,7 @@ def preferences(section, payload):
         raise EngineError('invalid_video_configuration', 422)
     allowed = set(FIELDS[section]) | {'expected_revision'}
     if section == 'production':
-        allowed |= {'duration_seconds', 'budget_credits', 'automatic_production'}
+        allowed |= {'duration_seconds', 'budget_credits', 'automatic_production', 'background'}
     if (set(payload) - allowed or type(payload.get('expected_revision')) is not int
             or payload['expected_revision'] < 1):
         raise EngineError('invalid_video_configuration', 422)
@@ -33,6 +33,9 @@ def preferences(section, payload):
                 or type(automatic) is not bool):
             raise EngineError('invalid_video_configuration', 422)
         result.update(duration_seconds=duration, budget_credits=budget, automatic_production=automatic)
+        background=payload.get('background',{'type':'auto'})
+        from .heygen_video_contract import validate_background
+        result['background']=validate_background(background)
     return result
 
 
@@ -46,7 +49,7 @@ def configuration(parameters):
                        'language': parameters.get('language') or
                            (parameters.get('query_context') or {}).get('language') or 'es',
                        'format': '16:9', 'provider': 'heygen', 'avatar_id': '',
-                       'voice_id': '', 'budget_credits': 20, 'automatic_production': False},
+                       'voice_id': '', 'background': {'type':'auto'}, 'budget_credits': 20, 'automatic_production': False},
     }
     for section, values in defaults.items():
         video[section] = {**values, **video.get(section, {})}
@@ -83,6 +86,8 @@ def edit(manager, agent_id, task_id, section, body=None, administrative=False):
                 voice_id='' if values['voice']=='auto' else values['voice'],
                 budget_credits=int(values['max_cost']), automatic_production=values['approval']=='automatic')
         else:
+            if section=='production' and 'background' not in body:
+                values['background']=video['production']['background']
             video[section] = values
             video.pop('editor', None)  # B2B section edits take precedence over a previous editor snapshot.
         params['video'] = video

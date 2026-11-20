@@ -13,6 +13,8 @@ BODY_SCHEMA={'type':'object','additionalProperties':False,
   'title':{'type':'string'},'aspect_ratio':{'enum':['16:9','9:16','1:1']},
   'resolution':{'const':'720p'},'engine':{'type':'object','additionalProperties':False,
    'required':['type'],'properties':{'type':{'const':'avatar_iv'}}},
+  'background':{'oneOf':[{'type':'object','additionalProperties':False,'required':['type','value'],'properties':{'type':{'const':'color'},'value':{'type':'string','pattern':'^#[0-9a-fA-F]{6}$'}}},
+   {'type':'object','additionalProperties':False,'required':['type','url'],'properties':{'type':{'const':'image'},'url':{'type':'string','maxLength':2048}}}]},
   'voice_settings':{'type':'object','additionalProperties':False,'required':['engine_settings'],
    'properties':{'engine_settings':{'type':'object','additionalProperties':False,
     'required':['engine_type'],'properties':{'engine_type':{'const':'heygen_voice'},
@@ -21,6 +23,20 @@ BODY_SCHEMA={'type':'object','additionalProperties':False,
 def validate_video_body(body):
  if not Draft202012Validator(BODY_SCHEMA).is_valid(body):
   raise EngineError('VIDEO_PROVIDER_INVALID_REQUEST',422)
+ if 'background' in body:validate_background(body['background'])
  from .provider_transport import serialize_body
  serialize_body(body)
  return body
+
+def validate_background(value):
+ from urllib.parse import urlsplit
+ import re
+ if value is None:return {'type':'auto'}
+ if not isinstance(value,dict):raise EngineError('VIDEO_CONFIGURATION_INVALID',422)
+ if value=={'type':'auto'}:return dict(value)
+ if value.get('type')=='color' and set(value)=={'type','value'} and isinstance(value['value'],str) and re.fullmatch(r'#[0-9a-fA-F]{6}',value['value']):return dict(value)
+ if value.get('type')=='image' and set(value)=={'type','url'} and isinstance(value['url'],str) and len(value['url'])<=2048:
+  try:parsed=urlsplit(value['url'])
+  except ValueError:raise EngineError('VIDEO_CONFIGURATION_INVALID',422) from None
+  if parsed.scheme=='https' and parsed.hostname and not parsed.username and not parsed.password:return dict(value)
+ raise EngineError('VIDEO_CONFIGURATION_INVALID',422)
