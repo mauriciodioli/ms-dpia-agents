@@ -44,7 +44,7 @@ class GroqScript:
                 'max_completion_tokens': self.settings.max_output_tokens,
                 'response_format': {'type': 'json_object'},
                 'messages': [
-                    {'role': 'system', 'content': SYSTEM_PROMPT + '\\nEsquema JSON: ' + json.dumps(schema, ensure_ascii=False)},
+                    {'role': 'system', 'content': SYSTEM_PROMPT + '\nEsquema JSON: ' + json.dumps(schema, ensure_ascii=False)},
                     {'role': 'user', 'content': json.dumps(request, ensure_ascii=False, allow_nan=False)}]}
         serialize_body(body)
         data = self.http.request('POST', GROQ_CHAT_URL, self.secret,
