@@ -111,6 +111,9 @@ DPIA_SCRAPER_TIMEOUT_SECONDS = int(os.getenv('DPIA_SCRAPER_TIMEOUT_SECONDS', '12
 AGENTS_OPENAI_MODELS = tuple(filter(None, (x.strip() for x in os.getenv(
     'AGENTS_OPENAI_MODELS', OPENAI_MODEL).split(','))))
 
+AGENTS_GROQ_MODEL = os.getenv('AGENTS_GROQ_MODEL', 'openai/gpt-oss-20b')
+AGENTS_GROQ_MODELS = tuple(filter(None, (x.strip() for x in os.getenv('AGENTS_GROQ_MODELS', AGENTS_GROQ_MODEL).split(','))))
+
 # Dedicated server-to-server PWA provisioning credential; never exposed to the browser.
 PWA_ACTIVATION_SECRET = os.environ.get('PWA_ACTIVATION_SECRET', '')
 
