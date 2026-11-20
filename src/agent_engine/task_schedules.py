@@ -7,13 +7,16 @@ from .errors import EngineError
 from .management import audit_agent
 from .scheduling import next_occurrence, delivery_time
 
+VIDEO_EXECUTION_SECONDS = 1800
+
 
 def execution_agent(task, agent):
     """Use the configured task instructions without mutating the shared agent."""
     if task['tipo']=='VIDEO_GENERAR':
         from .video_configuration import configuration
         video=configuration(task['parametros'] or {})
-        return {**agent,'_video_task_id':task['id'],'_execution_sources':None,
+        limits={**agent['limits'],'max_duration_seconds':max(agent['limits']['max_duration_seconds'],VIDEO_EXECUTION_SECONDS)}
+        return {**agent,'limits':limits,'_video_task_id':task['id'],'_execution_sources':None,
                 'instructions':video.get('editor',{}).get('objective') or task['nombre']}
     parameters = task['parametros'] or {}
     configuration = parameters.get('_agent_configuration') or {}

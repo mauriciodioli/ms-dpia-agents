@@ -96,6 +96,6 @@ def configured_task_video_resources(conn,principal,repo,agent_id,task_id):
     if not rows or rows[0]['tipo']!='VIDEO_GENERAR' or (rows[0]['parametros'] or {}).get('_deleted_at'):
         raise EngineError('task_not_found',404)
     rest=service()
-    candidates=[p for p in rest.listing(effective)['items'] if p['adapter']=='heygen' and p['enabled']]
-    if len(candidates)!=1:raise EngineError('VIDEO_PROVIDER_SELECTION_REQUIRED',409)
-    return rest.video_resources(effective,candidates[0]['id'],command['language'],command.get('avatar_id',''),command.get('voice_id',''))
+    from .shared_video_provider import resolve
+    provider=resolve(conn,effective.owner_id)
+    return rest.video_resources(effective,provider['id'],command['language'],command.get('avatar_id',''),command.get('voice_id',''),configured_task=True)

@@ -90,8 +90,9 @@ class TaskBox:
             parameters=task['input_snapshot'].get('parameters',{})
             if job.get('legacy_task_id')!=parameters.get('task_id'):raise EngineError('VIDEO_TASK_NOT_AUTHORIZED',403)
             row=authorize(conn,agent,parameters['task_id'],parameters.get('revision'))
-            from .rest_providers.service import access
-            access(conn,principal,'rest:write')
+            # Video tasks use an administrator-managed provider. The user needs
+            # execution scope, not permission to administer REST credentials.
+            principal.require('rest:write')
             if not row['habilitada']:raise EngineError('VIDEO_TASK_NOT_AUTHORIZED',403)
             if task['tool_id']==SCRIPT and not ((row['parametros'] or {}).get('video') or {}).get('script',{}).get('custom_script','').strip():
                 self.authorized(conn,job,{**task,'tool_id':'openai.analysis'},require_provider=True,check_integration=check_integration)

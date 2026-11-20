@@ -47,7 +47,7 @@ def shared_video_provider(conn, principal, repo):
 @api.get('/admin/heygen-usage')
 @endpoint(admin_only=True)
 def heygen_usage(conn, principal, repo):
-    """Read the administrator's own HeyGen account; never expose credentials."""
+    """Read the centrally configured HeyGen account; never expose credentials."""
     import json
     from datetime import datetime, timezone, timedelta
     from decimal import Decimal, InvalidOperation
@@ -55,10 +55,11 @@ def heygen_usage(conn, principal, repo):
     from .rest_providers.models import providers
     from .rest_providers.service import Service
     arguments()
-    rows=conn.execute(select(providers).where(providers.c.owner_id==principal.owner_id,
-        providers.c.adapter=='heygen',providers.c.enabled.is_(True))).mappings().all()
-    if len(rows)!=1:raise EngineError('VIDEO_PROVIDER_SELECTION_REQUIRED',409)
-    row=dict(rows[0])
+    from .shared_video_provider import resolve_shared, resolve
+    try:row=resolve_shared(conn,principal.owner_id)
+    except EngineError as error:
+        if error.code!='VIDEO_PROVIDER_SELECTION_REQUIRED':raise
+        row=resolve(conn,principal.owner_id)
     if not row['credential_ciphertext'] or row['credential_origin']!=row['base_url'] or row['health']!='HEALTHY':
         raise EngineError('rest_provider_not_ready',409)
     service=Service(conn.engine,current_app.config)

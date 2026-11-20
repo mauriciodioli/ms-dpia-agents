@@ -158,6 +158,12 @@ class Dispatcher:
                     raise EngineError('task_paused',409)
                 from .task_schedules import execution_agent
                 agent = execution_agent(tasks[0], agent)
+                if tasks[0]['tipo']=='VIDEO_GENERAR':
+                    from .video_plan import is_plan
+                    from .task_schedules import VIDEO_EXECUTION_SECONDS
+                    if is_plan(body) and 'deadline_at' not in body:
+                        body={**body,'limits':{**body['limits'],
+                            'max_duration_seconds':max(body['limits']['max_duration_seconds'],VIDEO_EXECUTION_SECONDS)}}
         from .execution_manager import ExecutionManager
         # Generate job_id early for planner token tracking
         job_id = str(uuid4())

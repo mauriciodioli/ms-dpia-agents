@@ -7,11 +7,7 @@ from .errors import EngineError
 KEY='shared-video-provider'
 
 
-def resolve(conn, owner):
-    own=conn.execute(select(providers).where(providers.c.owner_id==owner,
-        providers.c.adapter=='heygen',providers.c.enabled.is_(True))).mappings().all()
-    if len(own)>1:raise EngineError('VIDEO_PROVIDER_SELECTION_REQUIRED',409)
-    if own:return dict(own[0])
+def resolve_shared(conn, owner):
     policy=conn.execute(select(integrations).where(integrations.c.id==KEY)).mappings().first()
     config=policy['config'] if policy and policy['enabled'] else {}
     if not isinstance(config,dict):
@@ -25,3 +21,11 @@ def resolve(conn, owner):
         providers.c.enabled.is_(True))).mappings().first()
     if not row:raise EngineError('VIDEO_PROVIDER_SELECTION_REQUIRED',409)
     return dict(row)
+
+
+def resolve(conn, owner):
+    own=conn.execute(select(providers).where(providers.c.owner_id==owner,
+        providers.c.adapter=='heygen',providers.c.enabled.is_(True))).mappings().all()
+    if len(own)>1:raise EngineError('VIDEO_PROVIDER_SELECTION_REQUIRED',409)
+    if own:return dict(own[0])
+    return resolve_shared(conn,owner)

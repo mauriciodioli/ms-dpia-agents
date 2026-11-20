@@ -40,9 +40,9 @@
     'dpia.test.echo': 'Prueba interna (sin APIs)'
   };
   const errors = {
-    VIDEO_COST_NOT_VERIFIABLE:'No se pudo verificar la tarifa o el saldo de HeyGen para esta cuenta y estos recursos. Revisá Billing & Analytics y la configuración del proveedor.',
+    VIDEO_COST_NOT_VERIFIABLE:'No se pudo verificar el costo del video. Contactá al administrador para revisar la configuración.',
     VIDEO_COST_RATE_NOT_CONFIGURED:'Falta configurar el valor de un punto en USD.',
-    VIDEO_PROVIDER_BALANCE_INSUFFICIENT:'El saldo disponible de HeyGen no cubre el costo estimado.',
+    VIDEO_PROVIDER_BALANCE_INSUFFICIENT:'No se puede generar el video en este momento. Contactá al administrador.',
     VIDEO_LEDGER_SCHEMA_INCOMPATIBLE:'El esquema de puntos no admite esta operación. Consultá al administrador.',
     VIDEO_OPERATION_DISABLED:'Esta operación de video está deshabilitada.',
     selected_sources_unavailable:'Una conexión elegida para esta tarea ya no está disponible o autorizada. Revisá la selección de conexiones.',

@@ -110,12 +110,18 @@ class Service:
   output=data['data']
   if operation=='quota':output={k:output[k] for k in ('billing_type','wallet','subscription','usage_based') if k in output} if isinstance(output,dict) else {}
   return {'operation':operation,'data':redact(output),'provider':result}
- def video_resources(self,principal,identifier,language,avatar_id='',voice_id=''):
+ def video_resources(self,principal,identifier,language,avatar_id='',voice_id='',*,configured_task=False):
   from ..heygen_resources import resources
   import re
   if not isinstance(language,str) or not re.fullmatch(r'[A-Za-z]{2,20}(?:-[A-Za-z0-9]{2,8})?',language):raise EngineError('invalid_contract',422)
   with self.engine.connect() as c:
-   access(c,principal,'rest:read');row=dict(self.row(c,principal,identifier))
+   if configured_task:
+    principal.require('agents:read')
+    from ..shared_video_provider import resolve
+    row=resolve(c,principal.owner_id)
+    if row['id']!=identifier:raise EngineError('VIDEO_PROVIDER_SELECTION_REQUIRED',409)
+   else:
+    access(c,principal,'rest:read');row=dict(self.row(c,principal,identifier))
    if row['adapter']!='heygen' or not row['enabled']:raise EngineError('rest_provider_disabled',409)
    if not row['credential_ciphertext'] or row['credential_origin']!=row['base_url']:raise EngineError('rest_credential_required',409)
   secret=json.loads(self.secrets.decrypt(row))
@@ -127,6 +133,9 @@ class Service:
    return data
   result=resources(request,language,avatar_id,voice_id)
   with self.engine.connect() as c:
-   access(c,principal,'rest:read');current=self.row(c,principal,identifier)
-   if current['revision']!=row['revision']:raise EngineError('revision_conflict',409)
+   if configured_task:
+    current=resolve(c,principal.owner_id)
+   else:
+    access(c,principal,'rest:read');current=self.row(c,principal,identifier)
+   if current['id']!=row['id'] or current['revision']!=row['revision']:raise EngineError('revision_conflict',409)
   return result
