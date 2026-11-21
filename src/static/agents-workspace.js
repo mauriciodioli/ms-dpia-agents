@@ -1766,7 +1766,36 @@
     try{
       const h=await api('/admin/heygen-usage');heygenPanel.replaceChildren(node('h2','HeyGen · saldo y consumo'));
       heygenConnection=h.connection||null;
-      heygenPanel.append(node('p','Saldo de la cuenta: '+(h.balance===null?'Desconocido':h.balance+' '+(h.currency||''))),node('p','Consumo de los últimos 30 días (por producto y tipo de crédito).','help'));
+      const balanceLine=node('p','Saldo de la cuenta: '+(h.balance===null?'Desconocido':h.balance+' '+(h.currency||'')));
+      const lowBalanceWarning=node('p',undefined,'help');
+      lowBalanceWarning.setAttribute('role','status');
+      const balanceActions=node('div',undefined,'billing-navigation');
+      const refreshBalance=node('button','Actualizar saldo','secondary');
+      refreshBalance.type='button';
+      const topUp=document.createElement('a');
+      topUp.href='https://app.heygen.com/';
+      topUp.target='_blank';
+      topUp.rel='noopener noreferrer';
+      topUp.className='secondary';
+      topUp.textContent='Recargar HeyGen';
+      topUp.title='Abrir HeyGen para comprar créditos API. El pago se realiza fuera de DPIA.';
+      const displayBalance=value=>{
+        balanceLine.textContent='Saldo de la cuenta: '+(value.balance===null?'Desconocido':value.balance+' '+(value.currency||''));
+        const amount=value.balance===null?NaN:Number(value.balance);
+        const usd=(value.currency||'').toLowerCase()==='usd';
+        lowBalanceWarning.textContent=!Number.isFinite(amount)||!usd
+          ? 'No se puede verificar el umbral de USD 5 con el saldo disponible.'
+          : amount<5?'Saldo HeyGen bajo (menos de USD 5). Recargá antes de producir nuevos videos.':'';
+      };
+      displayBalance(h);
+      refreshBalance.onclick=async()=>{
+        refreshBalance.disabled=true;
+        try{const latest=await api('/admin/heygen-usage');displayBalance(latest);notify('Saldo HeyGen actualizado.');}
+        catch(error){lowBalanceWarning.textContent='No se pudo actualizar el saldo HeyGen.';showError(error,heygenPanel);}
+        finally{refreshBalance.disabled=false;}
+      };
+      balanceActions.append(refreshBalance,topUp);
+      heygenPanel.append(balanceLine,lowBalanceWarning,balanceActions,node('p','La recarga se realiza en HeyGen; DPIA no procesa pagos ni compra créditos por API.','help'),node('p','Consumo de los últimos 30 días (por producto y tipo de crédito).','help'));
       if(!h.usage_available)heygenPanel.append(node('p','No se pudo consultar el consumo de HeyGen. Revisá los permisos de la clave, incluido usage:read.'));
       else if(!h.usage.length)heygenPanel.append(node('p','No hay consumo registrado en este período.'));
       else table(heygenPanel,['Producto','Fondo','Unidad','Cobrado','Reintegrado','Cargos'],h.usage.map(u=>[u.product||'Desconocido',u.pool||'Desconocido',u.unit||'Desconocido',u.charged??'Desconocido',u.refunded??'Desconocido',u.charge_count??'Desconocido']));
