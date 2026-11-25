@@ -36,6 +36,16 @@ def activate_pwa():
     verify_hmac(PATH)
     arguments()
     body = json_body()
+    if body.get('operation') == 'billing_policy':
+        if set(body) != {'operation','owner_id'} or type(body['owner_id']) is not int or body['owner_id'] < 1:
+            raise EngineError('invalid_contract')
+        from .video_cost_api import load
+        from .video_costs import positive
+        with engine().connect() as conn:
+            active_user(conn, body['owner_id'])
+            policy = load(conn)
+            rate = positive(policy['usd_per_credit'], 'VIDEO_COST_RATE_NOT_CONFIGURED')
+        return {'owner_id':body['owner_id'], 'currency':'USD', 'usd_per_credit':str(rate), 'policy_revision':policy['revision']},200
     if body.get('operation') in ('video_resources','video_quote'):
         return video_resources_catalog(body)
     if body.get('operation') in ('schedule_task_now','run_existing_task_now'):
