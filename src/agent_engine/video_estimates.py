@@ -34,7 +34,7 @@ def validate_tariffs(values):
     return values
 
 
-def estimate(conn,provider,body,duration,now,account,job_id=None,avatar_type=None,voice_mode=None):
+def estimate(conn,provider,body,duration,now,account,job_id=None,avatar_type=None,voice_mode=None, *, check_balance=True):
     row=conn.execute(select(integrations).where(integrations.c.id=='video-cost-policy').with_for_update()).mappings().first()
     tariffs=validate_tariffs(row['config'].get('heygen_tariffs',[])) if row else []
     if not isinstance(account,dict) or account.get('billing_type')!='wallet' or (account.get('wallet') or {}).get('currency')!='usd':
@@ -52,6 +52,15 @@ def estimate(conn,provider,body,duration,now,account,job_id=None,avatar_type=Non
     if len(matches)!=1:raise EngineError('VIDEO_COST_NOT_VERIFIABLE',409)
     tariff=matches[0]
     estimated=positive(tariff['usd_per_second'],'VIDEO_COST_NOT_VERIFIABLE')*Decimal(duration)
+    if check_balance:
+        _check_wallet(account, estimated)
+    return {'account_id':account['username'],'estimated_usd':str(estimated),
+            'reference':tariff['reference'],'policy_revision':row['revision'],'duration_seconds':duration,
+            'usd_per_second':tariff['usd_per_second'],'valid_until':tariff['valid_until'],'confirmed':False,
+            'provisional':tariff.get('provisional',False)}
+
+
+def _check_wallet(account, estimated):
     try:
         balance=(account.get('wallet') or {}).get('remaining_balance')
         if isinstance(balance,bool) or balance is None:raise InvalidOperation()
@@ -60,7 +69,3 @@ def estimate(conn,provider,body,duration,now,account,job_id=None,avatar_type=Non
     except (InvalidOperation,ValueError,TypeError):
         raise EngineError('VIDEO_COST_NOT_VERIFIABLE',409) from None
     if balance<estimated:raise EngineError('VIDEO_PROVIDER_BALANCE_INSUFFICIENT',409)
-    return {'account_id':account['username'],'estimated_usd':str(estimated),
-            'reference':tariff['reference'],'policy_revision':row['revision'],'duration_seconds':duration,
-            'usd_per_second':tariff['usd_per_second'],'valid_until':tariff['valid_until'],'confirmed':False,
-            'provisional':tariff.get('provisional',False)}
