@@ -128,8 +128,19 @@ def video_resources_catalog(body):
         owner=body['owner_id'];active_user(conn,owner)
         agent=conn.execute(select(m.agents).where(m.agents.c.owner_id==owner,
             m.agents.c.legacy_agent_id==body['source_agent_id'])).mappings().first()
-        if not agent:raise EngineError('agent_not_found',404)
-        rows=ConfiguredTaskRepository(conn).rows(agent,body['task_id'])
+        repository = ConfiguredTaskRepository(conn)
+        if agent:
+            rows = repository.rows(agent,body['task_id'])
+        else:
+            # Catalog lookup requires an owned configured task, but it need not
+            # create a scheduler entry or provision a job just to list resources.
+            from sqlalchemy import MetaData, Table
+            legacy = Table('agentes', MetaData(), autoload_with=conn, resolve_fks=False)
+            tasks = repository.table()
+            rows = conn.execute(select(tasks).join(legacy, tasks.c.agente_id == legacy.c.id).where(
+                legacy.c.id == body['source_agent_id'], legacy.c.usuario_id == owner,
+                tasks.c.id == body['task_id'],
+            )).mappings().all()
         if not rows or rows[0]['tipo']!='VIDEO_GENERAR' or (rows[0]['parametros'] or {}).get('_deleted_at'):
             raise EngineError('task_not_found',404)
         provider=resolve(conn,owner)
