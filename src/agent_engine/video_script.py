@@ -38,7 +38,7 @@ def validate_script(script, context, custom=False):
         raise EngineError('VIDEO_SCRIPT_INVALID_RESPONSE', 502)
     allowed = {r['id'] for r in context['results']}
     for scene in scenes:
-        if not set(scene['result_ids']).issubset(allowed) or (not custom and context['video'].get('editor',{}).get('content_source','agent')!='user' and not scene['result_ids']):
+        if not set(scene['result_ids']).issubset(allowed) or (not custom and context['video'].get('editor',{}).get('content_source','agent')!='user' and not context.get('publication') and not scene['result_ids']):
             raise EngineError('VIDEO_SCRIPT_INVALID_REFERENCE', 502)
         # Deterministic plausibility bound, not an assertion of rendered duration.
         if len(scene['narration'].split()) > scene['duration_seconds'] * 4:
@@ -65,9 +65,10 @@ def build(context, generate):
                   'scenes':scenes}
         return validate_script(script, context, custom=True)
     user_only=video.get('editor',{}).get('content_source')=='user'
-    if user_only and not (video['script'].get('instructions','').strip() or video.get('editor',{}).get('objective','').strip()):
+    if user_only and not context.get('publication') and not (video['script'].get('instructions','').strip() or video.get('editor',{}).get('objective','').strip()):
         raise EngineError('VIDEO_SCRIPT_SOURCE_INSUFFICIENT',422)
-    sources = [] if user_only else evidence(context)
+    publication = context.get('publication')
+    sources = [] if user_only or publication else evidence(context)
     # History/provider content is untrusted input, never system instructions.
     request = {'objective':video.get('editor', {}).get('objective') or context['name'],
                'instructions':video['script'].get('instructions', ''),
@@ -75,6 +76,8 @@ def build(context, generate):
                'kind':production.get('video_type','Noticiero'),
                'language':production['language'], 'duration_seconds':production['duration_seconds'],
                'results':sources}
+    if publication:
+        request['publication'] = publication
     script = generate(request, SCRIPT_SCHEMA)
     return validate_script(script, context)
 

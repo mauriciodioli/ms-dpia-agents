@@ -74,6 +74,14 @@ def start():
     body=request.get_json(silent=True)
     email=body.get('email','').strip().lower() if isinstance(body,dict) and isinstance(body.get('email'),str) else ''
     if len(email)>120 or not EMAIL.fullmatch(email):return jsonify(error='Ingresá un correo válido.'),400
+    # Explicit opt-in for a local debugger only; never trust forwarded addresses.
+    from urllib.parse import urlsplit
+    local_email = os.getenv('DPIA_LOCAL_LOGIN_EMAIL', '').strip().lower()
+    local_request = (current_app.debug and local_email and email == local_email
+                     and request.remote_addr == '127.0.0.1'
+                     and urlsplit(request.host_url).hostname == '127.0.0.1'
+                     and not any(request.headers.get(h) for h in
+                                 ('Forwarded', 'X-Forwarded-For', 'X-Forwarded-Host')))
     stage='database'
     redis_total=0.0
     redis_attempted=False
@@ -95,6 +103,13 @@ def start():
         return result
     try:
         user=Usuario.query.filter_by(correo_electronico=email,activo=True).one_or_none()
+        if local_request:
+            if not user:
+                return jsonify(error='La cuenta local no existe o está inactiva.'), 403
+            session.clear()
+            session['user_id']=user.id
+            session['email']=user.correo_electronico
+            return jsonify(email=user.correo_electronico, authenticated=True)
         stage='configuration'
         redis,secret,host,sender=setup()
         stage='redis'

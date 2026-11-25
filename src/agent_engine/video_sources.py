@@ -1,10 +1,35 @@
 """Owner-scoped, persisted source material for an existing video child task."""
 import json
-from sqlalchemy import select
+from sqlalchemy import MetaData, Table, inspect, select
+from markupsafe import Markup
 from . import models as m
 from .configured_task_repository import ConfiguredTaskRepository
 from .errors import EngineError
 from .video_configuration import configuration
+
+
+def publication_context(conn, owner, source):
+    if (not isinstance(source, dict) or set(source) != {'type', 'application', 'publication_id'}
+            or source['type'] != 'publication' or source['application'] != 'bot421'
+            or type(source['publication_id']) is not int or source['publication_id'] < 1):
+        raise EngineError('VIDEO_PARENT_NOT_AUTHORIZED', 403)
+    metadata = MetaData()
+    publication = Table('publicacion', metadata, autoload_with=conn, resolve_fks=False)
+    row = conn.execute(select(publication).where(
+        publication.c.id == source['publication_id'], publication.c.user_id == owner
+    )).mappings().first()
+    if not row:
+        raise EngineError('VIDEO_PARENT_NOT_AUTHORIZED', 403)
+    extra = {}
+    if inspect(conn).has_table('publicacion_contenido_extra'):
+        table = Table('publicacion_contenido_extra', metadata, autoload_with=conn, resolve_fks=False)
+        extra = conn.execute(select(table).where(
+            table.c.publicacion_id == row['id'], table.c.user_id == owner
+        )).mappings().first() or {}
+    clean = lambda value, limit: Markup(str(value or '')).striptags()[:limit]
+    content = {key: clean(row.get(key), 1400) for key in ('titulo', 'texto', 'descripcion', 'idioma')}
+    content.update({key: clean(extra.get(key), 900) for key in ('noticias', 'ofertas')})
+    return content
 
 
 def source_context(conn, job):
@@ -21,6 +46,12 @@ def source_context(conn, job):
     if params.get('_deleted_at'):
         raise EngineError('VIDEO_TASK_NOT_AUTHORIZED', 403)
     video = configuration(params)
+    if 'source' in params and not params.get('parent_task_id') and not video.get('parent_task_id'):
+        content = publication_context(conn, job['owner_id'], params['source'])
+        return {'task_id': child['id'], 'parent_task_id': None,
+                'configuration_revision': params.get('_configuration_revision', 1),
+                'name': content['titulo'] or child['nombre'], 'video': video,
+                'results': [], 'publication': content}
     parent_id = video.get('parent_task_id', params.get('parent_task_id'))
     if type(parent_id) is not int or parent_id == child['id']:
         raise EngineError('VIDEO_PARENT_NOT_AUTHORIZED', 403)
@@ -29,6 +60,17 @@ def source_context(conn, job):
     parents = repo.rows(agent, parent_id)
     if not parents or parents[0]['tipo'] == 'VIDEO_GENERAR' or (parents[0]['parametros'] or {}).get('_deleted_at'):
         raise EngineError('VIDEO_PARENT_NOT_AUTHORIZED', 403)
+    context = {'task_id': child['id'], 'parent_task_id': parent_id,
+               'configuration_revision': params.get('_configuration_revision', 1),
+               'name': child['nombre'], 'video': video, 'results': []}
+    if parents[0]['tipo'] == 'PUBLICACION':
+        source = (parents[0]['parametros'] or {}).get('source')
+        content = publication_context(conn, job['owner_id'], source)
+        context['publication'] = content
+        if content['titulo']:
+            context['name'] = content['titulo']
+        return context
+
     # Explicitly choose the latest persisted parent investigation. No provider calls,
     # no raw worker drafts, and no other agent's or owner's history.
     query = select(m.results.c.id, m.results.c.job_id, m.results.c.payload).join(m.jobs,
@@ -37,9 +79,6 @@ def source_context(conn, job):
             m.jobs.c.legacy_task_id == parent_id, m.jobs.c.state.in_(['REVIEWING', 'DELIVERED'])
         ).order_by(m.jobs.c.created_at.desc(), m.jobs.c.id.desc(), m.results.c.version.desc()).limit(1)
     result = conn.execute(query).mappings().first()
-    context = {'task_id': child['id'], 'parent_task_id': parent_id,
-               'configuration_revision': params.get('_configuration_revision', 1),
-               'name': child['nombre'], 'video': video, 'results': []}
     if result:
         context['results'].append(dict(result))
     return context
