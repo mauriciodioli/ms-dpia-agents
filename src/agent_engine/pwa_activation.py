@@ -36,7 +36,7 @@ def activate_pwa():
     verify_hmac(PATH)
     arguments()
     body = json_body()
-    if body.get('operation') == 'video_resources':
+    if body.get('operation') in ('video_resources','video_quote'):
         return video_resources_catalog(body)
     if body.get('operation') in ('schedule_task_now','run_existing_task_now'):
         from .immediate_tasks import schedule_now
@@ -116,7 +116,10 @@ def activate_pwa():
 
 
 def video_resources_catalog(body):
-    if (set(body)!={'operation','owner_id','source_agent_id','task_id','language'} or
+    quoting = body['operation']=='video_quote'
+    fields={'operation','owner_id','source_agent_id','task_id','language'}
+    if quoting: fields.update(('duration','format','avatar_id','voice_id'))
+    if (set(body)!=fields or
             any(type(body.get(k)) is not int or body[k]<1 for k in ('owner_id','source_agent_id','task_id')) or
             not isinstance(body.get('language'),str)):
         raise EngineError('invalid_contract',422)
@@ -144,6 +147,14 @@ def video_resources_catalog(body):
         if not rows or rows[0]['tipo']!='VIDEO_GENERAR' or (rows[0]['parametros'] or {}).get('_deleted_at'):
             raise EngineError('task_not_found',404)
         provider=resolve(conn,owner)
+        if quoting:
+            if (type(body['duration']) is not int or body['duration'] not in (15,30,60)
+                or body['format'] not in ('16:9','9:16','1:1')
+                or body['language'] not in ('es','en','it')
+                or any(not isinstance(body[k],str) or not 0<len(body[k])<=256 for k in ('avatar_id','voice_id'))):
+                raise EngineError('invalid_contract',422)
+    if quoting:
+        return quote_video(body),200
     principal=Principal(owner,'PWA_SERVICE','ms202611sb2b',SCOPES,True,frozenset())
     return service().video_resources(principal,provider['id'],body['language'],configured_task=True),200
 
@@ -188,3 +199,40 @@ def task_sources_catalog(body):
         from .task_sources import catalog
         items = catalog(conn, agent, default_registry(conn=conn, owner=body['owner_id']))
     return {'api_version':'agents.v1', 'owner_id':body['owner_id'], 'items':items}, 200
+
+
+def quote_video(body):
+    import json
+    from decimal import Decimal, ROUND_CEILING
+    from flask import current_app
+    from .video_worker import VideoHandlers, voice_settings
+    from .heygen_resources import resolve_resource
+    from .video_estimates import estimate
+    from .video_cost_api import load
+    from .video_costs import positive
+    from .auth import now_utc
+    handler=VideoHandlers(engine(),current_app.config)
+    with engine().connect() as conn:
+        row=handler.provider(conn,body['owner_id'])
+    try: secret=json.loads(handler.rest.secrets.decrypt(row))
+    except (ValueError,TypeError): raise EngineError('integration_encryption_unavailable',503) from None
+    if not isinstance(secret,str) or not secret: raise EngineError('integration_encryption_unavailable',503)
+    read=lambda path,params=None:handler.request(row,secret,path,params,full=True)
+    avatar,ar=resolve_resource(read,'avatar_id',body['avatar_id'],body['language'])
+    voice,vr=resolve_resource(read,'voice_id',body['voice_id'],body['language'])
+    settings=voice_settings(handler.request(row,secret,'/v3/videos/voice-capabilities'),body['language'])
+    if vr.get('mode')=='professional': settings['engine_settings'].pop('model',None)
+    request_body={'avatar_id':avatar,'voice_id':voice,'aspect_ratio':body['format'],
+                  'engine':{'type':'avatar_iv'},'resolution':'720p','voice_settings':settings}
+    account=handler.request(row,secret,'/v3/users/me')
+    with engine().begin() as conn:
+        current=handler.provider(conn,body['owner_id'])
+        if current['id']!=row['id'] or current['revision']!=row['revision']:
+            raise EngineError('VIDEO_CONFIGURATION_CHANGED',409)
+        rate=positive(load(conn)['usd_per_credit'],'VIDEO_COST_RATE_NOT_CONFIGURED')
+        quote=estimate(conn,row,request_body,body['duration'],now_utc(),account,
+                       avatar_type=ar.get('avatar_type'),voice_mode=vr.get('mode'),check_balance=False)
+        credits=int((Decimal(quote['estimated_usd'])/rate).to_integral_value(rounding=ROUND_CEILING))
+    return {'currency':'USD','estimated_usd':quote['estimated_usd'],'amount':str(credits*rate),
+            'usd_per_credit':str(rate),'required_credits':credits,'valid_until':quote['valid_until'],
+            'provisional':quote['provisional'],'policy_revision':quote['policy_revision']}
