@@ -202,37 +202,38 @@ def task_sources_catalog(body):
 
 
 def quote_video(body):
-    import json
+    """Informative reference estimate; never authorizes production or reserves funds."""
     from decimal import Decimal, ROUND_CEILING
-    from flask import current_app
-    from .video_worker import VideoHandlers, voice_settings
-    from .heygen_resources import resolve_resource
-    from .video_estimates import estimate
+    from datetime import datetime
+    from .shared_video_provider import resolve
     from .video_cost_api import load
     from .video_costs import positive
+    from .video_estimates import validate_tariffs
     from .auth import now_utc
-    handler=VideoHandlers(engine(),current_app.config)
+
     with engine().connect() as conn:
-        row=handler.provider(conn,body['owner_id'])
-    try: secret=json.loads(handler.rest.secrets.decrypt(row))
-    except (ValueError,TypeError): raise EngineError('integration_encryption_unavailable',503) from None
-    if not isinstance(secret,str) or not secret: raise EngineError('integration_encryption_unavailable',503)
-    read=lambda path,params=None:handler.request(row,secret,path,params,full=True)
-    avatar,ar=resolve_resource(read,'avatar_id',body['avatar_id'],body['language'])
-    voice,vr=resolve_resource(read,'voice_id',body['voice_id'],body['language'])
-    settings=voice_settings(handler.request(row,secret,'/v3/videos/voice-capabilities'),body['language'])
-    if vr.get('mode')=='professional': settings['engine_settings'].pop('model',None)
-    request_body={'avatar_id':avatar,'voice_id':voice,'aspect_ratio':body['format'],
-                  'engine':{'type':'avatar_iv'},'resolution':'720p','voice_settings':settings}
-    account=handler.request(row,secret,'/v3/users/me')
-    with engine().begin() as conn:
-        current=handler.provider(conn,body['owner_id'])
-        if current['id']!=row['id'] or current['revision']!=row['revision']:
-            raise EngineError('VIDEO_CONFIGURATION_CHANGED',409)
-        rate=positive(load(conn)['usd_per_credit'],'VIDEO_COST_RATE_NOT_CONFIGURED')
-        quote=estimate(conn,row,request_body,body['duration'],now_utc(),account,
-                       avatar_type=ar.get('avatar_type'),voice_mode=vr.get('mode'),check_balance=False)
-        credits=int((Decimal(quote['estimated_usd'])/rate).to_integral_value(rounding=ROUND_CEILING))
-    return {'currency':'USD','estimated_usd':quote['estimated_usd'],'amount':str(credits*rate),
-            'usd_per_credit':str(rate),'required_credits':credits,'valid_until':quote['valid_until'],
-            'provisional':quote['provisional'],'policy_revision':quote['policy_revision']}
+        provider = resolve(conn, body['owner_id'])
+        policy = load(conn)
+    rate = positive(policy['usd_per_credit'], 'VIDEO_COST_RATE_NOT_CONFIGURED')
+    now = now_utc()
+    tariffs = [
+        tariff for tariff in validate_tariffs(policy['heygen_tariffs'])
+        if tariff['provider_id'] == provider['id']
+        and tariff['provider_revision'] == provider['revision']
+        and tariff['engine'] == 'avatar_iv'
+        and tariff['resolution'] == '720p'
+        and datetime.strptime(tariff['valid_until'], '%Y-%m-%dT%H:%M:%SZ') > now
+    ]
+    # Prefer a reference for the requested format. A unique remaining reference
+    # is indicative only, not a verified price for the selected resources.
+    matching_format = [t for t in tariffs if t['aspect_ratio'] == body['format']]
+    candidates = matching_format or tariffs
+    if len(candidates) != 1:
+        raise EngineError('VIDEO_COST_NOT_VERIFIABLE', 409)
+    tariff = candidates[0]
+    estimated = positive(tariff['usd_per_second'], 'VIDEO_COST_NOT_VERIFIABLE') * Decimal(body['duration'])
+    credits = int((estimated / rate).to_integral_value(rounding=ROUND_CEILING))
+    return {'currency': 'USD', 'estimated_usd': str(estimated), 'amount': str(credits * rate),
+            'usd_per_credit': str(rate), 'required_credits': credits,
+            'valid_until': tariff['valid_until'], 'provisional': True,
+            'policy_revision': policy['revision']}
