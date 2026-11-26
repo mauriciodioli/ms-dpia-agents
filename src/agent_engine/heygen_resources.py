@@ -52,7 +52,7 @@ def resolve_resource(request,key,selected,language):
  # Public first: a large private library cannot hide a usable public preset.
  # Public voices are filtered by the provider for the requested language, including multilingual voices.
  queries=({'ownership':'public','limit':20},{'ownership':'private','limit':20}) if key=='avatar_id' else (
-  {'type':'public','limit':20},{'type':'private','limit':20})
+  {'type':'public','limit':20,'language':language.split('-')[0].lower()},{'type':'private','limit':20})
  incomplete=False
  for params in queries:
   def accept(row):
