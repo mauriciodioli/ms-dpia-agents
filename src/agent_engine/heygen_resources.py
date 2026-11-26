@@ -102,6 +102,8 @@ def resources(request,language,avatar_id='',voice_id=''):
   try:
    for kind in ('public','private'):
     params={'ownership' if key=='avatar_id' else 'type':kind,'limit':50};seen=set()
+    if key=='voice_id' and kind=='public':
+     params['language']=language.split('-')[0].lower()
     for _ in range(3):
      response=request(path,params);data=response.get('data')
      if isinstance(data,dict):data=data.get('items',data.get('avatars' if key=='avatar_id' else 'voices'))
