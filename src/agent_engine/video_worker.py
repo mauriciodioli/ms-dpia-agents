@@ -238,29 +238,14 @@ class VideoHandlers:
             self.sleep(2)
 
 
-def voice_language_matches(value, language):
-    if not language or not isinstance(value, str) or not value.strip():
-        return True
-    aliases = {'spanish':'es','español':'es','espanol':'es','english':'en',
-               'italian':'it','italiano':'it','portuguese':'pt','português':'pt'}
-    def normalize(value):
-        value = value.strip().lower().replace('_','-').split('-')[0]
-        return aliases.get(value,value)
-    return normalize(value) in (normalize(language),'multilingual')
-
-
 def select_resource(data,key,selected,language=None):
     if isinstance(data,dict):data=data.get('avatars' if key=='avatar_id' else 'voices',data.get('items'))
     if not isinstance(data,list):raise EngineError('VIDEO_CATALOG_INVALID',502)
     if key=='avatar_id':
         data=[{**r,'avatar_id':r.get('id'),'status':'ACTIVE'} for r in data if isinstance(r,dict)
               and r.get('status','completed')=='completed' and 'avatar_iv' in r.get('supported_api_engines',[])]
-    if key=='voice_id':
-        data=[{**r,'voice_id':r.get('voice_id') or r.get('id'),'status':'ACTIVE'}
-              for r in data if isinstance(r,dict)
-              and r.get('status','ACTIVE') in ('ACTIVE','active','completed')]
     candidates=[r for r in data if isinstance(r,dict) and isinstance(r.get(key),str)
-                and r.get('status','ACTIVE')=='ACTIVE' and (not language or voice_language_matches(r.get('language'),language))]
+                and r.get('status','ACTIVE')=='ACTIVE' and (not language or r.get('language')==language)]
     if selected:
         candidates=[r for r in candidates if r[key]==selected]
     if not candidates:raise EngineError('VIDEO_AVATAR_UNAVAILABLE' if key=='avatar_id' else 'VIDEO_VOICE_UNAVAILABLE',409)
