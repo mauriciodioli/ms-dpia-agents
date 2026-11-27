@@ -14,7 +14,7 @@ def preferences(section, payload):
         raise EngineError('invalid_video_configuration', 422)
     allowed = set(FIELDS[section]) | {'expected_revision'}
     if section == 'production':
-        allowed |= {'duration_seconds', 'budget_credits', 'automatic_production', 'background'}
+        allowed |= {'duration_seconds', 'budget_credits', 'automatic_production', 'commercial_approval', 'background'}
     if (set(payload) - allowed or type(payload.get('expected_revision')) is not int
             or payload['expected_revision'] < 1):
         raise EngineError('invalid_video_configuration', 422)
@@ -32,7 +32,11 @@ def preferences(section, payload):
                 or type(budget) is not int or not 0 <= budget <= 1000000
                 or type(automatic) is not bool):
             raise EngineError('invalid_video_configuration', 422)
-        result.update(duration_seconds=duration, budget_credits=budget, automatic_production=automatic)
+        commercial = payload.get('commercial_approval', False)
+        if type(commercial) is not bool or (commercial and budget < 1):
+            raise EngineError('invalid_video_configuration', 422)
+        result.update(duration_seconds=duration, budget_credits=budget,
+                      automatic_production=automatic, commercial_approval=commercial)
         background=payload.get('background',{'type':'auto'})
         from .heygen_video_contract import validate_background
         result['background']=validate_background(background)
@@ -75,6 +79,8 @@ def edit(manager, agent_id, task_id, section, body=None, administrative=False):
     if body is not None:
         principal.require('agents:write')
         values = validate_editor(body) if section == 'settings' else preferences(section, body)
+        if values.get('commercial_approval') and manager.principal.owner_id != agent['owner_id']:
+            raise EngineError('SERVICE_OWNER_APPROVAL_REQUIRED', 403)
         if body['expected_revision'] != revision:
             raise EngineError('revision_conflict', 409)
         if section == 'settings':
@@ -84,7 +90,8 @@ def edit(manager, agent_id, task_id, section, body=None, administrative=False):
                 language=values['language'], format=values['aspect_ratio'],
                 avatar_id='' if values['avatar']=='auto' else values['avatar'],
                 voice_id='' if values['voice']=='auto' else values['voice'],
-                budget_credits=int(values['max_cost']), automatic_production=values['approval']=='automatic')
+                budget_credits=int(values['max_cost']), automatic_production=values['approval']=='automatic',
+                commercial_approval=values.get('commercial_approval', False))
         else:
             if section=='production' and 'background' not in body:
                 values['background']=video['production']['background']
@@ -115,7 +122,8 @@ def editor_values(row, video):
         'script_mode':'custom' if script['custom_script'] else 'automatic',
         'script':script['custom_script'], 'content_source':'agent', 'schedule':'manual',
         'time':((row.get('parametros') or {}).get('schedule') or {}).get('time','00:00'), 'timezone':((row.get('parametros') or {}).get('schedule') or {}).get('timezone','UTC'), 'approval':'automatic' if production['automatic_production'] else 'manual',
-        'max_cost':str(production['budget_credits'])}, **{k:v for k,v in video.get('editor',{}).items() if k in ('objective','tone','content_source')},
+        'max_cost':str(production['budget_credits']),
+        'commercial_approval':production.get('commercial_approval', False)}, **{k:v for k,v in video.get('editor',{}).items() if k in ('objective','tone','content_source')},
         'name':row['nombre']}
 
 
@@ -124,6 +132,10 @@ def validate_editor(body):
     import re
     required={'name','objective','kind','duration_seconds','language','aspect_ratio','tone','avatar',
               'voice','script_mode','script','content_source','schedule','time','timezone','approval','max_cost'}
+    if isinstance(body, dict) and 'commercial_approval' in body:
+        if type(body['commercial_approval']) is not bool:
+            raise EngineError('invalid_video_configuration', 422)
+        required.add('commercial_approval')
     if not isinstance(body,dict) or set(body)!=required|{'expected_revision'}:
         raise EngineError('invalid_video_configuration',422)
     if type(body['expected_revision']) is not int or body['expected_revision']<1:
@@ -146,4 +158,6 @@ def validate_editor(body):
         raise EngineError('invalid_video_configuration',422)
     try:ZoneInfo(body['timezone'])
     except (ValueError,ZoneInfoNotFoundError):raise EngineError('invalid_video_configuration',422) from None
+    if body.get('commercial_approval') and int(body['max_cost']) < 1:
+        raise EngineError('invalid_video_configuration', 422)
     return {key:body[key] for key in required}

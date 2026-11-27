@@ -29,12 +29,80 @@ def credits(usd, config):
     return int((amount / rate).to_integral_value(rounding=ROUND_CEILING))
 
 
-def reserve(conn, job, task, usd, config, production, quote_reference, now):
+def commercial_points(quote):
+    if (not isinstance(quote, dict) or quote.get('currency') != 'USD'
+            or type(quote.get('policy_revision')) is not int or quote['policy_revision'] < 1
+            or type(quote.get('points')) is not int or not 0 < quote['points'] <= 1000):
+        raise EngineError('SERVICE_PRICE_UNCONFIRMED', 409)
+    expected = credits(quote.get('amount'), {'AGENTS_VIDEO_USD_PER_CREDIT': quote.get('usd_per_credit')})
+    if expected != quote['points']:
+        raise EngineError('SERVICE_PRICE_UNCONFIRMED', 409)
+    return expected
+
+
+def priced_video(estimated_amount, policy):
+    rate = positive(policy['usd_per_credit'], 'VIDEO_COST_RATE_NOT_CONFIGURED')
+    points = credits(estimated_amount, {'AGENTS_VIDEO_USD_PER_CREDIT': rate})
+    return {'currency': 'USD', 'usd_per_credit': str(rate), 'points': points,
+            'policy_revision': policy['revision'], 'amount': str(points * rate)}
+
+
+def authorize_video(production, classification, estimate, policy):
+    """Freeze the commercial terms before submitting to the provider."""
+    if classification is not None:
+        commercial_points(classification)
+        return classification
+    if production.get('commercial_approval') is not True:
+        return None
+    authorized = {
+        **priced_video(estimate['estimated_usd'], policy),
+        'pricing_model': 'duration', 'authorized_seconds': production['duration_seconds'],
+        'duration_base_amount': estimate['estimated_usd'],
+        'authorization': 'configured_limit', 'max_points': production['budget_credits'],
+    }
+    commercial_points(authorized)
+    return authorized
+
+
+def measured_duration(response):
+    """Accept only a numeric duration from the matched provider response."""
+    value = response.get('duration')
+    if type(value) not in (int, float):
+        return None
+    try:
+        duration = positive(value, 'SERVICE_DURATION_UNCONFIRMED')
+    except EngineError:
+        return None
+    return str(duration)
+
+
+def commercial_charge(quote, cost):
+    points = commercial_points(quote)
+    ceiling = positive(quote['amount'], 'SERVICE_PRICE_UNCONFIRMED')
+    model = quote.get('pricing_model')
+    if model == 'fixed':
+        return points, str(ceiling)
+    if model != 'duration':
+        raise EngineError('SERVICE_PRICING_MODEL_UNCONFIRMED', 409)
+    if type(quote.get('authorized_seconds')) is not int or quote['authorized_seconds'] <= 0:
+        raise EngineError('SERVICE_PRICE_UNCONFIRMED', 409)
+    if cost.get('duration_source') != 'HEYGEN_VIDEO_RESPONSE':
+        raise EngineError('SERVICE_DURATION_UNCONFIRMED', 409)
+    duration = positive(cost.get('delivered_seconds'), 'SERVICE_DURATION_UNCONFIRMED')
+    authorized_duration = Decimal(quote['authorized_seconds'])
+    base = positive(quote.get('duration_base_amount', ceiling), 'SERVICE_PRICE_UNCONFIRMED')
+    if base > ceiling:
+        raise EngineError('SERVICE_PRICE_UNCONFIRMED', 409)
+    amount = base * min(duration, authorized_duration) / authorized_duration
+    return credits(amount, {'AGENTS_VIDEO_USD_PER_CREDIT': quote['usd_per_credit']}), str(amount)
+
+
+def reserve(conn, job, task, usd, config, production, quote_reference, now, commercial=None):
     """Caller supplies a verified provider quote, never a browser estimate."""
     if not production['automatic_production']:
         raise EngineError('VIDEO_PRODUCTION_APPROVAL_REQUIRED',409)
     validate_storage(conn)
-    units = credits(usd, config)
+    units = commercial_points(commercial) if commercial is not None else credits(usd, config)
     if type(production['budget_credits']) is not int or units > production['budget_credits']:
         raise EngineError('VIDEO_BUDGET_INSUFFICIENT',409)
     if not isinstance(quote_reference,str) or not quote_reference.strip():
@@ -51,7 +119,7 @@ def reserve(conn, job, task, usd, config, production, quote_reference, now):
     operation = str(uuid5(NAMESPACE_URL,'agents-video:'+task['id']))
     own = [r for r in held if context(r).get('video_operation')==operation]
     digest = hashlib.sha256(json.dumps({'usd':str(usd),'rate':str(config.get('AGENTS_VIDEO_USD_PER_CREDIT')),
-        'quote':quote_reference,'input':task['input_snapshot']},sort_keys=True).encode()).hexdigest()
+        'quote':quote_reference,'input':task['input_snapshot'], **({'commercial': commercial} if commercial else {})},sort_keys=True).encode()).hexdigest()
     previous = conn.execute(select(operaciones).where(operaciones.c.usuario_id==job['owner_id'],
         operaciones.c.operacion_id==str(uuid5(NAMESPACE_URL,operation+':0'))).with_for_update()).mappings().first()
     if previous:
@@ -59,45 +127,40 @@ def reserve(conn, job, task, usd, config, production, quote_reference, now):
         if len(own)!=units or any(r['estado']!='reserved' for r in own):
             raise EngineError('VIDEO_OPERATION_NOT_REPLAYABLE',409)
         return {'operation':operation,'reserved_credits':units,'usd_per_credit':str(config['AGENTS_VIDEO_USD_PER_CREDIT']),
-                'estimated_usd':str(usd),'quote_reference':quote_reference}
+                'estimated_usd':str(usd),'quote_reference':quote_reference, **({'commercial': commercial} if commercial else {})}
     if total-sum(cost(r) for r in held)<units:raise EngineError('INSUFFICIENT_POINTS',409)
     used = sum(cost(r) for r in held if context(r).get('agent_id')==job['agent_id'] and context(r).get('period')==window['key'])
     if used+units>policy['presupuesto_puntos_periodo']:raise EngineError('AGENT_BUDGET_EXHAUSTED',409)
     metadata={'video_operation':operation,'agent_id':job['agent_id'],'job_id':job['id'],
         'task_id':task['id'],'period':window['key'],'usd_per_credit':str(config['AGENTS_VIDEO_USD_PER_CREDIT']),
-        'estimated_usd':str(usd),'quote_reference':quote_reference}
+        'estimated_usd':str(usd),'quote_reference':quote_reference, **({'commercial': commercial} if commercial else {})}
     for index in range(units):
         conn.execute(insert(operaciones).values(operacion_id=str(uuid5(NAMESPACE_URL,operation+':'+str(index))),
             usuario_id=job['owner_id'],solicitud_hash=digest,origen='video',estado='reserved',
             contexto_json=json.dumps({**metadata,'unit':index}),creado_en=now,actualizado_en=now))
     return {'operation':operation,'reserved_credits':units,'usd_per_credit':metadata['usd_per_credit'],
-            'estimated_usd':str(usd),'quote_reference':quote_reference}
+            'estimated_usd':str(usd),'quote_reference':quote_reference, **({'commercial': commercial} if commercial else {})}
 
 
-def reconcile(conn, owner, reservation, actual_usd, now):
-    """Unknown costs keep their hold; settlement never invents a zero charge."""
+def reconcile(conn, owner, job_id, remote_id, actual_usd):
+    """Record attributable provider evidence independently of commercial points."""
+    from . import models as m
+
     try:
-        if isinstance(actual_usd,bool):raise InvalidOperation()
-        value=Decimal(str(actual_usd))
-        if not value.is_finite() or value<0:raise InvalidOperation()
-    except (InvalidOperation,ValueError,TypeError):raise EngineError('VIDEO_COST_NOT_VERIFIABLE',409) from None
-    actual = 0 if value==0 else credits(value,{'AGENTS_VIDEO_USD_PER_CREDIT':reservation['usd_per_credit']})
-    if actual>reservation['reserved_credits']:raise EngineError('VIDEO_COST_EXCEEDS_RESERVATION',409)
-    _, rows = locked_balance(conn,owner)
-    identifiers=[str(uuid5(NAMESPACE_URL,reservation['operation']+':'+str(i))) for i in range(reservation['reserved_credits'])]
-    own=conn.execute(select(operaciones).where(operaciones.c.usuario_id==owner,
-        operaciones.c.operacion_id.in_(identifiers)).with_for_update()).mappings().all()
-    if len(own)!=reservation['reserved_credits']:raise EngineError('VIDEO_RESERVATION_CONFLICT',409)
-    for row in own:
-        desired='consumed' if context(row)['unit']<actual else 'released'
-        if row['estado'] in ('consumed','released') and row['estado']!=desired:
-            raise EngineError('VIDEO_RESERVATION_CONFLICT',409)
-    for row in own:
-        state='consumed' if context(row)['unit']<actual else 'released'
-        conn.execute(update(operaciones).where(operaciones.c.operacion_id==row['operacion_id'],
-            operaciones.c.usuario_id==owner).values(estado=state,actualizado_en=now))
-    return {'actual_usd':str(actual_usd),'consumed_credits':actual,
-            'released_credits':reservation['reserved_credits']-actual}
+        if isinstance(actual_usd, bool):
+            raise InvalidOperation()
+        actual = Decimal(str(actual_usd))
+        if not actual.is_finite() or actual < 0 or actual >= 10**10 or actual != actual.quantize(Decimal('0.00000001')):
+            raise InvalidOperation()
+    except InvalidOperation:
+        raise EngineError('VIDEO_COST_NOT_VERIFIABLE', 409) from None
+    usage = conn.execute(update(m.usage).where(
+        m.usage.c.owner_id == owner, m.usage.c.job_id == job_id,
+        m.usage.c.provider_id == 'heygen.rest', m.usage.c.provider_record_id == remote_id
+    ).values(cost=actual, currency='USD', verified=True, evidence_source='ADMIN_PROVIDER_DOCUMENT'))
+    if usage.rowcount != 1:
+        raise EngineError('VIDEO_PROVIDER_USAGE_UNCONFIRMED', 409)
+    return {'actual_usd': str(actual_usd), 'reconciliation': 'CONFIRMED'}
 
 
 def transition(conn,owner,reservation,state,now):

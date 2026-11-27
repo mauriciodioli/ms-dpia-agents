@@ -93,7 +93,7 @@ def inspect_video(engine, config, job_id, *, service=None, _internal=False):
             'eligible':state=='completed','mode':'dry-run'}
     if _internal and valid_url:
         return report,{'job':dict(job),'task':dict(task),'script_task':dict(script),
-            'script':script_value,'checkpoint':checkpoint,'provider':provider,'url':url}
+            'script':script_value,'checkpoint':checkpoint,'provider':provider,'url':url,'provider_result':value}
     return (report,None) if _internal else report
 
 
@@ -102,7 +102,7 @@ def recover_video(engine, config, job_id, *, service=None, apply=False, now=None
     from .auth import now_utc
     from .state_store import reopen_timed_out_video
     from .video_worker import encoded_result
-    from .video_costs import transition
+    from .video_costs import measured_duration, transition
     from .execution_manager import ExecutionManager
     from .task_box import TaskBox
     from .informational_delivery import eligible_result, REASON
@@ -125,8 +125,11 @@ def recover_video(engine, config, job_id, *, service=None, apply=False, now=None
     if not data:return report
     if not apply:return report
     old=data['job']; task=data['task']; reservation=data['checkpoint']['reservation']
+    duration = measured_duration(data['provider_result'])
+    duration_evidence = ({'delivered_seconds': duration,
+                          'duration_source': 'HEYGEN_VIDEO_RESPONSE'} if duration else {})
     video={'url':data['url'],'provider':'heygen','remote_id':task['provider_job_id'],'state':'COMPLETED',
-        'script':data['script'],'cost':{**reservation,'actual_usd':None,'reconciliation':'PENDING'}}
+        'script':data['script'],'cost':{**reservation,**duration_evidence,'actual_usd':None,'reconciliation':'PENDING'}}
     output=encoded_result(data['script'],video)
     with engine.begin() as conn:
         job=conn.execute(select(m.jobs).where(m.jobs.c.id==job_id,m.jobs.c.owner_id==old['owner_id']).with_for_update()).mappings().one()

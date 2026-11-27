@@ -62,7 +62,10 @@ def outbox_command(watch, interval, batch_size):
     publisher = OutboxPublisher(box, streams)
     def cycle():
         box.recover(batch_size)
-        return publisher.publish_batch(batch_size)
+        published = publisher.publish_batch(batch_size)
+        from .video_settlement import recover_isolated
+        recover_isolated(box.engine, box.now(), batch_size, current_app.logger)
+        return published
     _repeat_queue_operation(cycle, watch, interval)
 
 
@@ -177,3 +180,14 @@ def video_recover_command(job_id,dry_run,apply):
     except (EngineError,SQLAlchemyError) as error:
         raise click.ClickException(error.code if isinstance(error,EngineError) else 'engine_storage_unavailable') from None
     click.echo(json.dumps(result,sort_keys=True))
+
+
+@click.command('agent-economic-diagnose')
+@with_appcontext
+def economic_diagnose_command():
+    """List shared ledger reservations and their available evidence without writing."""
+    import json
+    from .video_settlement import diagnose
+    with engine().connect() as conn:
+        for item in diagnose(conn):
+            click.echo(json.dumps(item, sort_keys=True))

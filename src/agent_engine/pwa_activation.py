@@ -213,18 +213,17 @@ def task_sources_catalog(body):
 
 def quote_video(body):
     """Informative reference estimate; never authorizes production or reserves funds."""
-    from decimal import Decimal, ROUND_CEILING
+    from decimal import Decimal
     from datetime import datetime
     from .shared_video_provider import resolve
     from .video_cost_api import load
-    from .video_costs import positive
+    from .video_costs import positive, priced_video
     from .video_estimates import validate_tariffs
     from .auth import now_utc
 
     with engine().connect() as conn:
         provider = resolve(conn, body['owner_id'])
         policy = load(conn)
-    rate = positive(policy['usd_per_credit'], 'VIDEO_COST_RATE_NOT_CONFIGURED')
     now = now_utc()
     tariffs = [
         tariff for tariff in validate_tariffs(policy['heygen_tariffs'])
@@ -242,8 +241,7 @@ def quote_video(body):
         raise EngineError('VIDEO_COST_NOT_VERIFIABLE', 409)
     tariff = candidates[0]
     estimated = positive(tariff['usd_per_second'], 'VIDEO_COST_NOT_VERIFIABLE') * Decimal(body['duration'])
-    credits = int((estimated / rate).to_integral_value(rounding=ROUND_CEILING))
-    return {'currency': 'USD', 'estimated_usd': str(estimated), 'amount': str(credits * rate),
-            'usd_per_credit': str(rate), 'required_credits': credits,
-            'valid_until': tariff['valid_until'], 'provisional': True,
-            'policy_revision': policy['revision']}
+    quote = priced_video(estimated, policy)
+    points = quote.pop('points')
+    return {**quote, 'estimated_usd': str(estimated), 'required_credits': points,
+            'valid_until': tariff['valid_until'], 'provisional': True}

@@ -94,7 +94,7 @@ def heygen_usage(conn, principal, repo):
     if not isinstance(username,str) or not username or secret in username:username=None
     return {'balance':balance,'currency':currency,'connection':{'id':row['id'],'revision':row['revision'],'account_id':username},
             'usage_available':status==200 and isinstance(usage.get('data'),list),
-            'usage':items,'has_more':bool(usage.get('has_more')) if status==200 else False,
+            'usage':items,'usage_scope':'ACCOUNT_BY_PRODUCT','has_more':bool(usage.get('has_more')) if status==200 else False,
             'start':start.isoformat(),'end':end.isoformat()}
 
 
@@ -194,8 +194,8 @@ def reconcile_video_cost(conn,principal,repo,job_id):
         if old.get('actual_usd')!=body['actual_usd'] or old.get('confirmation_reference')!=body['reference']:
             raise EngineError('VIDEO_RESERVATION_CONFLICT',409)
         return {'cost':old}
-    settled=reconcile(conn,job['owner_id'],old,body['actual_usd'],now_utc())
-    video['cost']={**old,**settled,'reconciliation':'CONFIRMED',
+    confirmed = reconcile(conn, job['owner_id'], job['id'], body['remote_id'], body['actual_usd'])
+    video['cost']={**old,**confirmed,
         'confirmation_source':'ADMIN_PROVIDER_DOCUMENT','confirmation_reference':body['reference']}
     output['video']=video
     conn.execute(update(m.tasks).where(m.tasks.c.id==task['id'],m.tasks.c.owner_id==job['owner_id']).values(output=output))
@@ -206,3 +206,22 @@ def reconcile_video_cost(conn,principal,repo,job_id):
     audit_agent(conn,principal,agent,'VIDEO_COST_RECONCILED',{'job_id':job['id'],'result_id':result['id'],
         'remote_id':body['remote_id'],'confirmation_reference':body['reference']},now_utc())
     return {'cost':video['cost']}
+
+
+@api.post('/admin/jobs/<job_id>/video-commercial-resolution')
+@endpoint(admin_only=True, write=True)
+def resolve_video_commercial_cost(conn, principal, repo, job_id):
+    from .api import identifier
+    from .video_settlement import resolve_historical
+
+    arguments()
+    require_session_write(principal, 'manage-integrations')
+    body = json_body()
+    if (not isinstance(body, dict) or set(body) != {'operation', 'result_id', 'action', 'reference'}
+            or not all(isinstance(value, str) for value in body.values())
+            or body['action'] not in ('retry_verified', 'refresh_duration', 'hold', 'waive')
+            or not 8 <= len(body['reference'].strip()) <= 500):
+        raise EngineError('invalid_contract')
+    cost = resolve_historical(conn, principal, identifier(job_id), identifier(body['operation']),
+                              identifier(body['result_id']), body['action'], body['reference'].strip())
+    return {'cost': cost}

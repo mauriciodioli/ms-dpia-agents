@@ -160,16 +160,18 @@ class VideoHandlers:
             account=self.request(row,secret,'/v3/users/me')
             from .video_estimates import estimate
             from .video_cost_api import load
-            from .video_costs import reserve,transition
+            from .video_costs import authorize_video, reserve, transition
             with self.engine.begin() as conn:
                 current_job,current_task=context.box._owned(conn,context.lease)
                 current=self.provider(conn,job['owner_id'])
                 if current['revision']!=row['revision']:raise EngineError('VIDEO_CONFIGURATION_CHANGED',409)
                 quote=estimate(conn,row,body,production['duration_seconds'],context.box.now(),account,job_id=current_job['id'],
                     avatar_type=avatar_row.get('avatar_type'),voice_mode=voice_row.get('mode'))
-                rate=load(conn)['usd_per_credit']
+                policy=load(conn)
+                rate=policy['usd_per_credit']
+                commercial=authorize_video(production, source.get('commercial'), quote, policy)
                 reservation=reserve(conn,current_job,current_task,quote['estimated_usd'],
-                    {'AGENTS_VIDEO_USD_PER_CREDIT':rate},production,quote['reference'],context.box.now())
+                    {'AGENTS_VIDEO_USD_PER_CREDIT':rate},production,quote['reference'],context.box.now(), commercial=commercial)
                 reservation['provisional_estimate']=quote.get('provisional',False)
                 checkpoint={'video_script':script,'reservation':reservation,'estimate':quote,'provider_id':row['id'],
                             'provider_revision':row['revision'],'request':body,'state':'PREPARED'}
@@ -225,14 +227,16 @@ class VideoHandlers:
                 parsed=urlsplit(url) if isinstance(url,str) else None
                 if not parsed or parsed.scheme!='https' or not parsed.hostname or parsed.username or parsed.password:
                     raise EngineError('VIDEO_PROVIDER_INVALID_RESPONSE',502)
-                # Provider does not expose an attributable charge in this contract.
-                # Keep holds pending; never label duration*rate as a confirmed charge.
-                from .video_costs import transition
+                # Duration is provider evidence, separate from the price and the provider's charge.
+                from .video_costs import measured_duration, transition
+                delivered_seconds = measured_duration(result)
+                duration_evidence = ({'delivered_seconds': delivered_seconds,
+                                      'duration_source': 'HEYGEN_VIDEO_RESPONSE'} if delivered_seconds else {})
                 with self.engine.begin() as conn:
                     context.box._owned(conn,context.lease)
                     transition(conn,job['owner_id'],checkpoint['reservation'],'pending',context.box.now())
                 video={'url':url,'provider':'heygen','remote_id':remote,'state':'COMPLETED',
-                       'script':script,'cost':{**checkpoint['reservation'],'actual_usd':None,'reconciliation':'PENDING'}}
+                       'script':script,'cost':{**checkpoint['reservation'], **duration_evidence, 'actual_usd':None,'reconciliation':'PENDING'}}
                 return encoded_result(script,video)
             if state not in ('waiting','pending','processing'):raise EngineError('VIDEO_PROVIDER_INVALID_RESPONSE',502)
             self.sleep(2)

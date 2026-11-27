@@ -1,5 +1,6 @@
 """Owner-scoped, persisted source material for an existing video child task."""
 import json
+from uuid import NAMESPACE_URL, uuid5
 from sqlalchemy import MetaData, Table, inspect, select
 from markupsafe import Markup
 from . import models as m
@@ -48,7 +49,11 @@ def source_context(conn, job):
     video = configuration(params)
     if 'source' in params and not params.get('parent_task_id') and not video.get('parent_task_id'):
         content = publication_context(conn, job['owner_id'], params['source'])
-        return {'task_id': child['id'], 'parent_task_id': None,
+        execution = params.get('_publication_execution') or {}
+        key = execution.get('key')
+        schedule = str(uuid5(NAMESPACE_URL, f"immediate-task:{job['owner_id']}:{key}")) if key else None
+        commercial = execution.get('commercial') if schedule and schedule == job.get('schedule_id') else None
+        return {'task_id': child['id'], 'parent_task_id': None, 'commercial': commercial,
                 'configuration_revision': params.get('_configuration_revision', 1),
                 'name': content['titulo'] or child['nombre'], 'video': video,
                 'results': [], 'publication': content}
